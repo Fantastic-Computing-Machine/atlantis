@@ -13,7 +13,7 @@ RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json ./
 
 # Install all dependencies (including devDependencies for build)
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # ============================================
 # Stage 2: Build the application
@@ -45,8 +45,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Install only wget for healthcheck (minimal footprint)
-RUN apk add --no-cache wget
+# No extra packages needed for healthcheck
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \
@@ -73,7 +72,7 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+    CMD node -e "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # Start the standalone server
 CMD ["node", "server.js"]

@@ -112,31 +112,51 @@ ATLANTIS_DATA_DIR=/home/user/atlantis-data
 PORT=8080 ATLANTIS_DATA_DIR=./data docker compose up -d
 ```
 
-### Manual Docker Build
+### Run from Docker Hub (Recommended)
 
-If you prefer not to use docker-compose:
+You can pull the pre-built image directly from Docker Hub. It supports AMD64 (Standard PC/Server), ARM64 (Raspberry Pi, Apple Silicon).
 
 ```bash
-# Build the image
-docker build -t atlantis:latest .
+# Pull the latest version
+docker pull strikead/atlantis:latest
 
 # Run the container
 docker run -d \
   --name atlantis \
   -p 3000:3000 \
-  -v ./data:/app/data \
+  -v $(pwd)/data:/app/data \
   --restart unless-stopped \
-  atlantis:latest
+  strikead/atlantis:latest
 ```
 
-### Updating
+### Quick Run
 
+If you just want to try it out (no data persistence):
 ```bash
-# Pull latest changes
-git pull
+docker run -p 3000:3000 strikead/atlantis:latest
+```
 
-# Rebuild and restart
-docker compose up -d --build
+### Versioning
+
+You can valid tags from [Docker Hub](https://hub.docker.com/r/strikead/atlantis/tags):
+
+- `latest` - Stable release from master branch
+- `v1.0.0` - Specific semantic version
+- `sha-xxxx` - Specific commit
+
+### Docker Compose
+
+You can also use the included `docker-compose.yml` but point it to the remote image:
+
+```yaml
+services:
+  atlantis:
+    image: strikead/atlantis:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
 ```
 
 ## Data & Backup
