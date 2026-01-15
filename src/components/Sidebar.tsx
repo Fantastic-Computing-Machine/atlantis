@@ -11,6 +11,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,8 +29,16 @@ import {
 } from '@/components/ui/tooltip';
 import { useDiagramStore } from '@/lib/store';
 import { Diagram } from '@/lib/types';
-import { cn, formatDate } from '@/lib/utils';
-import { Download, Plus, Search, Star, Trash2, Upload } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import {
+  Download,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Star,
+  Trash2,
+  Upload
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -35,7 +50,7 @@ interface SidebarProps {
 }
 
 // Max characters for diagram title display
-const MAX_TITLE_LENGTH = 24;
+const MAX_TITLE_LENGTH = 30;
 
 function truncateTitle(title: string): string {
   if (title.length <= MAX_TITLE_LENGTH) return title;
@@ -108,9 +123,7 @@ export function Sidebar({ diagrams: initialDiagrams, currentDiagramId }: Sidebar
     }
   };
 
-  const handleFavorite = async (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleFavorite = async (id: string) => {
     const diagram = diagrams.find(d => d.id === id);
     if (!diagram) return;
 
@@ -157,21 +170,20 @@ export function Sidebar({ diagrams: initialDiagrams, currentDiagramId }: Sidebar
 
   return (
     <>
-      <div className="flex flex-col h-full border-r bg-background">
-        <div className="p-3 space-y-3">
+      <div className="flex flex-col h-full w-full bg-background/50 backdrop-blur-sm">
+        <div className="p-4 space-y-4">
           <Link href="/" className="flex items-center gap-2 px-1 hover:opacity-80 transition-opacity">
             <span className="text-xl" role="img" aria-label="atlantis logo">🔱</span>
-            <h1 className="text-lg font-semibold text-foreground">
+            <h1 className="text-lg font-semibold tracking-tight text-foreground">
               atlantis
             </h1>
           </Link>
 
-          <Button 
-            onClick={handleCreate} 
-            variant="outline"
-            className="w-full justify-start gap-2"
+          <Button
+            onClick={handleCreate}
+            className="w-full justify-start gap-2 bg-foreground text-background hover:bg-foreground/90"
           >
-            <Plus className="h-4 w-4" strokeWidth={1.5} />
+            <Plus className="h-4 w-4" strokeWidth={2} />
             New Diagram
           </Button>
 
@@ -179,21 +191,20 @@ export function Sidebar({ diagrams: initialDiagrams, currentDiagramId }: Sidebar
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
             <Input
               placeholder="Search..."
-              className="pl-8 h-9"
+              className="pl-8 h-9 bg-background"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
         </div>
 
-        <ScrollArea className="flex-1 px-3">
-          <div className="space-y-1 pb-3">
+        <ScrollArea className="flex-1 px-2">
+          <div className="space-y-0.5 pb-3">
             {isLoading ? (
               <>
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="p-2 rounded-md">
-                    <Skeleton className="h-4 w-3/4 mb-1.5" />
-                    <Skeleton className="h-3 w-1/2" />
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="px-2 py-2">
+                    <Skeleton className="h-8 w-full" />
                   </div>
                 ))}
               </>
@@ -203,74 +214,66 @@ export function Sidebar({ diagrams: initialDiagrams, currentDiagramId }: Sidebar
               </div>
             ) : (
               filteredDiagrams.map((diagram) => (
-                <Link
+                <div
                   key={diagram.id}
-                  href={`/${diagram.id}`}
                   className={cn(
-                    "flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+                    "group flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm transition-colors",
                     currentDiagramId === diagram.id
-                      ? "bg-accent text-accent-foreground"
-                      : "hover:bg-muted text-foreground"
+                      ? "bg-accent text-accent-foreground font-medium"
+                      : "hover:bg-accent/50 text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <span className="text-base shrink-0">{diagram.emoji || '📊'}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1">
-                      <span className="truncate text-sm" title={diagram.title}>
-                        {truncateTitle(diagram.title)}
-                      </span>
-                      {diagram.isFavorite && (
-                        <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400" strokeWidth={1.5} />
-                      )}
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDate(diagram.updatedAt)}
+                  <Link
+                    href={`/${diagram.id}`}
+                    className="flex-1 flex items-center gap-3 min-w-0 overflow-hidden"
+                  >
+                    <span className="text-base shrink-0 opacity-80">{diagram.emoji || '📊'}</span>
+                    <span className="truncate" title={diagram.title}>
+                      {truncateTitle(diagram.title)}
                     </span>
-                  </div>
-                  <div className="flex items-center shrink-0">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          className="p-1 rounded hover:bg-muted-foreground/10 text-muted-foreground hover:text-foreground transition-colors"
-                          onClick={(e) => handleFavorite(e, diagram.id)}
-                        >
-                          <Star 
-                            className={cn(
-                              "h-3.5 w-3.5",
-                              diagram.isFavorite && "fill-yellow-400 text-yellow-400"
-                            )} 
-                            strokeWidth={1.5} 
-                          />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="text-xs">
+                    {diagram.isFavorite && (
+                      <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400" />
+                    )}
+                  </Link>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 data-[state=open]:opacity-100",
+                          currentDiagramId === diagram.id && "opacity-100"
+                        )}
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Menu</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuItem onClick={() => handleFavorite(diagram.id)}>
+                        <Star className={cn("mr-2 h-4 w-4", diagram.isFavorite && "fill-yellow-400 text-yellow-400")} />
                         {diagram.isFavorite ? 'Unfavorite' : 'Favorite'}
-                      </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setDeleteId(diagram.id);
-                          }}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="text-xs">Delete</TooltipContent>
-                    </Tooltip>
-                  </div>
-                </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => setDeleteId(diagram.id)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               ))
             )}
           </div>
         </ScrollArea>
 
-        <div className="p-3 border-t space-y-3">
-          <div className="flex items-center justify-between text-sm">
+        <div className="p-3 border-t bg-background/50 backdrop-blur-sm space-y-3">
+          {/* Auto-save toggle */}
+          <div className="flex items-center justify-between text-sm px-1">
             <label htmlFor="auto-save" className="text-muted-foreground">
               Auto-save
             </label>
@@ -284,7 +287,7 @@ export function Sidebar({ diagrams: initialDiagrams, currentDiagramId }: Sidebar
           <div className="flex gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleBackup}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleBackup}>
                   <Download className="h-4 w-4" strokeWidth={1.5} />
                 </Button>
               </TooltipTrigger>
@@ -298,9 +301,10 @@ export function Sidebar({ diagrams: initialDiagrams, currentDiagramId }: Sidebar
                     type="file"
                     accept=".json"
                     onChange={handleRestore}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    title="Restore backup"
                   />
-                  <Button variant="ghost" size="icon" className="h-8 w-8 pointer-events-none">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground pointer-events-none">
                     <Upload className="h-4 w-4" strokeWidth={1.5} />
                   </Button>
                 </div>

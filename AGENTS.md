@@ -1,160 +1,84 @@
 # AGENTS.md - Atlantis Codebase Guide
 
-A self-hosted Mermaid.js diagramming app with split-view editor + live preview.
+This document provides essential information for AI agents working on the Atlantis codebase. Atlantis is a self-hosted Mermaid.js diagramming application.
 
-**Tech Stack:** Next.js 16 (App Router), React 19, TypeScript (strict), Zustand, Tailwind CSS v4, Shadcn UI, CodeMirror, Mermaid.js
+## 🛠️ Build & Development Commands
 
-## Build/Lint/Test Commands
+| Command | Description |
+|---------|-------------|
+| `npm install` | Install dependencies |
+| `npm run dev` | Start development server at `http://localhost:3000` |
+| `npm run build` | Create optimized production build |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint to check for code quality issues |
 
-```bash
-npm install        # Install dependencies
-npm run dev        # Dev server at http://localhost:3000
-npm run build      # Production build
-npm run start      # Start production server
-npm run lint       # Run ESLint
-```
+**Note on Testing:** currently, there is no test infrastructure (Jest/Vitest) configured. If you are asked to add tests, you must first set up the testing environment (e.g., install Vitest, configure it).
 
-**Testing:** No test infrastructure configured. When adding tests, use Vitest or Jest.
-
-## Project Structure
+## 📂 Project Structure
 
 ```
 src/
-├── app/                 # Next.js App Router
-│   ├── api/diagrams/    # CRUD endpoints (route.ts, [id]/route.ts)
-│   ├── globals.css      # Global styles
-│   ├── layout.tsx       # Root layout (server component)
-│   └── page.tsx         # Main page (server component)
+├── app/                 # Next.js 16 App Router
+│   ├── [id]/            # Dynamic route for diagram editor
+│   ├── api/             # API routes (diagrams, backup)
+│   ├── globals.css      # Global styles (Tailwind)
+│   ├── layout.tsx       # Root layout
+│   └── page.tsx         # Home page (DiagramGrid)
 ├── components/          # React components
-│   ├── ui/              # Shadcn UI components (don't modify directly)
-│   └── *.tsx            # Feature components (MainApp, Sidebar, etc.)
-└── lib/
-    ├── data.ts          # File-based persistence (getDiagrams, saveDiagrams)
-    ├── store.ts         # Zustand store (useDiagramStore)
-    ├── types.ts         # TypeScript interfaces
-    └── utils.ts         # Utility functions (cn)
-data/diagrams.json       # Runtime data storage (gitignored)
+│   ├── ui/              # Shadcn UI primitives (DO NOT MODIFY unless necessary)
+│   ├── Canvas.tsx       # Mermaid rendering component
+│   ├── Editor.tsx       # CodeMirror editor component
+│   ├── Sidebar.tsx      # App sidebar
+│   └── ...
+├── lib/                 # Core logic & utilities
+│   ├── data.ts          # File system persistence layer
+│   ├── store.ts         # Zustand state management
+│   ├── types.ts         # Shared TypeScript interfaces
+│   └── utils.ts         # Utility functions (cn, etc.)
+└── ...
 ```
 
-## Code Style Guidelines
+## 📝 Code Style & Conventions
 
-### TypeScript
-- Strict mode enabled - all code must pass strict type checking
-- Define shared interfaces in `src/lib/types.ts`
-- Use explicit return types for functions
+### TypeScript & React
 
-```typescript
-export interface Diagram {
-  id: string;
-  title: string;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-  isFavorite: boolean;
-}
+* **Strict Mode:** The project uses `strict: true`. All code must be fully typed. Avoid `any`.
+* **Functional Components:** Use React functional components with named exports.
+* **Hooks:** Use standard React hooks (`useState`, `useEffect`) and custom hooks.
+* **State Management:** Use **Zustand** (`src/lib/store.ts`) for global state.
+* **Imports:** Use absolute imports with `@/` alias (e.g., `import { Button } from '@/components/ui/button'`).
 
-export async function getDiagrams(): Promise<Diagram[]> { /* ... */ }
-```
+### Styling (Tailwind CSS)
 
-### Imports
-- Use path alias `@/*` for `src/` imports
-- Order: external packages → internal modules → relative
-- Single quotes for paths
+* Use Tailwind CSS utility classes for styling.
+* Use `cn()` utility (from `clsx` and `tailwind-merge`) for conditional class names.
+* Follow the design system established by **Shadcn UI**.
+* Support both Light and Dark modes using `next-themes`.
 
-```typescript
-import { NextResponse } from 'next/server';
-import { getDiagrams } from '@/lib/data';
-import { Diagram } from '@/lib/types';
-```
+### Icons
 
-### React Components
-- Function components only, named exports
-- Client components: add `'use client';` at top
-- Props interface inline or in types.ts
-
-```typescript
-'use client';
-
-interface MyComponentProps {
-  title: string;
-  onSave: () => void;
-}
-
-export function MyComponent({ title, onSave }: MyComponentProps) {
-  return <Button onClick={onSave}>{title}</Button>;
-}
-```
+* Use **Lucide React** for icons.
+* Import individual icons: `import { Save, Menu } from 'lucide-react'`.
 
 ### Naming Conventions
 
-| Type | Convention | Example |
-|------|------------|---------|
-| Components | PascalCase | `MainApp`, `Sidebar` |
-| Functions/Variables | camelCase | `handleEditorChange`, `currentDiagram` |
-| Interfaces | PascalCase | `DiagramStore` |
-| Component files | PascalCase | `MainApp.tsx` |
-| Utility files | camelCase | `store.ts` |
-| API route dirs | kebab-case | `api/diagrams/[id]/` |
+* **Files/Components:** `PascalCase` (e.g., `DiagramEditor.tsx`).
+* **Functions/Variables:** `camelCase` (e.g., `handleSave`, `currentDiagram`).
+* **Types/Interfaces:** `PascalCase` (e.g., `Diagram`, `DiagramStore`).
+* **API Routes:** Kebab-case folders (e.g., `api/diagrams/[id]/route.ts`).
 
-### Styling
-- Tailwind CSS utility classes
-- Use `cn()` from `@/lib/utils` for conditional classes
+## ⚠️ Critical Rules for Agents
 
-```typescript
-<div className={cn("h-full flex flex-col", isActive && "bg-accent")} />
-```
+1. **Hydration Safety:** When using client-only libraries (like `react-resizable-panels`, `mermaid`, or `codemirror`) or browser APIs (`window`, `localStorage`), ensure code runs only on the client or handle hydration mismatches (e.g., using `useEffect` to set a `mounted` state).
+2. **Shadcn UI:** Do not modify components in `src/components/ui/` unless you are fixing a bug in the component itself or customizing the design system globally. Use them as primitives.
+3. **Persistence:** The app uses file-based persistence (`data/diagrams.json`). Ensure file operations are safe and handle errors.
+4. **Error Handling:** Use `sonner` for toast notifications (`toast.success`, `toast.error`) to provide user feedback.
+5. **Verification:** After making changes, ALWAYS run `npm run build` to ensure type safety and successful compilation.
 
-### Error Handling
-- try/catch for async operations
-- Appropriate HTTP status codes in API routes
-- Toast notifications (`sonner`) for user feedback
+## 🚀 Workflow
 
-```typescript
-// API route
-if (index === -1) {
-  return NextResponse.json({ error: 'Not found' }, { status: 404 });
-}
-
-// Client-side
-try {
-  const res = await fetch(`/api/diagrams/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-  if (!res.ok) throw new Error('Failed');
-  toast.success('Saved');
-} catch { toast.error('Failed to save'); }
-```
-
-### API Routes (Next.js App Router)
-- Export named functions: `GET`, `POST`, `PUT`, `DELETE`
-- Use `NextResponse.json()` for responses
-- Dynamic params via Promise
-
-```typescript
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
-  return NextResponse.json(updatedDiagram);
-}
-```
-
-### State Management (Zustand)
-- Store in `src/lib/store.ts`, types in `src/lib/types.ts`
-- Access via `useDiagramStore()` hook
-
-```typescript
-const { diagrams, currentDiagram, updateDiagram } = useDiagramStore();
-```
-
-## Common Patterns
-
-### Adding a New Feature
-1. Define types in `src/lib/types.ts`
-2. Add state/actions to `src/lib/store.ts` if needed
-3. Create component in `src/components/`
-4. Add API route in `src/app/api/` if backend needed
-
-### Data Persistence
-- All data in `data/diagrams.json`
-- Use `getDiagrams()` and `saveDiagrams()` from `@/lib/data`
-- Data directory auto-created if missing
+1. **Analyze:** Read relevant files first using `read` or `glob`. Understand the context.
+2. **Research:** Use web search, web fetch, or MCP tools to consult official documentation for the latest APIs and best practices, especially for libraries like Next.js, Shadcn UI, and Mermaid.js.
+3. **Plan:** Formulate a plan for your changes.
+4. **Implement:** specific, minimal changes. prefer editing existing files over creating new ones if functionality fits.
+5. **Verify:** Run `npm run build` to catch TypeScript errors or build failures.

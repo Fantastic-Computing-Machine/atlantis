@@ -1,31 +1,34 @@
 'use client';
 
-import { Canvas } from '@/components/Canvas';
-import { Editor } from '@/components/Editor';
-import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { useDiagramStore } from '@/lib/store';
 import { Diagram } from '@/lib/types';
 import { copyToClipboard } from '@/lib/utils';
-import { Menu, Moon, Save, Share2, Sun } from 'lucide-react';
+import { Moon, Save, Share2, Star, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+
+const Canvas = dynamic(() => import('@/components/Canvas').then((mod) => mod.Canvas), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+      Loading Canvas...
+    </div>
+  ),
+});
+
+const Editor = dynamic(() => import('@/components/Editor').then((mod) => mod.Editor), {
+  ssr: false,
+  loading: () => <div className="h-full w-full bg-muted/30 animate-pulse" />,
+});
 
 interface DiagramEditorProps {
   initialDiagram: Diagram;
@@ -34,10 +37,10 @@ interface DiagramEditorProps {
 
 export function DiagramEditor({ initialDiagram, allDiagrams }: DiagramEditorProps) {
   const [diagram, setDiagram] = useState<Diagram>(initialDiagram);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { setTheme, theme } = useTheme();
-  const { settings, updateDiagram } = useDiagramStore();
+  const settings = useDiagramStore((state) => state.settings);
+  const updateDiagram = useDiagramStore((state) => state.updateDiagram);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef(initialDiagram.content);
   const lastSavedTitleRef = useRef(initialDiagram.title);
@@ -65,10 +68,10 @@ export function DiagramEditor({ initialDiagram, allDiagrams }: DiagramEditorProp
       const updated = await res.json();
       setDiagram((prev) => ({ ...prev, updatedAt: updated.updatedAt }));
       // Update store so sidebar reflects changes
-      updateDiagram(diagram.id, { 
-        title: diagram.title, 
+      updateDiagram(diagram.id, {
+        title: diagram.title,
         content: diagram.content,
-        updatedAt: updated.updatedAt 
+        updatedAt: updated.updatedAt
       });
       lastSavedContentRef.current = diagram.content;
       lastSavedTitleRef.current = diagram.title;
@@ -135,6 +138,21 @@ export function DiagramEditor({ initialDiagram, allDiagrams }: DiagramEditorProp
     }
   };
 
+  const handleFavorite = async () => {
+    try {
+      const nextFavorite = !diagram.isFavorite;
+      setDiagram((prev) => ({ ...prev, isFavorite: nextFavorite }));
+      updateDiagram(diagram.id, { isFavorite: nextFavorite });
+      await fetch(`/api/diagrams/${diagram.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ isFavorite: nextFavorite }),
+      });
+      toast.success(nextFavorite ? 'Added to favorites' : 'Removed from favorites');
+    } catch {
+      toast.error('Failed to update favorite');
+    }
+  };
+
   // Show loading state until client hydration is complete
   if (!mounted) {
     return (
@@ -148,97 +166,71 @@ export function DiagramEditor({ initialDiagram, allDiagrams }: DiagramEditorProp
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-background text-foreground flex">
-      {/* Mobile sidebar trigger */}
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="outline"
-            size="icon"
-            className="md:hidden fixed top-3 left-3 z-50"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-0">
-          <Sidebar diagrams={allDiagrams} currentDiagramId={diagram.id} />
-        </SheetContent>
-      </Sheet>
+    <div className="h-screen w-screen overflow-hidden bg-background text-foreground flex flex-col">
+      <div className="h-14 border-b flex items-center justify-between px-4 bg-background/50 backdrop-blur-sm z-10 shrink-0">
+        <div className="flex items-center gap-3 overflow-hidden">
+          <div className="flex items-center gap-2 min-w-0 text-lg font-medium">
+            <Link href="/" className="shrink-0 hover:opacity-80 transition-opacity">
+              🔱atlantis //
+            </Link>
+            <span className="text-xl shrink-0">{diagram.emoji || '📊'}</span>
+            <input
+              value={diagram.title}
+              onChange={handleTitleChange}
+              onBlur={handleTitleBlur}
+              maxLength={60}
+              className="bg-transparent border-none focus:outline-none focus:ring-0 px-0 w-48 sm:w-64 truncate"
+              placeholder="Untitled Diagram"
+            />
+          </div>
+        </div>
 
-      {/* Desktop sidebar */}
-      <div className="hidden md:block w-64 shrink-0 h-full">
-        <Sidebar diagrams={allDiagrams} currentDiagramId={diagram.id} />
+        <div className="flex items-center gap-2">
+
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            /{diagram.id}
+          </span>
+
+          <Button variant="ghost" size="icon" onClick={handleShare}>
+            <Share2 className="h-4 w-4" />
+          </Button>
+
+          <Button
+            variant={diagram.isFavorite ? 'default' : 'ghost'}
+            size="icon"
+            onClick={handleFavorite}
+            aria-pressed={diagram.isFavorite}
+            className={diagram.isFavorite ? 'bg-amber-500 text-amber-50 hover:bg-amber-500/90' : ''}
+          >
+            <Star className={diagram.isFavorite ? 'h-4 w-4 fill-current' : 'h-4 w-4'} />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          >
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          </Button>
+
+          <Button onClick={() => saveChanges()} size="sm" className="gap-2">
+            <Save size={16} />
+            <span className="hidden sm:inline">Save</span>
+          </Button>
+        </div>
       </div>
 
-      {/* Main content area */}
-      <div className="flex-1 h-full flex flex-col min-w-0">
-        {/* Header */}
-        <div className="h-14 border-b flex items-center justify-between px-4 bg-background/50 backdrop-blur-sm z-10 shrink-0">
-          <div className="flex items-center gap-3 overflow-hidden pl-10 md:pl-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xl shrink-0">{diagram.emoji || '📊'}</span>
-              <input
-                value={diagram.title}
-                onChange={handleTitleChange}
-                onBlur={handleTitleBlur}
-                className="bg-transparent border-none text-lg font-medium focus:outline-none focus:ring-0 px-0 w-48 sm:w-64 truncate"
-                placeholder="Untitled Diagram"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground hidden sm:inline">
-              /{diagram.id}
-            </span>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={handleShare}>
-                  <Share2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Copy link to clipboard</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                >
-                  <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                  <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Toggle theme</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button onClick={() => saveChanges()} size="sm" className="gap-2">
-                  <Save size={16} />
-                  <span className="hidden sm:inline">Save</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Save changes (Ctrl+S)</TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-
-        {/* Editor and Canvas */}
-        <div className="flex-1 min-h-0">
-          <ResizablePanelGroup>
-            <ResizablePanel defaultSize={40} minSize={20}>
-              <Editor value={diagram.content} onChange={handleEditorChange} />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={60} minSize={20}>
-              <Canvas code={diagram.content} diagramId={diagram.id} />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </div>
+      <div className="flex-1 min-h-0">
+        <ResizablePanelGroup direction="horizontal">
+          <ResizablePanel defaultSize={45} minSize={25}>
+            <Editor value={diagram.content} onChange={handleEditorChange} />
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={55} minSize={25}>
+            <Canvas code={diagram.content} diagramId={diagram.id} />
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
     </div>
   );
