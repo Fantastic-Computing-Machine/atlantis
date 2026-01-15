@@ -1,36 +1,155 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# atlantis 🔱
+
+A premium, self-hosted Mermaid.js diagramming application built with Next.js, Tailwind CSS, and Shadcn UI.
+
+![Atlantis Preview](/public/preview.png)
+
+## Features
+
+- 🎨 **Modern Editor**: Split-pane interface with code editor and live preview.
+- 🧜‍♂️ **Full Mermaid Support**: Supports all diagram types supported by Mermaid.js.
+- 💾 **Local Persistence**: Diagrams are saved to a local JSON file (`data/diagrams.json`), making it easy to backup and self-host.
+- 🌗 **Dark/Light Mode**: Beautiful UI that adapts to your system preference.
+- ⭐ **Favorites**: Organize your diagrams by marking important ones.
+- 📂 **Backup & Restore**: Export your data to JSON and restore it whenever needed.
+- 🔎 **Search**: fast searching through your saved diagrams.
+
+## Tech Stack
+
+- **Framework**: [Next.js 14+](https://nextjs.org/) (App Router)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Components**: [Shadcn UI](https://ui.shadcn.com/)
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **Editor**: [CodeMirror](https://uiwjs.github.io/react-codemirror/)
+- **Rendering**: [Mermaid.js](https://mermaid.js.org/)
+- **State**: [Zustand](https://github.com/pmndrs/zustand)
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+ installed on your machine.
+
+### Installation
+
+1. Clone the repository:
+
+    ```bash
+    git clone https://github.com/yourusername/atlantis.git
+    cd atlantis
+    ```
+
+2. Install dependencies:
+
+    ```bash
+    npm install
+    # or
+    yarn install
+    # or
+    pnpm install
+    ```
+
+3. Run the development server:
+
+    ```bash
+    npm run dev
+    ```
+
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Docker Deployment
+
+The easiest way to self-host atlantis is with Docker.
+
+### Quick Start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Clone and run with docker-compose
+git clone https://github.com/yourusername/atlantis.git
+cd atlantis
+docker compose up -d
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Configuration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+#### Custom Port
 
-## Learn More
+Change the port by setting the `PORT` environment variable:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+PORT=8080 docker compose up -d
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Or create a `.env` file:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```env
+PORT=8080
+```
 
-## Deploy on Vercel
+#### Custom Data Directory
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+By default, diagrams are stored in a Docker named volume. To persist data to a specific directory on your host:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+# Use an absolute path
+ATLANTIS_DATA_DIR=/path/to/your/data docker compose up -d
+
+# Or use a relative path
+ATLANTIS_DATA_DIR=./my-diagrams docker compose up -d
+```
+
+Or add to your `.env` file:
+
+```env
+ATLANTIS_DATA_DIR=/home/user/atlantis-data
+```
+
+#### Example: Custom Port + Data Directory
+
+```bash
+PORT=8080 ATLANTIS_DATA_DIR=./data docker compose up -d
+```
+
+### Manual Docker Build
+
+If you prefer not to use docker-compose:
+
+```bash
+# Build the image
+docker build -t atlantis:latest .
+
+# Run the container
+docker run -d \
+  --name atlantis \
+  -p 3000:3000 \
+  -v ./data:/app/data \
+  --restart unless-stopped \
+  atlantis:latest
+```
+
+### Updating
+
+```bash
+# Pull latest changes
+git pull
+
+# Rebuild and restart
+docker compose up -d --build
+```
+
+## Data & Backup
+
+Data is stored in `data/diagrams.json` (or your configured `ATLANTIS_DATA_DIR`).
+
+- **Backup**: Click "Backup JSON" in the sidebar to download your diagrams.
+- **Restore**: Click "Restore JSON" and select a valid backup file.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
+## License
+
+MIT - see [LICENSE](LICENSE) for details.

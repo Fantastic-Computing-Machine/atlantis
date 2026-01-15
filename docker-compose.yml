@@ -1,0 +1,28 @@
+services:
+  atlantis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: atlantis:latest
+    container_name: atlantis
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      # Persist diagram data - map to your preferred location
+      # Default: uses Docker named volume
+      # Custom: set ATLANTIS_DATA_DIR environment variable or edit this file
+      # Example: ./my-data:/app/data
+      - ${ATLANTIS_DATA_DIR:-atlantis_data}:/app/data
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  atlantis_data:
+    driver: local

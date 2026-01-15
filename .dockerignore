@@ -1,0 +1,53 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build outputs
+.next
+out
+build
+dist
+
+# Testing
+coverage
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE and editor files
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+*.md
+!README.md
+
+# Logs
+*.log
+npm-debug.log*
+
+# Data directory (will be mounted as volume)
+data
+
+# Misc
+.turbo
+.vercel
+.eslintcache
