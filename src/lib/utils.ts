@@ -87,3 +87,10 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Sanitize a string for use as a filename
+ */
+export function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+}

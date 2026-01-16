@@ -15,24 +15,24 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
 import { useDiagramStore } from '@/lib/store';
 import { Diagram } from '@/lib/types';
-import { cn, copyToClipboard, formatDate } from '@/lib/utils';
-import { Download, Moon, Plus, Share2, Star, Sun, Trash2, Upload, BookOpen, Settings2, Search } from 'lucide-react';
+import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
+import { Download, Moon, Plus, Share2, Star, Sun, Trash2, Upload, BookOpen, Settings2, Search, MoreHorizontal, Github } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import mermaid from 'mermaid';
+import { jsPDF } from 'jspdf';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,12 +64,15 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
     setIsLoading(false);
   }, [initialDiagrams]);
 
-  const sortedDiagrams = [...diagrams].sort((a, b) => {
-    if (a.isFavorite === b.isFavorite) {
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    }
-    return a.isFavorite ? -1 : 1;
-  });
+  const starredDiagrams = diagrams
+    .filter((d) => d.isFavorite)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+  const otherDiagrams = diagrams
+    .filter((d) => !d.isFavorite)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+  const hasStarred = starredDiagrams.length > 0;
 
   const handleCreate = async () => {
     try {
@@ -127,6 +130,89 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
     }
   };
 
+  const handleDownload = async (diagram: Diagram, format: 'svg' | 'png' | 'pdf') => {
+    try {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: theme === 'dark' ? 'dark' : 'default',
+        securityLevel: 'loose',
+      });
+
+      const id = `mermaid-${diagram.id}`;
+      const { svg } = await mermaid.render(id, diagram.content);
+      const filename = sanitizeFilename(diagram.title || 'untitled_diagram');
+
+      if (format === 'svg') {
+        const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.svg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success('SVG downloaded');
+      } else {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas context not supported');
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svg, 'image/svg+xml');
+        const svgEl = doc.documentElement;
+        
+        const viewBox = svgEl.getAttribute('viewBox')?.split(' ').map(Number);
+        const svgWidth = viewBox ? viewBox[2] : parseFloat(svgEl.getAttribute('width') || '800');
+        const svgHeight = viewBox ? viewBox[3] : parseFloat(svgEl.getAttribute('height') || '600');
+        
+        const scale = 2;
+        canvas.width = svgWidth * scale;
+        canvas.height = svgHeight * scale;
+
+        const img = new Image();
+        const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = url;
+        });
+
+        ctx.scale(scale, scale);
+        ctx.drawImage(img, 0, 0, svgWidth, svgHeight);
+        URL.revokeObjectURL(url);
+
+        if (format === 'png') {
+          const a = document.createElement('a');
+          a.href = canvas.toDataURL('image/png');
+          a.download = `${filename}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          toast.success('PNG downloaded');
+        } else if (format === 'pdf') {
+          const isLandscape = svgWidth > svgHeight;
+          const pdf = new jsPDF({
+            orientation: isLandscape ? 'landscape' : 'portrait',
+            unit: 'px',
+            format: [svgWidth + 40, svgHeight + 40]
+          });
+          pdf.setFillColor(255, 255, 255);
+          pdf.rect(0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight(), 'F');
+          const imgData = canvas.toDataURL('image/png');
+          pdf.addImage(imgData, 'PNG', 20, 20, svgWidth, svgHeight);
+          pdf.save(`${filename}.pdf`);
+          toast.success('PDF downloaded');
+        }
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+      toast.error('Failed to download diagram');
+    }
+  };
+
   const handleBackup = () => {
     window.location.href = '/api/backup';
   };
@@ -165,11 +251,133 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
 
   const diagramToDelete = deleteId ? diagrams.find((d) => d.id === deleteId) : null;
 
+  const renderDiagramGrid = (list: Diagram[]) => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {list.map((diagram) => (
+        <Link key={diagram.id} href={`/${diagram.id}`} className="group">
+          <Card
+            className={cn(
+              'overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-primary/50 h-full',
+              'cursor-pointer'
+            )}
+          >
+            <CardHeader className="pb-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="text-2xl shrink-0">{diagram.emoji || '📊'}</span>
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-base truncate">{diagram.title}</CardTitle>
+                    <CardDescription className="text-xs">
+                      {formatDate(diagram.updatedAt)}
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                    <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Open menu</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => handleShare(e, diagram.id)}
+                      >
+                        <Share2 className="mr-2 h-4 w-4" />
+                        <span>Copy link</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => handleFavorite(e, diagram.id)}
+                      >
+                        <Star
+                          className={cn(
+                            'mr-2 h-4 w-4',
+                            diagram.isFavorite ? 'fill-yellow-400 text-yellow-400' : ''
+                          )}
+                        />
+                        <span>{diagram.isFavorite ? 'Unstar' : 'Star'}</span>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                          <Download className="mr-2 h-4 w-4" />
+                          <span>Download</span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDownload(diagram, 'svg');
+                            }}
+                          >
+                            SVG
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDownload(diagram, 'png');
+                            }}
+                          >
+                            PNG
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDownload(diagram, 'pdf');
+                            }}
+                          >
+                            PDF
+                          </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDeleteId(diagram.id);
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        <span>Delete</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-muted/50 rounded-md p-3 h-24 overflow-hidden">
+                <pre className="text-xs text-muted-foreground font-mono whitespace-pre-wrap line-clamp-4">
+                  {diagram.content}
+                </pre>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      ))}
+    </div>
+  );
+
   return (
     <>
-      <div className="min-h-screen bg-background text-foreground">
+      <div className="min-h-screen bg-background text-foreground flex flex-col">
         {/* Header */}
-        <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
+        <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm shrink-0">
           <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <span className="text-2xl" role="img" aria-label="atlantis logo">
@@ -192,6 +400,22 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
             </div>
 
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                asChild
+                className="hidden sm:flex"
+              >
+                <a
+                  href="https://github.com/Fantastic-Computing-Machine/atlantis"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="GitHub Repository"
+                >
+                  <Github className="h-4 w-4" />
+                </a>
+              </Button>
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -290,7 +514,7 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
         </header>
 
         {/* Main Content */}
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 py-8 flex-1">
           {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
@@ -305,7 +529,7 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
                 </Card>
               ))}
             </div>
-          ) : sortedDiagrams.length === 0 ? (
+          ) : diagrams.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <Card className="max-w-md text-center border-dashed">
                 <CardHeader className="pb-4 space-y-3">
@@ -328,100 +552,33 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
               </Card>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {sortedDiagrams.map((diagram) => (
-                <Link key={diagram.id} href={`/${diagram.id}`} className="group">
-                  <Card
-                    className={cn(
-                      'overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-primary/50 h-full',
-                      'cursor-pointer'
-                    )}
-                  >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="text-2xl shrink-0">{diagram.emoji || '📊'}</span>
-                          <div className="min-w-0 flex-1">
-                            <CardTitle className="text-base truncate">{diagram.title}</CardTitle>
-                            <CardDescription className="text-xs">
-                              {formatDate(diagram.updatedAt)}
-                            </CardDescription>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={(e) => handleShare(e, diagram.id)}
-                              >
-                                <Share2 className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Copy link</TooltipContent>
-                          </Tooltip>
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={(e) => handleFavorite(e, diagram.id)}
-                              >
-                                <Star
-                                  className={cn(
-                                    'h-4 w-4',
-                                    diagram.isFavorite
-                                      ? 'fill-yellow-400 text-yellow-400'
-                                      : 'text-muted-foreground'
-                                  )}
-                                />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {diagram.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                            </TooltipContent>
-                          </Tooltip>
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setDeleteId(diagram.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Delete diagram</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="bg-muted/50 rounded-md p-3 h-24 overflow-hidden">
-                        <pre className="text-xs text-muted-foreground font-mono whitespace-pre-wrap line-clamp-4">
-                          {diagram.content}
-                        </pre>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
+            <div className="space-y-8">
+              {hasStarred && (
+                <section>
+                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    Starred
+                  </h2>
+                  {renderDiagramGrid(starredDiagrams)}
+                </section>
+              )}
+              
+              {(otherDiagrams.length > 0 || !hasStarred) && (
+                <section>
+                  {hasStarred && (
+                    <h2 className="text-lg font-semibold mb-4 text-muted-foreground">
+                      Other diagrams
+                    </h2>
+                  )}
+                  {renderDiagramGrid(otherDiagrams)}
+                </section>
+              )}
             </div>
           )}
         </main>
 
         {/* Footer */}
-        <footer className="border-t py-6 mt-8">
+        <footer className="border-t py-6 mt-auto shrink-0">
           <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
             Powered by{' '}
             <a
