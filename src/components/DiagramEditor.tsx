@@ -238,7 +238,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={55} minSize={25}>
-              <Canvas code={diagram.content} diagramId={diagram.id} />
+              <Canvas code={diagram.content} diagramId={diagram.id} title={diagram.title} />
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>

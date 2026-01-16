@@ -18,6 +18,7 @@ import {
 import { cn, copyToClipboard } from '@/lib/utils';
 import {
   AlertCircle,
+  Download,
   Focus,
   Grid3x3,
   Maximize,
@@ -29,6 +30,7 @@ import {
   ZoomOut
 } from 'lucide-react';
 import mermaid from 'mermaid';
+import { jsPDF } from 'jspdf';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -41,6 +43,7 @@ import { toast } from 'sonner';
 interface CanvasProps {
   code: string;
   diagramId?: string;
+  title?: string;
 }
 
 type BgPattern = 'none' | 'dots' | 'grid';
@@ -48,7 +51,7 @@ type BgPattern = 'none' | 'dots' | 'grid';
 // Smooth animation duration in ms
 const ANIMATION_DURATION = 200;
 
-export function Canvas({ code, diagramId }: CanvasProps) {
+export function Canvas({ code, diagramId, title }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const transformRef = useRef<ReactZoomPanPinchRef>(null);
@@ -147,6 +150,136 @@ export function Canvas({ code, diagramId }: CanvasProps) {
       transformRef.current.centerView(1, ANIMATION_DURATION);
     }
   }, []);
+
+  const sanitizeFilename = (ext: string) => {
+    const name = title || diagramId || 'diagram';
+    const safeName = name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    return `${safeName}.${ext}`;
+  };
+
+  const handleExportSvg = () => {
+    if (!svg) return;
+    try {
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = sanitizeFilename('svg');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('SVG downloaded');
+    } catch (err) {
+      console.error('Export SVG error:', err);
+      toast.error('Failed to export SVG');
+    }
+  };
+
+  const handleExportPng = async () => {
+    if (!containerRef.current) return;
+    const svgEl = containerRef.current.querySelector('svg');
+    if (!svgEl) return;
+
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context not supported');
+
+      // Get intrinsic dimensions from viewBox
+      const viewBox = svgEl.getAttribute('viewBox')?.split(' ').map(Number);
+      const svgWidth = viewBox ? viewBox[2] : svgEl.clientWidth;
+      const svgHeight = viewBox ? viewBox[3] : svgEl.clientHeight;
+      
+      // Use high DPI for better quality
+      const scale = 2;
+      canvas.width = svgWidth * scale;
+      canvas.height = svgHeight * scale;
+
+      const img = new Image();
+      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0, svgWidth, svgHeight);
+      
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = sanitizeFilename('png');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('PNG downloaded');
+    } catch (err) {
+      console.error('Export PNG error:', err);
+      toast.error('Failed to export PNG');
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!containerRef.current) return;
+    const svgEl = containerRef.current.querySelector('svg');
+    if (!svgEl) return;
+
+    try {
+      // 1. Render to Canvas first (reusing PNG logic parts)
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context not supported');
+
+      const viewBox = svgEl.getAttribute('viewBox')?.split(' ').map(Number);
+      const svgWidth = viewBox ? viewBox[2] : svgEl.clientWidth;
+      const svgHeight = viewBox ? viewBox[3] : svgEl.clientHeight;
+      
+      // Scale for PDF quality
+      const scale = 2; 
+      canvas.width = svgWidth * scale;
+      canvas.height = svgHeight * scale;
+
+      const img = new Image();
+      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0, svgWidth, svgHeight);
+      const imgData = canvas.toDataURL('image/png');
+      URL.revokeObjectURL(url);
+
+      // 2. Create PDF
+      const isLandscape = svgWidth > svgHeight;
+      const pdf = new jsPDF({
+        orientation: isLandscape ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [svgWidth + 40, svgHeight + 40] // Add margin
+      });
+
+      // Add white background
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight(), 'F');
+
+      // Add image centered
+      pdf.addImage(imgData, 'PNG', 20, 20, svgWidth, svgHeight);
+      pdf.save(sanitizeFilename('pdf'));
+      toast.success('PDF downloaded');
+
+    } catch (err) {
+      console.error('Export PDF error:', err);
+      toast.error('Failed to export PDF');
+    }
+  };
 
   const getPatternClass = () => {
     switch (bgPattern) {
@@ -297,6 +430,30 @@ export function Canvas({ code, diagramId }: CanvasProps) {
                     <TooltipContent side="left">Copy link</TooltipContent>
                   </Tooltip>
                 )}
+
+                <DropdownMenu>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" disabled={!svg}>
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">Export diagram</TooltipContent>
+                  </Tooltip>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleExportSvg}>
+                      Download SVG
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportPng}>
+                      Download PNG
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportPdf}>
+                      Download PDF
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 <DropdownMenu>
                   <Tooltip>
