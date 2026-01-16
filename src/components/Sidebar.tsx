@@ -21,7 +21,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import {
   Tooltip,
   TooltipContent,
@@ -64,8 +63,6 @@ export function Sidebar({ diagrams: initialDiagrams, currentDiagramId }: Sidebar
     toggleFavorite,
     removeDiagram,
     addDiagram,
-    settings,
-    setAutoSave,
   } = useDiagramStore();
   const [search, setSearch] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -272,18 +269,6 @@ export function Sidebar({ diagrams: initialDiagrams, currentDiagramId }: Sidebar
         </ScrollArea>
 
         <div className="p-3 border-t bg-background/50 backdrop-blur-sm space-y-3">
-          {/* Auto-save toggle */}
-          <div className="flex items-center justify-between text-sm px-1">
-            <label htmlFor="auto-save" className="text-muted-foreground">
-              Auto-save
-            </label>
-            <Switch
-              id="auto-save"
-              checked={settings.autoSave}
-              onCheckedChange={setAutoSave}
-            />
-          </div>
-
           <div className="flex gap-2">
             <Tooltip>
               <TooltipTrigger asChild>

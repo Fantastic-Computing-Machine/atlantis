@@ -8,20 +8,30 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useDiagramStore } from '@/lib/store';
 import { Diagram } from '@/lib/types';
 import { cn, copyToClipboard, formatDate } from '@/lib/utils';
-import { Download, Moon, Plus, Search, Share2, Star, Sun, Trash2, Upload, BookOpen } from 'lucide-react';
+import { Download, Moon, Plus, Search, Share2, Star, Sun, Trash2, Upload, BookOpen, Settings2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -45,15 +55,23 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const { setTheme, theme } = useTheme();
+  const { settings, setAutoSave } = useDiagramStore();
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setDiagrams(initialDiagrams);
     setIsLoading(false);
   }, [initialDiagrams]);
 
+  const normalizedSearch = search.trim().toLowerCase();
+
   const filteredDiagrams = diagrams
-    .filter((d) => d.title.toLowerCase().includes(search.toLowerCase()))
+    .filter((diagram) => {
+      if (!normalizedSearch) return true;
+      const haystack = `${diagram.title} ${diagram.content}`.toLowerCase();
+      return haystack.includes(normalizedSearch);
+    })
     .sort((a, b) => {
       if (a.isFavorite === b.isFavorite) {
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
@@ -149,6 +167,10 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
     e.target.value = '';
   };
 
+  const openRestorePicker = () => {
+    fileInputRef.current?.click();
+  };
+
   const diagramToDelete = deleteId ? diagrams.find((d) => d.id === deleteId) : null;
 
   return (
@@ -177,63 +199,99 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
             </div>
 
             <div className="flex items-center gap-2">
-              {enableApiAccess && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" asChild>
-                      <Link href="/docs">
-                        <BookOpen className="h-5 w-5" />
-                      </Link>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>API Documentation</TooltipContent>
-                </Tooltip>
-              )}
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  >
-                    <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                    <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Toggle theme</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={handleBackup}>
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Backup diagrams</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleRestore}
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                    />
-                    <Button variant="outline" size="icon" className="pointer-events-none">
-                      <Upload className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>Restore from backup</TooltipContent>
-              </Tooltip>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleRestore}
+                className="hidden"
+              />
 
               <Button onClick={handleCreate} className="gap-2">
                 <Plus size={18} />
                 <span className="hidden sm:inline">New Diagram</span>
               </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Settings2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Settings</span>
+                    <span className="text-xs text-muted-foreground hidden lg:inline">
+                      Auto-save {settings.autoSave ? 'On' : 'Off'}
+                    </span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel>Quick settings</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setTheme(theme === 'dark' ? 'light' : 'dark');
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      {theme === 'dark' ? (
+                        <Sun className="h-4 w-4" />
+                      ) : (
+                        <Moon className="h-4 w-4" />
+                      )}
+                      <span>{theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}</span>
+                    </div>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    className="flex items-center justify-between gap-4"
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    <div className="flex flex-col">
+                      <span>Auto-save</span>
+                      <span className="text-xs text-muted-foreground">Platform-wide 2s debounce</span>
+                    </div>
+                    <Switch checked={settings.autoSave} onCheckedChange={setAutoSave} />
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      handleBackup();
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Download className="h-4 w-4" />
+                      <span>Backup diagrams</span>
+                    </div>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      openRestorePicker();
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Upload className="h-4 w-4" />
+                      <span>Restore from backup</span>
+                    </div>
+                  </DropdownMenuItem>
+
+                  {enableApiAccess && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/docs" className="flex items-center gap-2">
+                          <BookOpen className="h-4 w-4" />
+                          <span>API Documentation</span>
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </header>
@@ -257,29 +315,48 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
           ) : filteredDiagrams.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <Card className="max-w-md text-center border-dashed">
-                <CardHeader className="pb-4">
-                  <div className="flex justify-center mb-2">
+                <CardHeader className="pb-4 space-y-3">
+                  <div className="flex justify-center">
                     <span className="text-5xl" role="img" aria-label="atlantis logo">
                       🔱
                     </span>
                   </div>
                   <CardTitle className="text-2xl">
-                    {search ? 'No diagrams found' : 'Welcome to atlantis'}
+                    {normalizedSearch
+                      ? 'No diagrams match your search'
+                      : 'No diagrams yet'}
                   </CardTitle>
-                  <CardDescription>
-                    {search
-                      ? 'Try a different search term'
-                      : 'Create your first Mermaid diagram to get started.'}
+                  <CardDescription className="space-y-1">
+                    {normalizedSearch ? (
+                      <>
+                        <span>Try a different term or clear the search.</span>
+                        <span className="block text-muted-foreground/80">
+                          Searching titles and Mermaid content.
+                        </span>
+                      </>
+                    ) : (
+                      'Create your first Mermaid diagram to get started.'
+                    )}
                   </CardDescription>
                 </CardHeader>
-                {!search && (
-                  <CardContent>
+                <CardContent className="flex flex-col gap-2">
+                  {normalizedSearch ? (
+                    <>
+                      <Button variant="outline" onClick={() => setSearch('')}>
+                        Clear search
+                      </Button>
+                      <Button onClick={handleCreate} className="gap-2">
+                        <Plus size={18} />
+                        New Diagram
+                      </Button>
+                    </>
+                  ) : (
                     <Button onClick={handleCreate} className="gap-2">
                       <Plus size={18} />
                       Create Your First Diagram
                     </Button>
-                  </CardContent>
-                )}
+                  )}
+                </CardContent>
               </Card>
             </div>
           ) : (
