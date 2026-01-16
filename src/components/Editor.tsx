@@ -14,8 +14,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import { EditorView } from '@codemirror/view';
+import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import CodeMirror from '@uiw/react-codemirror';
 import { Copy, Settings2, WrapText } from 'lucide-react';
 import { useTheme } from 'next-themes';

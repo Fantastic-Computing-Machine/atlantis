@@ -1,0 +1,198 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Atlantis API",
+    "version": "1.0.0",
+    "description": "API documentation for the Atlantis diagramming application."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/api/access": {
+      "get": {
+        "summary": "List all diagrams",
+        "description": "Retrieve a paginated list of all stored diagrams. Requires `ENABLE_API_ACCESS=true`.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number to retrieve"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Number of items per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of diagrams",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagramList"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API Access Disabled"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new diagram",
+        "description": "Create a new diagram with Mermaid content. Validates syntax before saving. Requires `ENABLE_API_ACCESS=true`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDiagramRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Diagram created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Diagram"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or Mermaid syntax error"
+          },
+          "403": {
+            "description": "API Access Disabled"
+          }
+        }
+      }
+    },
+    "/api/access/{id}": {
+      "get": {
+        "summary": "Get a single diagram",
+        "description": "Retrieve the full details of a specific diagram by ID. Requires `ENABLE_API_ACCESS=true`.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique ID of the diagram"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The diagram details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Diagram"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Diagram not found"
+          },
+          "403": {
+            "description": "API Access Disabled"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Diagram": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "abc123"
+          },
+          "title": {
+            "type": "string",
+            "example": "System Architecture"
+          },
+          "content": {
+            "type": "string",
+            "example": "graph TD; A-->B;"
+          },
+          "emoji": {
+            "type": "string",
+            "example": "📊"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isFavorite": {
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
+      "CreateDiagramRequest": {
+        "type": "object",
+        "required": ["content"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "New Diagram"
+          },
+          "content": {
+            "type": "string",
+            "example": "graph TD; A-->B;"
+          }
+        }
+      },
+      "DiagramList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "title": { "type": "string" }
+              }
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": { "type": "integer" },
+              "limit": { "type": "integer" },
+              "total": { "type": "integer" },
+              "totalPages": { "type": "integer" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

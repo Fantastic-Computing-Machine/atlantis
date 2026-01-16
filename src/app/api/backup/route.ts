@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
     await saveDiagrams(body);
     return NextResponse.json({ success: true, count: body.length });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed to restore backup' }, { status: 400 });
   }
 }

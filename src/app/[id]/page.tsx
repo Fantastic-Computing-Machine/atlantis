@@ -17,5 +17,5 @@ export default async function DiagramPage({ params }: PageProps) {
     notFound();
   }
 
-  return <DiagramEditor initialDiagram={diagram} allDiagrams={diagrams} />;
+  return <DiagramEditor initialDiagram={diagram} />;
 }

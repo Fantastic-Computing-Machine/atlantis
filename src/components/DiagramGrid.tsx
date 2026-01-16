@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/tooltip';
 import { Diagram } from '@/lib/types';
 import { cn, copyToClipboard, formatDate } from '@/lib/utils';
-import { Download, Moon, Plus, Search, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
+import { Download, Moon, Plus, Search, Share2, Star, Sun, Trash2, Upload, BookOpen } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -36,9 +36,10 @@ import {
 
 interface DiagramGridProps {
   initialDiagrams: Diagram[];
+  enableApiAccess?: boolean;
 }
 
-export function DiagramGrid({ initialDiagrams }: DiagramGridProps) {
+export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridProps) {
   const [diagrams, setDiagrams] = useState<Diagram[]>(initialDiagrams);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -176,6 +177,19 @@ export function DiagramGrid({ initialDiagrams }: DiagramGridProps) {
             </div>
 
             <div className="flex items-center gap-2">
+              {enableApiAccess && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" asChild>
+                      <Link href="/docs">
+                        <BookOpen className="h-5 w-5" />
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>API Documentation</TooltipContent>
+                </Tooltip>
+              )}
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

@@ -10,7 +10,7 @@ export async function getDiagrams(): Promise<Diagram[]> {
     await fs.access(DATA_FILE);
     const data = await fs.readFile(DATA_FILE, 'utf-8');
     return JSON.parse(data);
-  } catch (error) {
+  } catch {
     // If file doesn't exist, return empty array and create it
     await fs.mkdir(DATA_DIR, { recursive: true });
     await fs.writeFile(DATA_FILE, '[]', 'utf-8');

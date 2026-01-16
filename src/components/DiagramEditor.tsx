@@ -32,10 +32,9 @@ const Editor = dynamic(() => import('@/components/Editor').then((mod) => mod.Edi
 
 interface DiagramEditorProps {
   initialDiagram: Diagram;
-  allDiagrams: Diagram[];
 }
 
-export function DiagramEditor({ initialDiagram, allDiagrams }: DiagramEditorProps) {
+export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const [diagram, setDiagram] = useState<Diagram>(initialDiagram);
   const [mounted, setMounted] = useState(false);
   const { setTheme, theme } = useTheme();

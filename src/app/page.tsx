@@ -1,9 +1,10 @@
 import { DiagramGrid } from '@/components/DiagramGrid';
 import { getDiagrams } from '@/lib/data';
 
-export const revalidate = 30;
+export const dynamic = 'force-dynamic';
 
 export default async function Page() {
   const diagrams = await getDiagrams();
-  return <DiagramGrid initialDiagrams={diagrams} />;
+  const enableApiAccess = process.env.ENABLE_API_ACCESS === 'true';
+  return <DiagramGrid initialDiagrams={diagrams} enableApiAccess={enableApiAccess} />;
 }
