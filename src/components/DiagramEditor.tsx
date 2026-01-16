@@ -66,7 +66,6 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
       if (!res.ok) throw new Error('Failed to save');
       const updated = await res.json();
       setDiagram((prev) => ({ ...prev, updatedAt: updated.updatedAt }));
-      // Update store so sidebar reflects changes
       updateDiagram(diagram.id, {
         title: diagram.title,
         content: diagram.content,

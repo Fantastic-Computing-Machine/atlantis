@@ -39,7 +39,7 @@ Use descriptive branch names:
 - `feature/add-export-png` - New features
 - `fix/diagram-centering` - Bug fixes
 - `docs/update-readme` - Documentation updates
-- `refactor/sidebar-component` - Code refactoring
+- `refactor/layout-component` - Code refactoring
 
 ### Making Changes
 
@@ -165,7 +165,7 @@ src/
 Use the same format as commit messages:
 ```
 feat: add PNG export functionality
-fix: resolve hydration mismatch in sidebar
+fix: resolve hydration mismatch in header
 ```
 
 ## Reporting Issues

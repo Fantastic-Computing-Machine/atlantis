@@ -145,8 +145,8 @@ docker run -p 3000:3000 strikead/atlantis:latest
 
 Data is stored in `data/diagrams.json` (or your configured `ATLANTIS_DATA_DIR`).
 
-- **Backup**: Click "Backup JSON" in the sidebar to download your diagrams.
-- **Restore**: Click "Restore JSON" and select a valid backup file.
+- **Backup**: Use **Settings → Backup** (homepage header) to download your diagrams.
+- **Restore**: Use **Settings → Restore** and select a valid backup file.
 
 ## API Access
 
