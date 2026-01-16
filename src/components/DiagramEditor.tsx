@@ -9,12 +9,13 @@ import {
 import { useDiagramStore } from '@/lib/store';
 import { Diagram } from '@/lib/types';
 import { copyToClipboard } from '@/lib/utils';
-import { Moon, Save, Share2, Star, Sun } from 'lucide-react';
+import { Moon, Save, Search, Share2, Star, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
 
 const Canvas = dynamic(() => import('@/components/Canvas').then((mod) => mod.Canvas), {
   ssr: false,
@@ -37,6 +38,7 @@ interface DiagramEditorProps {
 export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const [diagram, setDiagram] = useState<Diagram>(initialDiagram);
   const [mounted, setMounted] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const { setTheme, theme } = useTheme();
   const settings = useDiagramStore((state) => state.settings);
   const updateDiagram = useDiagramStore((state) => state.updateDiagram);
@@ -164,72 +166,85 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-background text-foreground flex flex-col">
-      <div className="h-14 border-b flex items-center justify-between px-4 bg-background/50 backdrop-blur-sm z-10 shrink-0">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div className="flex items-center gap-2 min-w-0 text-lg font-medium">
-            <Link href="/" className="shrink-0 hover:opacity-80 transition-opacity">
-              🔱atlantis //
-            </Link>
-            <span className="text-xl shrink-0">{diagram.emoji || '📊'}</span>
-            <input
-              value={diagram.title}
-              onChange={handleTitleChange}
-              onBlur={handleTitleBlur}
-              maxLength={60}
-              className="bg-transparent border-none focus:outline-none focus:ring-0 px-0 w-48 sm:w-64 truncate"
-              placeholder="Untitled Diagram"
-            />
+    <>
+      <div className="h-screen w-screen overflow-hidden bg-background text-foreground flex flex-col">
+        <div className="h-14 border-b grid grid-cols-[1fr_auto_1fr] items-center px-4 bg-background/50 backdrop-blur-sm z-10 shrink-0 gap-3">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="flex items-center gap-2 min-w-0 text-lg font-medium">
+              <Link href="/" className="shrink-0 hover:opacity-80 transition-opacity">
+                🔱atlantis //
+              </Link>
+              <span className="text-xl shrink-0">{diagram.emoji || '📊'}</span>
+              <input
+                value={diagram.title}
+                onChange={handleTitleChange}
+                onBlur={handleTitleBlur}
+                maxLength={60}
+                className="bg-transparent border-none focus:outline-none focus:ring-0 px-0 w-48 sm:w-64 truncate"
+                placeholder="Untitled Diagram"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => setIsSearchOpen(true)}
+              aria-label="Search diagrams"
+            >
+              <Search className="h-4 w-4" />
+              <span className="hidden sm:inline">Search</span>
+              <span className="text-[11px] text-muted-foreground hidden lg:inline">Ctrl / Cmd + K</span>
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="ghost" size="icon" onClick={handleShare}>
+              <Share2 className="h-4 w-4" />
+            </Button>
+
+            <Button
+              variant={diagram.isFavorite ? 'default' : 'ghost'}
+              size="icon"
+              onClick={handleFavorite}
+              aria-pressed={diagram.isFavorite}
+              className={diagram.isFavorite ? 'bg-amber-500 text-amber-50 hover:bg-amber-500/90' : ''}
+            >
+              <Star className={diagram.isFavorite ? 'h-4 w-4 fill-current' : 'h-4 w-4'} />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            >
+              <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            </Button>
+
+            <Button onClick={() => saveChanges()} size="sm" className="gap-2">
+              <Save size={16} />
+              <span className="hidden sm:inline">Save</span>
+            </Button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-
-          <span className="text-xs text-muted-foreground hidden sm:inline">
-            /{diagram.id}
-          </span>
-
-          <Button variant="ghost" size="icon" onClick={handleShare}>
-            <Share2 className="h-4 w-4" />
-          </Button>
-
-          <Button
-            variant={diagram.isFavorite ? 'default' : 'ghost'}
-            size="icon"
-            onClick={handleFavorite}
-            aria-pressed={diagram.isFavorite}
-            className={diagram.isFavorite ? 'bg-amber-500 text-amber-50 hover:bg-amber-500/90' : ''}
-          >
-            <Star className={diagram.isFavorite ? 'h-4 w-4 fill-current' : 'h-4 w-4'} />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          >
-            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-          </Button>
-
-          <Button onClick={() => saveChanges()} size="sm" className="gap-2">
-            <Save size={16} />
-            <span className="hidden sm:inline">Save</span>
-          </Button>
+        <div className="flex-1 min-h-0">
+          <ResizablePanelGroup direction="horizontal">
+            <ResizablePanel defaultSize={45} minSize={25}>
+              <Editor value={diagram.content} onChange={handleEditorChange} />
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={55} minSize={25}>
+              <Canvas code={diagram.content} diagramId={diagram.id} />
+            </ResizablePanel>
+          </ResizablePanelGroup>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0">
-        <ResizablePanelGroup direction="horizontal">
-          <ResizablePanel defaultSize={45} minSize={25}>
-            <Editor value={diagram.content} onChange={handleEditorChange} />
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={55} minSize={25}>
-            <Canvas code={diagram.content} diagramId={diagram.id} />
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      </div>
-    </div>
+      <GlobalSearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
+    </>
   );
 }

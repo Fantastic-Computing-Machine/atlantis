@@ -16,7 +16,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -24,10 +23,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
 import { useDiagramStore } from '@/lib/store';
 import { Diagram } from '@/lib/types';
 import { cn, copyToClipboard, formatDate } from '@/lib/utils';
-import { Download, Moon, Plus, Search, Share2, Star, Sun, Trash2, Upload, BookOpen, Settings2 } from 'lucide-react';
+import { Download, Moon, Plus, Share2, Star, Sun, Trash2, Upload, BookOpen, Settings2, Search } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -51,7 +51,7 @@ interface DiagramGridProps {
 
 export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridProps) {
   const [diagrams, setDiagrams] = useState<Diagram[]>(initialDiagrams);
-  const [search, setSearch] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const { setTheme, theme } = useTheme();
@@ -64,20 +64,12 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
     setIsLoading(false);
   }, [initialDiagrams]);
 
-  const normalizedSearch = search.trim().toLowerCase();
-
-  const filteredDiagrams = diagrams
-    .filter((diagram) => {
-      if (!normalizedSearch) return true;
-      const haystack = `${diagram.title} ${diagram.content}`.toLowerCase();
-      return haystack.includes(normalizedSearch);
-    })
-    .sort((a, b) => {
-      if (a.isFavorite === b.isFavorite) {
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      }
-      return a.isFavorite ? -1 : 1;
-    });
+  const sortedDiagrams = [...diagrams].sort((a, b) => {
+    if (a.isFavorite === b.isFavorite) {
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    }
+    return a.isFavorite ? -1 : 1;
+  });
 
   const handleCreate = async () => {
     try {
@@ -186,16 +178,17 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
               <h1 className="text-xl font-bold">atlantis</h1>
             </div>
 
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search diagrams..."
-                  className="pl-9"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+            <div className="flex-1 max-w-md flex justify-center">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => setIsSearchOpen(true)}
+                aria-label="Open search"
+              >
+                <Search className="h-4 w-4" />
+                <span className="hidden sm:inline">Search</span>
+                <span className="text-xs text-muted-foreground hidden lg:inline">Ctrl / Cmd + K</span>
+              </Button>
             </div>
 
             <div className="flex items-center gap-2">
@@ -312,7 +305,7 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
                 </Card>
               ))}
             </div>
-          ) : filteredDiagrams.length === 0 ? (
+          ) : sortedDiagrams.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
               <Card className="max-w-md text-center border-dashed">
                 <CardHeader className="pb-4 space-y-3">
@@ -321,47 +314,22 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
                       🔱
                     </span>
                   </div>
-                  <CardTitle className="text-2xl">
-                    {normalizedSearch
-                      ? 'No diagrams match your search'
-                      : 'No diagrams yet'}
-                  </CardTitle>
+                  <CardTitle className="text-2xl">No diagrams yet</CardTitle>
                   <CardDescription className="space-y-1">
-                    {normalizedSearch ? (
-                      <>
-                        <span>Try a different term or clear the search.</span>
-                        <span className="block text-muted-foreground/80">
-                          Searching titles and Mermaid content.
-                        </span>
-                      </>
-                    ) : (
-                      'Create your first Mermaid diagram to get started.'
-                    )}
+                    Create your first Mermaid diagram to get started.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2">
-                  {normalizedSearch ? (
-                    <>
-                      <Button variant="outline" onClick={() => setSearch('')}>
-                        Clear search
-                      </Button>
-                      <Button onClick={handleCreate} className="gap-2">
-                        <Plus size={18} />
-                        New Diagram
-                      </Button>
-                    </>
-                  ) : (
-                    <Button onClick={handleCreate} className="gap-2">
-                      <Plus size={18} />
-                      Create Your First Diagram
-                    </Button>
-                  )}
+                  <Button onClick={handleCreate} className="gap-2">
+                    <Plus size={18} />
+                    Create Your First Diagram
+                  </Button>
                 </CardContent>
               </Card>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredDiagrams.map((diagram) => (
+              {sortedDiagrams.map((diagram) => (
                 <Link key={diagram.id} href={`/${diagram.id}`} className="group">
                   <Card
                     className={cn(
@@ -380,7 +348,7 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
                             </CardDescription>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -467,6 +435,12 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
           </div>
         </footer>
       </div>
+
+      <GlobalSearchDialog
+        open={isSearchOpen}
+        onOpenChange={setIsSearchOpen}
+        initialDiagrams={diagrams}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
