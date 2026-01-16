@@ -29,16 +29,20 @@ import {
   ZoomIn,
   ZoomOut
 } from 'lucide-react';
-import mermaid from 'mermaid';
-import { jsPDF } from 'jspdf';
+import dynamic from 'next/dynamic';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ReactZoomPanPinchRef,
-  TransformComponent,
-  TransformWrapper
-} from 'react-zoom-pan-pinch';
+import type { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { toast } from 'sonner';
+
+const TransformWrapper = dynamic(
+  () => import('react-zoom-pan-pinch').then((mod) => mod.TransformWrapper),
+  { ssr: false }
+);
+const TransformComponent = dynamic(
+  () => import('react-zoom-pan-pinch').then((mod) => mod.TransformComponent),
+  { ssr: false }
+);
 
 interface CanvasProps {
   code: string;
@@ -63,19 +67,21 @@ export function Canvas({ code, diagramId, title }: CanvasProps) {
   const { resolvedTheme } = useTheme();
 
   useEffect(() => {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: resolvedTheme === 'dark' ? 'dark' : 'default',
-      securityLevel: 'loose',
-      fontFamily: 'inherit',
-      flowchart: { useMaxWidth: false },
-      sequence: { useMaxWidth: false },
-      gantt: { useMaxWidth: false },
-      journey: { useMaxWidth: false },
-      class: { useMaxWidth: false },
-      state: { useMaxWidth: false },
-      er: { useMaxWidth: false },
-      pie: { useMaxWidth: false },
+    import('mermaid').then((mermaid) => {
+      mermaid.default.initialize({
+        startOnLoad: false,
+        theme: resolvedTheme === 'dark' ? 'dark' : 'default',
+        securityLevel: 'loose',
+        fontFamily: 'inherit',
+        flowchart: { useMaxWidth: false },
+        sequence: { useMaxWidth: false },
+        gantt: { useMaxWidth: false },
+        journey: { useMaxWidth: false },
+        class: { useMaxWidth: false },
+        state: { useMaxWidth: false },
+        er: { useMaxWidth: false },
+        pie: { useMaxWidth: false },
+      });
     });
   }, [resolvedTheme]);
 
@@ -112,6 +118,7 @@ export function Canvas({ code, diagramId, title }: CanvasProps) {
       try {
         setError(null);
         const id = `mermaid-${Date.now()}`;
+        const mermaid = (await import('mermaid')).default;
         const { svg } = await mermaid.render(id, code);
         if (isMounted) setSvg(svg);
       } catch (err) {
@@ -260,6 +267,7 @@ export function Canvas({ code, diagramId, title }: CanvasProps) {
 
       // 2. Create PDF
       const isLandscape = svgWidth > svgHeight;
+      const jsPDF = (await import('jspdf')).default;
       const pdf = new jsPDF({
         orientation: isLandscape ? 'landscape' : 'portrait',
         unit: 'px',

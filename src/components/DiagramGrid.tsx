@@ -31,8 +31,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import mermaid from 'mermaid';
-import { jsPDF } from 'jspdf';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -132,6 +130,7 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
 
   const handleDownload = async (diagram: Diagram, format: 'svg' | 'png' | 'pdf') => {
     try {
+      const mermaid = (await import('mermaid')).default;
       mermaid.initialize({
         startOnLoad: false,
         theme: theme === 'dark' ? 'dark' : 'default',
@@ -193,6 +192,7 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
           document.body.removeChild(a);
           toast.success('PNG downloaded');
         } else if (format === 'pdf') {
+          const jsPDF = (await import('jspdf')).default;
           const isLandscape = svgWidth > svgHeight;
           const pdf = new jsPDF({
             orientation: isLandscape ? 'landscape' : 'portrait',
