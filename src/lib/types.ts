@@ -8,6 +8,13 @@ export interface Diagram {
   isFavorite: boolean;
 }
 
+export interface DiagramPage {
+  items: Diagram[];
+  total: number;
+  hasMore: boolean;
+  nextOffset: number;
+}
+
 export interface AppSettings {
   autoSave: boolean;
 }

@@ -1,15 +1,25 @@
 import { ensureCsrfCookie, csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
-import { getDiagrams, saveDiagrams } from '@/lib/data';
+import { getDiagramPage, getDiagrams, saveDiagrams } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { Diagram } from '@/lib/types';
 import { generateShortId, getRandomEmoji } from '@/lib/utils';
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+const DEFAULT_LIMIT = 24;
+
+export async function GET(request: Request) {
   try {
     await ensureCsrfCookie();
-    const diagrams = await getDiagrams();
-    return NextResponse.json(diagrams);
+    const url = new URL(request.url);
+    const limit = url.searchParams.get('limit');
+    const offset = url.searchParams.get('offset');
+    const query = url.searchParams.get('query') || undefined;
+
+    const limitNumber = limit ? Number.parseInt(limit, 10) : DEFAULT_LIMIT;
+    const offsetNumber = offset ? Number.parseInt(offset, 10) : 0;
+
+    const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query });
+    return NextResponse.json(page);
   } catch (error) {
     logApiError('GET /api/diagrams', error);
     return NextResponse.json({ error: 'Failed to load diagrams' }, { status: 500 });

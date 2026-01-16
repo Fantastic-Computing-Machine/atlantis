@@ -1,10 +1,13 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { Diagram } from './types';
+import { Diagram, DiagramPage } from './types';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DATA_FILE = path.join(DATA_DIR, 'diagrams.json');
 const TEMP_FILE = `${DATA_FILE}.tmp`;
+
+const DEFAULT_PAGE_SIZE = 24;
+const MAX_PAGE_SIZE = 100;
 
 // Simple in-memory mutex to serialize writes and avoid file corruption under concurrent requests
 let writeLock: Promise<void> = Promise.resolve();
@@ -38,6 +41,46 @@ export async function getDiagrams(): Promise<Diagram[]> {
     await fs.writeFile(DATA_FILE, '[]', 'utf-8');
     return [];
   }
+}
+
+export async function getDiagramPage({
+  limit = DEFAULT_PAGE_SIZE,
+  offset = 0,
+  query,
+}: {
+  limit?: number;
+  offset?: number;
+  query?: string;
+}): Promise<DiagramPage> {
+  const normalizedLimit = Number.isFinite(limit)
+    ? Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE)
+    : DEFAULT_PAGE_SIZE;
+  const normalizedOffset = Number.isFinite(offset) ? Math.max(Math.trunc(offset as number), 0) : 0;
+  const diagrams = await getDiagrams();
+
+  const normalizedQuery = query?.trim().toLowerCase();
+  const filtered = normalizedQuery
+    ? diagrams.filter((diagram) => {
+        const haystack = `${diagram.title} ${diagram.content}`.toLowerCase();
+        return haystack.includes(normalizedQuery);
+      })
+    : diagrams;
+
+  const sorted = [...filtered].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+
+  const items = sorted.slice(normalizedOffset, normalizedOffset + normalizedLimit);
+  const total = sorted.length;
+  const nextOffset = normalizedOffset + items.length;
+  const hasMore = nextOffset < total;
+
+  return {
+    items,
+    total,
+    hasMore,
+    nextOffset,
+  };
 }
 
 export async function saveDiagrams(diagrams: Diagram[]): Promise<void> {

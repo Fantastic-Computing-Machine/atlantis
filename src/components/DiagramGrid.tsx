@@ -30,7 +30,7 @@ import { Download, Moon, Plus, Share2, Star, Sun, Trash2, Upload, BookOpen, Sett
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -45,23 +45,112 @@ import {
 
 interface DiagramGridProps {
   initialDiagrams: Diagram[];
+  initialHasMore?: boolean;
+  initialNextOffset?: number;
+  initialTotal?: number;
   enableApiAccess?: boolean;
 }
 
-export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridProps) {
+export function DiagramGrid({
+  initialDiagrams,
+  initialHasMore,
+  initialNextOffset,
+  initialTotal,
+  enableApiAccess,
+}: DiagramGridProps) {
   const [diagrams, setDiagrams] = useState<Diagram[]>(initialDiagrams);
+  const [hasMore, setHasMore] = useState<boolean>(initialHasMore ?? false);
+  const [nextOffset, setNextOffset] = useState<number>(initialNextOffset ?? initialDiagrams.length);
+  const [total, setTotal] = useState<number>(initialTotal ?? initialDiagrams.length);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const { setTheme, theme } = useTheme();
   const { settings, setAutoSave } = useDiagramStore();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setDiagrams(initialDiagrams);
+    setHasMore(initialHasMore ?? false);
+    setNextOffset(initialNextOffset ?? initialDiagrams.length);
+    setTotal(initialTotal ?? initialDiagrams.length);
     setIsLoading(false);
-  }, [initialDiagrams]);
+  }, [initialDiagrams, initialHasMore, initialNextOffset, initialTotal]);
+
+  const fetchNextPage = useCallback(async () => {
+    if (!hasMore || isFetchingMore) return;
+
+    setIsFetchingMore(true);
+    try {
+      const res = await fetch(`/api/diagrams?limit=24&offset=${nextOffset}`);
+      if (!res.ok) {
+        throw new Error('Failed to load more');
+      }
+      const data = await res.json();
+      const incoming: Diagram[] = Array.isArray(data.items) ? data.items : [];
+      setDiagrams((prev) => {
+        const existingIds = new Set(prev.map((d) => d.id));
+        const merged = [...prev];
+        incoming.forEach((item) => {
+          if (!existingIds.has(item.id)) {
+            merged.push(item);
+          }
+        });
+        return merged;
+      });
+      setHasMore(Boolean(data.hasMore));
+      setNextOffset(typeof data.nextOffset === 'number' ? data.nextOffset : nextOffset + (data.items?.length || 0));
+      setTotal(typeof data.total === 'number' ? data.total : total);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to load more diagrams');
+    } finally {
+      setIsFetchingMore(false);
+    }
+  }, [hasMore, isFetchingMore, nextOffset, total]);
+
+  useEffect(() => {
+    if (!hasMore || isFetchingMore) return;
+    const target = loadMoreRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasMore, isFetchingMore]);
+
+  const reloadFirstPage = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/diagrams?limit=24&offset=0');
+      if (!res.ok) {
+        throw new Error('Failed to load diagrams');
+      }
+      const data = await res.json();
+      const items: Diagram[] = Array.isArray(data.items) ? data.items : [];
+      setDiagrams(items);
+      setHasMore(Boolean(data.hasMore));
+      setNextOffset(typeof data.nextOffset === 'number' ? data.nextOffset : items.length);
+      setTotal(typeof data.total === 'number' ? data.total : items.length);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to load diagrams');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const starredDiagrams = diagrams
     .filter((d) => d.isFavorite)
@@ -112,6 +201,7 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
       }
 
       setDiagrams((prev) => prev.filter((d) => d.id !== deleteId));
+      setTotal((prev) => Math.max(prev - 1, 0));
       toast.success('Diagram deleted');
     } catch {
       toast.error('Failed to delete diagram');
@@ -260,9 +350,7 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
           body: JSON.stringify(json),
         });
         if (res.ok) {
-          const newRes = await fetch('/api/diagrams');
-          const data = await newRes.json();
-          setDiagrams(data);
+          await reloadFirstPage();
           toast.success('Backup restored successfully');
         } else {
           throw new Error('Restore failed');
@@ -587,7 +675,8 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
                 <section>
                   <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    Starred
+                    <span>Starred //</span>
+                    <span className="text-muted-foreground">{starredDiagrams.length}</span>
                   </h2>
                   {renderDiagramGrid(starredDiagrams)}
                 </section>
@@ -596,13 +685,42 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
               {(otherDiagrams.length > 0 || !hasStarred) && (
                 <section>
                   {hasStarred && (
-                    <h2 className="text-lg font-semibold mb-4 text-muted-foreground">
-                      Other diagrams
+                    <h2 className="text-lg font-semibold mb-4 text-muted-foreground flex items-center gap-2">
+                      <span>Other diagrams //</span>
+                      <span className="text-muted-foreground">
+                        {otherDiagrams.length} of {Math.max(total - starredDiagrams.length, 0)}
+                      </span>
+                    </h2>
+                  )}
+                  {!hasStarred && (
+                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <span>Other diagrams //</span>
+                      <span className="text-muted-foreground">
+                        {otherDiagrams.length} of {Math.max(total - starredDiagrams.length, 0)}
+                      </span>
                     </h2>
                   )}
                   {renderDiagramGrid(otherDiagrams)}
                 </section>
               )}
+
+              {isFetchingMore && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" aria-hidden>
+                  {[1, 2, 3, 4].map((i) => (
+                    <Card key={`skeleton-${i}`} className="overflow-hidden">
+                      <CardHeader className="pb-2">
+                        <Skeleton className="h-6 w-3/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                      </CardHeader>
+                      <CardContent>
+                        <Skeleton className="h-24 w-full" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              <div ref={loadMoreRef} className="h-10" aria-hidden />
             </div>
           )}
         </main>

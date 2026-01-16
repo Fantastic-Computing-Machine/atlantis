@@ -34,6 +34,7 @@ export function GlobalSearchDialog({
 }: GlobalSearchDialogProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const controllerRef = useRef<AbortController | null>(null);
   const [query, setQuery] = useState('');
   const [diagrams, setDiagrams] = useState<Diagram[]>(initialDiagrams || []);
   const [isLoading, setIsLoading] = useState(false);
@@ -62,25 +63,50 @@ export function GlobalSearchDialog({
     if (open) {
       setActiveIndex(0);
       setTimeout(() => inputRef.current?.focus(), 0);
-      const fetchDiagrams = async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-          const res = await fetch('/api/diagrams');
-          if (!res.ok) throw new Error('Failed to fetch diagrams');
-          const data: Diagram[] = await res.json();
-          setDiagrams(data);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'Unable to load diagrams');
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      fetchDiagrams();
     } else {
       setQuery('');
+      setError(null);
+      controllerRef.current?.abort();
+      controllerRef.current = null;
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const controller = new AbortController();
+    controllerRef.current?.abort();
+    controllerRef.current = controller;
+
+    const timeoutId = window.setTimeout(async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams({ limit: '50', offset: '0' });
+        const normalized = query.trim();
+        if (normalized) {
+          params.set('query', normalized);
+        }
+        const res = await fetch(`/api/diagrams?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error('Failed to fetch diagrams');
+        const data = await res.json();
+        const items: Diagram[] = Array.isArray(data.items) ? data.items : [];
+        setDiagrams(items);
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        setError(err instanceof Error ? err.message : 'Unable to load diagrams');
+      } finally {
+        setIsLoading(false);
+      }
+    }, 200);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [open, query]);
 
   const sortedResults = useMemo(() => {
     const normalized = query.trim().toLowerCase();
