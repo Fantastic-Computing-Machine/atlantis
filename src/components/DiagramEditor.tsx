@@ -8,9 +8,9 @@ import {
 } from '@/components/ui/resizable';
 import { ensureCsrfToken, CSRF_HEADER_NAME } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
-import { Diagram } from '@/lib/types';
+import { Checkpoint, Diagram } from '@/lib/types';
 import { copyToClipboard } from '@/lib/utils';
-import { Moon, Save, Search, Share2, Star, Sun } from 'lucide-react';
+import { History, Moon, Save, Search, Share2, Star, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -32,6 +32,8 @@ const Editor = dynamic(() => import('@/components/Editor').then((mod) => mod.Edi
   loading: () => <div className="h-full w-full bg-muted/30 animate-pulse" />,
 });
 
+const MAX_CHECKPOINTS = 15;
+
 interface DiagramEditorProps {
   initialDiagram: Diagram;
 }
@@ -40,6 +42,9 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const [diagram, setDiagram] = useState<Diagram>(initialDiagram);
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
+  const [isLoadingCheckpoints, setIsLoadingCheckpoints] = useState(false);
+  const [isSavingCheckpoint, setIsSavingCheckpoint] = useState(false);
   const { setTheme, theme } = useTheme();
   const settings = useDiagramStore((state) => state.settings);
   const updateDiagram = useDiagramStore((state) => state.updateDiagram);
@@ -164,6 +169,65 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     }
   };
 
+  const loadCheckpoints = useCallback(async () => {
+    setIsLoadingCheckpoints(true);
+    try {
+      const res = await fetch(`/api/diagrams/${diagram.id}/checkpoint`);
+      if (!res.ok) throw new Error('Failed to load checkpoints');
+      const data = await res.json();
+      setCheckpoints(data.checkpoints ?? []);
+    } catch {
+      toast.error('Failed to load checkpoints');
+    } finally {
+      setIsLoadingCheckpoints(false);
+    }
+  }, [diagram.id]);
+
+  useEffect(() => {
+    loadCheckpoints();
+  }, [loadCheckpoints]);
+
+  const handleSaveCheckpoint = useCallback(async () => {
+    setIsSavingCheckpoint(true);
+    try {
+      const csrfToken = await ensureCsrfToken();
+      const res = await fetch(`/api/diagrams/${diagram.id}/checkpoint`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          [CSRF_HEADER_NAME]: csrfToken,
+        },
+        body: JSON.stringify({
+          content: diagram.content,
+          title: diagram.title,
+          emoji: diagram.emoji,
+          isFavorite: diagram.isFavorite,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to create checkpoint');
+      const data = await res.json();
+      setDiagram((prev) => ({ ...prev, updatedAt: data.diagram.updatedAt }));
+      updateDiagram(diagram.id, { updatedAt: data.diagram.updatedAt });
+      setCheckpoints((prev) => {
+        const next = [data.checkpoint as Checkpoint, ...prev.filter((cp) => cp.id !== data.checkpoint.id)];
+        return next.slice(0, MAX_CHECKPOINTS);
+      });
+      toast.success('Checkpoint saved');
+    } catch {
+      toast.error('Failed to save checkpoint');
+    } finally {
+      setIsSavingCheckpoint(false);
+    }
+  }, [diagram, updateDiagram]);
+
+  const handleSelectCheckpoint = (checkpointId: string) => {
+    const checkpoint = checkpoints.find((cp) => cp.id === checkpointId);
+    if (!checkpoint) return;
+    setDiagram((prev) => ({ ...prev, content: checkpoint.content }));
+    updateDiagram(diagram.id, { content: checkpoint.content });
+    toast.success('Checkpoint loaded');
+  };
+
   // Show loading state until client hydration is complete
   if (!mounted) {
     return (
@@ -234,6 +298,41 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
               <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
               <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             </Button>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleSaveCheckpoint}
+                disabled={isSavingCheckpoint}
+              >
+                <History size={16} />
+                <span className="hidden sm:inline">Checkpoint</span>
+              </Button>
+
+              <select
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    handleSelectCheckpoint(e.target.value);
+                    e.target.value = '';
+                  }
+                }}
+                disabled={isLoadingCheckpoints || checkpoints.length === 0}
+                aria-label="Switch checkpoint"
+              >
+                <option value="" disabled>
+                  {isLoadingCheckpoints ? 'Loading...' : 'Switch checkpoint'}
+                </option>
+                {checkpoints.map((cp) => (
+                  <option key={cp.id} value={cp.id}>
+                    {new Date(cp.updatedAt).toLocaleString()}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <Button onClick={() => saveChanges()} size="sm" className="gap-2">
               <Save size={16} />

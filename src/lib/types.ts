@@ -8,6 +8,12 @@ export interface Diagram {
   isFavorite: boolean;
 }
 
+export interface Checkpoint {
+  id: string;
+  content: string;
+  updatedAt: string;
+}
+
 export interface DiagramPage {
   items: Diagram[];
   total: number;

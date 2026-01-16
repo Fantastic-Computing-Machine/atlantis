@@ -1,5 +1,5 @@
 import { ensureCsrfCookie } from '@/lib/csrf';
-import { getDiagrams } from '@/lib/data';
+import { getDiagramById } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 
@@ -14,9 +14,7 @@ export async function GET(
   try {
     await ensureCsrfCookie();
     const { id } = await params;
-    const diagrams = await getDiagrams();
-
-    const diagram = diagrams.find((d) => d.id === id);
+    const diagram = await getDiagramById(id);
 
     if (!diagram) {
       return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });

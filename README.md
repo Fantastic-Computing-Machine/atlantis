@@ -8,7 +8,7 @@ A premium, self-hosted Mermaid.js diagramming application built with Next.js, Ta
 
 - 🎨 **Modern Editor**: Split-pane interface with code editor and live preview.
 - 🧜‍♂️ **Full Mermaid Support**: Supports all diagram types supported by Mermaid.js.
-- 💾 **Local Persistence**: Diagrams are saved to a local JSON file (`data/diagrams.json`), making it easy to backup and self-host.
+- 💾 **Local Persistence**: Diagrams are stored in SQLite by default (`data/atlantis.db`), with optional Postgres/MySQL via envs.
 - 🌗 **Dark/Light Mode**: Beautiful UI that adapts to your system preference.
 - ⭐ **Favorites**: Organize your diagrams by marking important ones.
 - 📂 **Backup & Restore**: Export your data to JSON and restore it whenever needed.
@@ -43,13 +43,15 @@ A premium, self-hosted Mermaid.js diagramming application built with Next.js, Ta
 
     ```bash
     npm install
-    # or
-    yarn install
-    # or
-    pnpm install
     ```
 
-3. Run the development server:
+3. Copy the sample env and adjust as needed:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+4. Run the development server (schema applies automatically on first start for SQLite):
 
     ```bash
     npm run dev
@@ -122,7 +124,9 @@ PORT=8080 ATLANTIS_DATA_DIR=./my-data docker compose up -d
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | The port the application will listen on. |
-| `ATLANTIS_DATA_DIR` | `atlantis_data` | Path on host to store diagram JSON files. |
+| `PRISMA_PROVIDER` | `sqlite` | Database provider (`sqlite`, `postgresql`, `mysql`). |
+| `DATABASE_URL` / `DB_CONNECTION` | `file:./data/atlantis.db` | Connection string; defaults to local SQLite file. |
+| `PRISMA_AUTO_APPLY` | `true` (non-prod), `false` (prod) | Auto-runs `prisma db push` on server start to ensure schema exists. |
 | `ENABLE_API_ACCESS` | `false` | Set to `true` to enable the REST API and /docs. |
 
 ### Versioning
@@ -143,10 +147,12 @@ docker run -p 3000:3000 strikead/atlantis:latest
 
 ## Data & Backup
 
-Data is stored in `data/diagrams.json` (or your configured `ATLANTIS_DATA_DIR`).
+Data is stored in a database (default SQLite at `data/atlantis.db`; switch via `PRISMA_PROVIDER`/`DATABASE_URL`).
+- On dev start, the schema is auto-applied (via `PRISMA_AUTO_APPLY`, default true outside production) so you shouldn’t need to run Prisma commands manually for local SQLite.
 
 - **Backup**: Use **Settings → Backup** (homepage header) to download your diagrams.
 - **Restore**: Use **Settings → Restore** and select a valid backup file.
+- **Checkpoints**: Create manual checkpoints in the editor (up to 15 recent checkpoints kept per diagram).
 
 ## API Access
 

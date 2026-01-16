@@ -1,8 +1,6 @@
 import { csrfFailureResponse, ensureCsrfCookie, validateCsrfToken } from '@/lib/csrf';
-import { getDiagrams, saveDiagrams } from '@/lib/data';
+import { createDiagram, getDiagramPage } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
-import { generateShortId, getRandomEmoji } from '@/lib/utils';
-import { Diagram } from '@/lib/types';
 import { NextResponse } from 'next/server';
 import mermaid from 'mermaid';
 
@@ -25,17 +23,12 @@ export async function GET(request: Request) {
     await ensureCsrfCookie();
 
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const page = Math.max(parseInt(searchParams.get('page') || '1', 10), 1);
+    const limit = Math.max(parseInt(searchParams.get('limit') || '10', 10), 1);
+    const offset = (page - 1) * limit;
 
-    const diagrams = await getDiagrams();
-    const sortedDiagrams = [...diagrams].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
-
-    const startIndex = (page - 1) * limit;
-    const endIndex = page * limit;
-    const paginatedDiagrams = sortedDiagrams.slice(startIndex, endIndex).map((d) => ({
+    const diagramsPage = await getDiagramPage({ limit, offset });
+    const paginatedDiagrams = diagramsPage.items.map((d) => ({
       id: d.id,
       title: d.title,
     }));
@@ -45,8 +38,8 @@ export async function GET(request: Request) {
       pagination: {
         page,
         limit,
-        total: diagrams.length,
-        totalPages: Math.ceil(diagrams.length / limit),
+        total: diagramsPage.total,
+        totalPages: Math.ceil(diagramsPage.total / limit),
       },
     });
   } catch (error) {
@@ -84,23 +77,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const diagrams = await getDiagrams();
-    let id = generateShortId();
-    while (diagrams.some((d) => d.id === id)) {
-      id = generateShortId();
-    }
-
-    const newDiagram: Diagram = {
-      id,
-      title: title || 'Untitled Diagram',
-      content,
-      emoji: getRandomEmoji(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isFavorite: false,
-    };
-
-    await saveDiagrams([newDiagram, ...diagrams]);
+    const newDiagram = await createDiagram({ title, content });
 
     return NextResponse.json(newDiagram, { status: 201 });
   } catch (error) {

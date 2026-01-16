@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ============================================
-# Stage 1: Install dependencies only
+# Stage 1: Install dependencies + Prisma client
 # ============================================
 FROM node:20-alpine AS deps
 WORKDIR /app
@@ -9,11 +9,21 @@ WORKDIR /app
 # Install libc6-compat for Alpine compatibility
 RUN apk add --no-cache libc6-compat
 
-# Copy only package files for better layer caching
+ARG PRISMA_PROVIDER=sqlite
+ARG DATABASE_URL=file:./data/atlantis.db
+ENV PRISMA_PROVIDER=${PRISMA_PROVIDER}
+ENV DATABASE_URL=${DATABASE_URL}
+
+# Copy package and prisma metadata for cached install/generate
 COPY package.json package-lock.json ./
+COPY prisma ./prisma
+COPY scripts/prepare-prisma-schema.js ./scripts/prepare-prisma-schema.js
 
 # Install all dependencies (including devDependencies for build)
 RUN --mount=type=cache,target=/root/.npm npm ci
+
+# Prepare Prisma schema (provider-aware) and generate client
+RUN npm run prisma:prepare && npx prisma generate
 
 # ============================================
 # Stage 2: Build the application
@@ -21,8 +31,15 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy dependencies from deps stage
+ARG PRISMA_PROVIDER=sqlite
+ARG DATABASE_URL=file:./data/atlantis.db
+ENV PRISMA_PROVIDER=${PRISMA_PROVIDER}
+ENV DATABASE_URL=${DATABASE_URL}
+
+# Copy dependencies and Prisma artifacts from deps stage
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/prisma ./prisma
+COPY --from=deps /app/scripts ./scripts
 
 # Copy source files
 COPY . .
@@ -30,6 +47,9 @@ COPY . .
 # Disable Next.js telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_OUTPUT=standalone
+
+# Ensure schema matches build args and regenerate client (no-op if unchanged)
+RUN npm run prisma:prepare && npx prisma generate
 
 # Build the application with standalone output
 RUN npm run build
@@ -40,13 +60,16 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
+ARG PRISMA_PROVIDER=sqlite
+ARG DATABASE_URL=file:./data/atlantis.db
+ENV PRISMA_PROVIDER=${PRISMA_PROVIDER}
+ENV DATABASE_URL=${DATABASE_URL}
+
 # Set production environment
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-
-# No extra packages needed for healthcheck
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \
@@ -62,7 +85,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 # 3. Static files
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Create data directory for diagram persistence
+# 4. Prisma schema and engines for runtime client
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+
+# Create data directory for diagram persistence (SQLite default)
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 
 # Switch to non-root user

@@ -10,6 +10,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      PRISMA_PROVIDER: sqlite
+      DATABASE_URL: file:./data/atlantis.db
 
     steps:
     - name: Check out code
@@ -48,3 +51,6 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
+        build-args: |
+          PRISMA_PROVIDER=${{ env.PRISMA_PROVIDER }}
+          DATABASE_URL=${{ env.DATABASE_URL }}

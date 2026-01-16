@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Provider is resolved from env (DB_CONNECTION or PRISMA_PROVIDER) with sqlite fallback
+// via scripts/prepare-prisma-schema.js
+// Supported providers: postgresql, mysql, sqlite
+
+datasource db {
+  provider = "@@PROVIDER@@"
+  url      = env("DATABASE_URL")
+}
+
+model Diagram {
+  id         String    @id
+  title      String
+  emoji      String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime
+  isFavorite Boolean   @default(false)
+  contents   Content[]
+
+  @@index([updatedAt], map: "diagram_updatedAt_idx")
+  // Optional future index for search tuning
+  // @@index([title], map: "diagram_title_idx")
+}
+
+model Content {
+  id        String   @id
+  diagramId String
+  content   String
+  updatedAt DateTime
+  diagram   Diagram  @relation(fields: [diagramId], references: [id], onDelete: Cascade)
+
+  @@index([diagramId, updatedAt], map: "content_diagram_updated_idx")
+}

@@ -1,5 +1,5 @@
 import { DiagramEditor } from '@/components/DiagramEditor';
-import { getDiagrams } from '@/lib/data';
+import { getDiagramById } from '@/lib/data';
 import { notFound } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
@@ -10,8 +10,7 @@ interface PageProps {
 
 export default async function DiagramPage({ params }: PageProps) {
   const { id } = await params;
-  const diagrams = await getDiagrams();
-  const diagram = diagrams.find((d) => d.id === id);
+  const diagram = await getDiagramById(id);
 
   if (!diagram) {
     notFound();
