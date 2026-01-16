@@ -22,6 +22,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
+import { ensureCsrfToken, CSRF_HEADER_NAME } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
 import { Diagram } from '@/lib/types';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
@@ -74,10 +75,18 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
 
   const handleCreate = async () => {
     try {
+      const csrfToken = await ensureCsrfToken();
       const res = await fetch('/api/diagrams', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          [CSRF_HEADER_NAME]: csrfToken,
+        },
         body: JSON.stringify({}),
       });
+      if (!res.ok) {
+        throw new Error('Failed to create');
+      }
       const newDiagram = await res.json();
       toast.success('New diagram created');
       router.push(`/${newDiagram.id}`);
@@ -90,7 +99,18 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
     if (!deleteId) return;
 
     try {
-      await fetch(`/api/diagrams/${deleteId}`, { method: 'DELETE' });
+      const csrfToken = await ensureCsrfToken();
+      const res = await fetch(`/api/diagrams/${deleteId}`, {
+        method: 'DELETE',
+        headers: {
+          [CSRF_HEADER_NAME]: csrfToken,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to delete');
+      }
+
       setDiagrams((prev) => prev.filter((d) => d.id !== deleteId));
       toast.success('Diagram deleted');
     } catch {
@@ -110,8 +130,13 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
       prev.map((d) => (d.id === id ? { ...d, isFavorite: !d.isFavorite } : d))
     );
 
+    const csrfToken = await ensureCsrfToken();
     await fetch(`/api/diagrams/${id}`, {
       method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        [CSRF_HEADER_NAME]: csrfToken,
+      },
       body: JSON.stringify({ isFavorite: !diagram.isFavorite }),
     });
   };
@@ -225,8 +250,13 @@ export function DiagramGrid({ initialDiagrams, enableApiAccess }: DiagramGridPro
     reader.onload = async (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
+        const csrfToken = await ensureCsrfToken();
         const res = await fetch('/api/backup', {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            [CSRF_HEADER_NAME]: csrfToken,
+          },
           body: JSON.stringify(json),
         });
         if (res.ok) {

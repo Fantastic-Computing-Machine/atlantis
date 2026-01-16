@@ -1,5 +1,7 @@
-import { NextResponse } from 'next/server';
+import { ensureCsrfCookie } from '@/lib/csrf';
 import { getDiagrams } from '@/lib/data';
+import { logApiError } from '@/lib/logger';
+import { NextResponse } from 'next/server';
 
 export async function GET(
   request: Request,
@@ -9,14 +11,20 @@ export async function GET(
     return new NextResponse('API Access Disabled', { status: 403 });
   }
 
-  const { id } = await params;
-  const diagrams = await getDiagrams();
-  
-  const diagram = diagrams.find(d => d.id === id);
-  
-  if (!diagram) {
-    return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });
-  }
+  try {
+    await ensureCsrfCookie();
+    const { id } = await params;
+    const diagrams = await getDiagrams();
 
-  return NextResponse.json(diagram);
+    const diagram = diagrams.find((d) => d.id === id);
+
+    if (!diagram) {
+      return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(diagram);
+  } catch (error) {
+    logApiError('GET /api/access/[id]', error);
+    return NextResponse.json({ error: 'Failed to fetch diagram' }, { status: 500 });
+  }
 }

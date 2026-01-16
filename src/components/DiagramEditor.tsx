@@ -6,6 +6,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
+import { ensureCsrfToken, CSRF_HEADER_NAME } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
 import { Diagram } from '@/lib/types';
 import { copyToClipboard } from '@/lib/utils';
@@ -61,8 +62,13 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
 
   const saveChanges = useCallback(async (showToast = true) => {
     try {
+      const csrfToken = await ensureCsrfToken();
       const res = await fetch(`/api/diagrams/${diagram.id}`, {
         method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          [CSRF_HEADER_NAME]: csrfToken,
+        },
         body: JSON.stringify(diagram),
       });
       if (!res.ok) throw new Error('Failed to save');
@@ -143,8 +149,13 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
       const nextFavorite = !diagram.isFavorite;
       setDiagram((prev) => ({ ...prev, isFavorite: nextFavorite }));
       updateDiagram(diagram.id, { isFavorite: nextFavorite });
+      const csrfToken = await ensureCsrfToken();
       await fetch(`/api/diagrams/${diagram.id}`, {
         method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          [CSRF_HEADER_NAME]: csrfToken,
+        },
         body: JSON.stringify({ isFavorite: nextFavorite }),
       });
       toast.success(nextFavorite ? 'Added to favorites' : 'Removed from favorites');
