@@ -1,7 +1,9 @@
 import fs from 'fs';
+import { mkdirSync } from 'fs';
 import path from 'path';
-import { spawnSync } from 'child_process';
 import { PrismaClient } from '@prisma/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
@@ -13,44 +15,24 @@ function ensureDataDir(url: string) {
   if (!url.startsWith('file:')) return;
   const filePath = url.replace('file:', '');
   const dir = path.dirname(filePath);
-  fs.mkdirSync(dir, { recursive: true });
+  mkdirSync(dir, { recursive: true });
 }
 
-function shouldAutoApply(): boolean {
-  const raw = (process.env.PRISMA_AUTO_APPLY ?? (process.env.NODE_ENV === 'production' ? 'false' : 'true')).toLowerCase();
-  return raw !== 'false';
-}
-
-let ensured = false;
-function ensurePrismaSchema() {
-  if (ensured) return;
-  ensured = true;
-  const url = resolveDatabaseUrl();
-  ensureDataDir(url);
-
-  if (!shouldAutoApply()) return;
-  if (process.env.PRISMA_SKIP_AUTOPUSH === 'true') return;
-
-  const result = spawnSync('npx', ['prisma', 'db', 'push', '--skip-generate'], {
-    stdio: 'inherit',
-    env: { ...process.env, DATABASE_URL: url },
-  });
-
-  if (result.error || result.status !== 0) {
-    console.warn('[prisma] db push failed; proceeding without auto-apply');
+function createAdapter(url: string) {
+  if (url.startsWith('file:')) {
+    ensureDataDir(url);
+    return new PrismaBetterSqlite3({ url: url as ':memory:' | (string & {}) });
   }
+  if (url.startsWith('postgres')) {
+    return new PrismaPg({ connectionString: url });
+  }
+  throw new Error(`Unsupported DATABASE_URL for Prisma adapter: ${url}`);
 }
-
-ensurePrismaSchema();
 
 export const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({
-    datasources: {
-      db: {
-        url: resolveDatabaseUrl(),
-      },
-    },
+    adapter: createAdapter(resolveDatabaseUrl()),
   });
 
 if (process.env.NODE_ENV !== 'production') {

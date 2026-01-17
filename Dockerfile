@@ -88,6 +88,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # 4. Prisma schema and engines for runtime client
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+COPY --from=deps --chown=nextjs:nodejs /app/scripts ./scripts
 
 # Create data directory for diagram persistence (SQLite default)
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
@@ -102,5 +104,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD node -e "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-# Start the standalone server
-CMD ["node", "server.js"]
+# Run lightweight bootstrap (generate skipped, optional db push if enabled) then start server
+CMD ["sh", "-c", "node scripts/bootstrap.js && node server.js"]

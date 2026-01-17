@@ -1,5 +1,4 @@
 import type { Prisma } from '@prisma/client';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { prisma } from './prisma';
 import { Checkpoint, Diagram, DiagramPage } from './types';
 import { generateShortId, getRandomEmoji } from './utils';
@@ -9,7 +8,7 @@ const MAX_PAGE_SIZE = 100;
 const MAX_CHECKPOINTS = 15;
 const TITLE_MAX = 100;
 
-type TransactionClient = Prisma.TransactionClient;
+type TransactionClient = typeof prisma;
 type DiagramWithLatest = {
   id: string;
   title: string;
@@ -73,6 +72,16 @@ async function ensureUniqueId(check: (id: string) => Promise<boolean>) {
     id = generateShortId();
   }
   return id;
+}
+
+function isNotFoundError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2025';
+}
+
+async function withTx<T>(fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
+  // Prisma v7 transaction typing under bundler: use any casting for callback form
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  return (prisma as any).$transaction(fn as any) as Promise<T>;
 }
 
 export async function getDiagramPage({
@@ -183,7 +192,7 @@ export async function createDiagram({
     return Boolean(existing);
   });
 
-  const diagram = await prisma.$transaction(async (tx: TransactionClient) => {
+  const diagram = await withTx(async (tx: TransactionClient) => {
     const createdDiagram = await tx.diagram.create({
       data: {
         id: diagramId,
@@ -227,7 +236,7 @@ export async function updateDiagramById(
   const now = new Date();
   const hasContentUpdate = typeof updates.content === 'string';
 
-  const diagram = await prisma.$transaction(async (tx: TransactionClient) => {
+  const diagram = await withTx(async (tx: TransactionClient) => {
     await tx.diagram.update({
       where: { id },
       data: {
@@ -305,7 +314,7 @@ export async function createCheckpoint(
 
   const now = new Date();
 
-  const result = await prisma.$transaction(async (tx: TransactionClient) => {
+  const result = await withTx(async (tx: TransactionClient) => {
     await tx.diagram.update({
       where: { id: diagramId },
       data: {
@@ -364,7 +373,7 @@ export async function deleteDiagramById(id: string): Promise<boolean> {
     await prisma.diagram.delete({ where: { id } });
     return true;
   } catch (error: unknown) {
-    if (error instanceof PrismaClientKnownRequestError && error.code === 'P2025') {
+    if (isNotFoundError(error)) {
       return false;
     }
     if (error instanceof Error) {
@@ -375,7 +384,7 @@ export async function deleteDiagramById(id: string): Promise<boolean> {
 }
 
 export async function restoreDiagrams(diagrams: Diagram[]): Promise<void> {
-  await prisma.$transaction(async (tx: TransactionClient) => {
+  await withTx(async (tx: TransactionClient) => {
     await tx.content.deleteMany();
     await tx.diagram.deleteMany();
 

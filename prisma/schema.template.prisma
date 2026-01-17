@@ -8,7 +8,6 @@ generator client {
 
 datasource db {
   provider = "@@PROVIDER@@"
-  url      = env("DATABASE_URL")
 }
 
 model Diagram {
