@@ -11,17 +11,17 @@ datasource db {
 }
 
 model Diagram {
-  id         String    @id
-  title      String
-  emoji      String
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime
-  isFavorite Boolean   @default(false)
-  contents   Content[]
+  id           String    @id
+  title        String
+  emoji        String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime
+  isFavorite   Boolean   @default(false)
+  searchVector String    @default("")
+  contents     Content[]
 
   @@index([updatedAt], map: "diagram_updatedAt_idx")
-  // Optional future index for search tuning
-  // @@index([title], map: "diagram_title_idx")
+  @@index([searchVector], map: "diagram_searchVector_idx")
 }
 
 model Content {

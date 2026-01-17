@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '.prisma/client';
 import { prisma } from './prisma';
 import { Checkpoint, Diagram, DiagramPage } from './types';
 import { generateShortId, getRandomEmoji } from './utils';
@@ -9,15 +9,9 @@ const MAX_CHECKPOINTS = 15;
 const TITLE_MAX = 100;
 
 type TransactionClient = typeof prisma;
-type DiagramWithLatest = {
-  id: string;
-  title: string;
-  emoji: string;
-  createdAt: Date;
-  updatedAt: Date;
-  isFavorite: boolean;
-  contents: Array<{ content: string }>;
-};
+type DiagramWithLatest = Prisma.DiagramGetPayload<{
+  include: { contents: { orderBy: { updatedAt: 'desc' }; take: 1 } };
+}>;
 
 function normalizeLimit(limit?: number | null) {
   if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
@@ -29,10 +23,8 @@ function normalizeOffset(offset?: number | null) {
   return Math.max(Math.trunc(offset as number), 0);
 }
 
-function isSQLite() {
-  const provider = (process.env.PRISMA_PROVIDER || '').toLowerCase();
-  const url = (process.env.DATABASE_URL || process.env.DB_CONNECTION || '').toLowerCase();
-  return provider === 'sqlite' || url.startsWith('file:');
+function buildSearchVector(title: string, content: string) {
+  return `${title} ${content}`.toLowerCase();
 }
 
 function toDiagram(diagram: DiagramWithLatest): Diagram {
@@ -46,18 +38,6 @@ function toDiagram(diagram: DiagramWithLatest): Diagram {
     updatedAt: diagram.updatedAt.toISOString(),
     isFavorite: diagram.isFavorite,
   };
-}
-
-function filterByQuery(diagrams: DiagramWithLatest[], query?: string) {
-  if (!query) return diagrams;
-  const term = query.trim().toLowerCase();
-  if (!term) return diagrams;
-
-  return diagrams.filter((diagram) => {
-    const latestContent = diagram.contents[0]?.content ?? '';
-    const haystack = `${diagram.title} ${latestContent}`.toLowerCase();
-    return haystack.includes(term);
-  });
 }
 
 function validateLengths(title?: string, content?: string) {
@@ -96,55 +76,19 @@ export async function getDiagramPage({
   const normalizedLimit = normalizeLimit(limit);
   const normalizedOffset = normalizeOffset(offset);
 
-  if (query) {
-    if (!isSQLite()) {
-      const diagrams = await prisma.diagram.findMany({
-        where: {
-          OR: [
-            { title: { contains: query } },
-            { contents: { some: { content: { contains: query } } } },
-          ],
-        },
-        orderBy: { updatedAt: 'desc' },
-        skip: normalizedOffset,
-        take: normalizedLimit,
-        include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
-      });
-      const total = await prisma.diagram.count({
-        where: {
-          OR: [
-            { title: { contains: query } },
-            { contents: { some: { content: { contains: query } } } },
-          ],
-        },
-      });
-      const nextOffset = normalizedOffset + diagrams.length;
-      const hasMore = nextOffset < total;
-      return { items: diagrams.map(toDiagram), total, hasMore, nextOffset };
-    }
-
-    const diagrams = await prisma.diagram.findMany({
-      orderBy: { updatedAt: 'desc' },
-      include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
-    });
-
-    const filtered = filterByQuery(diagrams, query);
-    const items = filtered.slice(normalizedOffset, normalizedOffset + normalizedLimit).map(toDiagram);
-    const total = filtered.length;
-    const nextOffset = normalizedOffset + items.length;
-    const hasMore = nextOffset < total;
-
-    return { items, total, hasMore, nextOffset };
-  }
+  const where: Prisma.DiagramWhereInput | undefined = query?.trim()
+    ? { searchVector: { contains: query.trim().toLowerCase() } }
+    : undefined;
 
   const [diagrams, total] = await Promise.all([
     prisma.diagram.findMany({
+      where,
       orderBy: { updatedAt: 'desc' },
       skip: normalizedOffset,
       take: normalizedLimit,
       include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
     }),
-    prisma.diagram.count(),
+    prisma.diagram.count({ where }),
   ]);
 
   const items = diagrams.map(toDiagram);
@@ -193,14 +137,18 @@ export async function createDiagram({
   });
 
   const diagram = await withTx(async (tx: TransactionClient) => {
+    const nextTitle = title || 'Untitled Diagram';
+    const nextContent = content || 'graph TD\n    A[Start] --> B[End]';
+
     const createdDiagram = await tx.diagram.create({
       data: {
         id: diagramId,
-        title: title || 'Untitled Diagram',
+        title: nextTitle,
         emoji: emoji || getRandomEmoji(),
         createdAt: now,
         updatedAt: now,
         isFavorite: false,
+        searchVector: buildSearchVector(nextTitle, nextContent),
       },
     });
 
@@ -208,7 +156,7 @@ export async function createDiagram({
       data: {
         id: contentId,
         diagramId,
-        content: content || 'graph TD\n    A[Start] --> B[End]',
+        content: nextContent,
         updatedAt: now,
       },
     });
@@ -237,27 +185,21 @@ export async function updateDiagramById(
   const hasContentUpdate = typeof updates.content === 'string';
 
   const diagram = await withTx(async (tx: TransactionClient) => {
-    await tx.diagram.update({
-      where: { id },
-      data: {
-        title: updates.title ?? existing.title,
-        emoji: updates.emoji ?? existing.emoji,
-        isFavorite: typeof updates.isFavorite === 'boolean' ? updates.isFavorite : existing.isFavorite,
-        updatedAt: now,
-      },
+    const latestContent = await tx.content.findFirst({
+      where: { diagramId: id },
+      orderBy: { updatedAt: 'desc' },
     });
 
-    if (hasContentUpdate) {
-      const latestContent = await tx.content.findFirst({
-        where: { diagramId: id },
-        orderBy: { updatedAt: 'desc' },
-      });
+    const nextTitle = updates.title ?? existing.title;
+    let nextContent = latestContent?.content ?? '';
 
+    if (hasContentUpdate) {
+      nextContent = updates.content ?? nextContent;
       if (latestContent) {
         await tx.content.update({
           where: { id: latestContent.id },
           data: {
-            content: updates.content ?? latestContent.content,
+            content: nextContent,
             updatedAt: now,
           },
         });
@@ -271,12 +213,23 @@ export async function updateDiagramById(
           data: {
             id: contentId,
             diagramId: id,
-            content: updates.content ?? '',
+            content: nextContent,
             updatedAt: now,
           },
         });
       }
     }
+
+    await tx.diagram.update({
+      where: { id },
+      data: {
+        title: nextTitle,
+        emoji: updates.emoji ?? existing.emoji,
+        isFavorite: typeof updates.isFavorite === 'boolean' ? updates.isFavorite : existing.isFavorite,
+        updatedAt: now,
+        searchVector: buildSearchVector(nextTitle, nextContent),
+      },
+    });
 
     const latest = await tx.diagram.findUnique({
       where: { id },
@@ -315,14 +268,18 @@ export async function createCheckpoint(
   const now = new Date();
 
   const result = await withTx(async (tx: TransactionClient) => {
+    const nextTitle = payload.title ?? existing.title;
+    const nextContent = payload.content;
+
     await tx.diagram.update({
       where: { id: diagramId },
       data: {
-        title: payload.title ?? existing.title,
+        title: nextTitle,
         emoji: payload.emoji ?? existing.emoji,
         isFavorite:
           typeof payload.isFavorite === 'boolean' ? payload.isFavorite : existing.isFavorite,
         updatedAt: now,
+        searchVector: buildSearchVector(nextTitle, nextContent),
       },
     });
 
@@ -335,7 +292,7 @@ export async function createCheckpoint(
       data: {
         id: checkpointId,
         diagramId,
-        content: payload.content,
+        content: nextContent,
         updatedAt: now,
       },
     });
@@ -392,6 +349,8 @@ export async function restoreDiagrams(diagrams: Diagram[]): Promise<void> {
       const createdAt = diagram.createdAt ? new Date(diagram.createdAt) : new Date();
       const updatedAt = diagram.updatedAt ? new Date(diagram.updatedAt) : createdAt;
 
+      const searchVector = buildSearchVector(diagram.title, diagram.content);
+
       await tx.diagram.create({
         data: {
           id: diagram.id,
@@ -400,6 +359,7 @@ export async function restoreDiagrams(diagrams: Diagram[]): Promise<void> {
           createdAt,
           updatedAt,
           isFavorite: diagram.isFavorite,
+          searchVector,
         },
       });
 
