@@ -55,6 +55,9 @@ RUN npm run prisma:prepare && npx prisma generate
 # Build the application with standalone output
 RUN npm run build
 
+# Prepare a baseline SQLite database for runtime
+RUN mkdir -p /app/data && npx prisma db push
+
 # ============================================
 # Stage 3: Production runner (minimal image)
 # ============================================
@@ -71,6 +74,8 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+ENV PRISMA_AUTO_APPLY=true
+ENV PRISMA_FORCE_GENERATE=true
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \
@@ -83,14 +88,22 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 # 2. Standalone server (includes minimal node_modules)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 
+# 2b. Full node_modules for Prisma CLI + adapters (ensures runtime DB setup works)
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+
 # 3. Static files
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # 4. Prisma schema and engines for runtime client
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=deps --chown=nextjs:nodejs /app/scripts ./scripts
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+
+# 5. Baseline SQLite database (empty schema)
+COPY --from=builder --chown=nextjs:nodejs /app/data ./data
 
 # Create data directory for diagram persistence (SQLite default)
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data

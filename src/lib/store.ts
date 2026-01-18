@@ -4,6 +4,8 @@ import { DiagramStore } from './types';
 
 const DEFAULT_SETTINGS = {
   autoSave: true,
+  hasAiApiKey: false,
+  aiProvider: 'auto' as const,
 };
 
 export const useDiagramStore = create<DiagramStore>()(
@@ -46,6 +48,14 @@ export const useDiagramStore = create<DiagramStore>()(
       setAutoSave: (enabled) =>
         set((state) => ({
           settings: { ...state.settings, autoSave: enabled },
+        })),
+      setHasAiApiKey: (hasKey) =>
+        set((state) => ({
+          settings: { ...state.settings, hasAiApiKey: hasKey },
+        })),
+      setAiProvider: (provider) =>
+        set((state) => ({
+          settings: { ...state.settings, aiProvider: provider ?? 'auto' },
         })),
     }),
     {
