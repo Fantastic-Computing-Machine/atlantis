@@ -1,6 +1,7 @@
 'use client';
 
 import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
+import { PeekDiagramModal } from '@/components/PeekDiagramModal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +38,7 @@ import { useDiagramStore } from '@/lib/store';
 import { Diagram } from '@/lib/types';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
-import { BookOpen, Download, Github, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
+import { BookOpen, Download, Eye, Github, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -68,6 +69,7 @@ export function DiagramGrid({
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [peekDiagram, setPeekDiagram] = useState<Diagram | null>(null);
   const { setTheme, theme } = useTheme();
   const { settings, setAutoSave } = useDiagramStore();
   const router = useRouter();
@@ -392,8 +394,21 @@ export function DiagramGrid({
                     </CardDescription>
                   </div>
                 </div>
-                <div className="flex items-center">
-                    <DropdownMenu>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPeekDiagram(diagram);
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span className="sr-only">Peek diagram</span>
+                  </Button>
+                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
@@ -515,7 +530,7 @@ export function DiagramGrid({
               >
                 <Search className="h-4 w-4" />
                 <span className="hidden sm:inline">Search</span>
-                 <span className="text-xs text-muted-foreground hidden lg:inline">{shortcutHint}</span>
+                <span className="text-xs text-muted-foreground hidden lg:inline">{shortcutHint}</span>
 
               </Button>
             </div>
@@ -689,7 +704,7 @@ export function DiagramGrid({
                 <section>
                   {hasStarred && (
                     <h2 className="text-lg font-semibold mb-4 text-muted-foreground flex items-center gap-2">
-                          <span>All diagrams //</span>
+                      <span>All diagrams //</span>
                       <span className="text-muted-foreground">
                         {otherDiagrams.length} of {Math.max(total - starredDiagrams.length, 0)}
                       </span>
@@ -697,7 +712,7 @@ export function DiagramGrid({
                   )}
                   {!hasStarred && (
                     <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                          <span>All diagrams //</span>
+                      <span>All diagrams //</span>
                       <span className="text-muted-foreground">
                         {otherDiagrams.length} of {Math.max(total - starredDiagrams.length, 0)}
                       </span>
@@ -771,6 +786,15 @@ export function DiagramGrid({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PeekDiagramModal
+        diagram={peekDiagram}
+        onClose={() => setPeekDiagram(null)}
+        onDelete={(id) => {
+          setPeekDiagram(null);
+          setDeleteId(id);
+        }}
+      />
     </>
   );
 }
