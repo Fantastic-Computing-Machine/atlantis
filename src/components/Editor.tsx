@@ -19,25 +19,21 @@ import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import CodeMirror from '@uiw/react-codemirror';
 import { Copy, Settings2, WrapText } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface EditorProps {
   value: string;
   onChange: (value: string) => void;
+  selectionRange?: { from: number; to: number } | null;
 }
 
-export function Editor({ value, onChange }: EditorProps) {
+export function Editor({ value, onChange, selectionRange }: EditorProps) {
   const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
   const [showLineNumbers, setShowLineNumbers] = useState(true);
   const [showIndentGuides, setShowIndentGuides] = useState(true);
   const [wordWrap, setWordWrap] = useState(true);
-
-  // Prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const editorViewRef = useRef<EditorView | null>(null);
 
   const handleChange = useCallback((val: string) => {
     onChange(val);
@@ -47,6 +43,24 @@ export function Editor({ value, onChange }: EditorProps) {
     navigator.clipboard.writeText(value);
     toast.success('Copied to clipboard');
   }, [value]);
+
+  const handleCreateEditor = useCallback((view: EditorView) => {
+    editorViewRef.current = view;
+  }, []);
+
+  useEffect(() => {
+    if (!selectionRange || !editorViewRef.current) return;
+    const view = editorViewRef.current;
+    const docLength = view.state.doc.length;
+    const from = Math.max(0, Math.min(selectionRange.from, docLength));
+    const to = Math.max(from, Math.min(selectionRange.to, docLength));
+
+    view.dispatch({
+      selection: { anchor: from, head: to },
+      effects: EditorView.scrollIntoView(from, { y: 'center' })
+    });
+    view.focus();
+  }, [selectionRange]);
 
   const extensions = useMemo(() => {
     const exts = [];
@@ -139,8 +153,9 @@ export function Editor({ value, onChange }: EditorProps) {
         <CodeMirror
           value={value}
           height="100%"
-          theme={mounted && resolvedTheme === 'dark' ? 'dark' : 'light'}
+          theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
           onChange={handleChange}
+          onCreateEditor={handleCreateEditor}
           extensions={extensions}
           className="h-full text-sm [&_.cm-editor]:h-full [&_.cm-scroller]:!overflow-auto"
           basicSetup={{

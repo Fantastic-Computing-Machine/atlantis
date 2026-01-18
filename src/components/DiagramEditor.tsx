@@ -36,10 +36,113 @@ interface DiagramEditorProps {
   initialDiagram: Diagram;
 }
 
+type NodeSelection = { id: string; label?: string };
+type TextRange = { from: number; to: number };
+
+const COLOR_PRESETS = [
+  { name: 'Blue', value: '#3b82f6' },
+  { name: 'Green', value: '#22c55e' },
+  { name: 'Amber', value: '#f59e0b' },
+  { name: 'Orange', value: '#f97316' },
+  { name: 'Red', value: '#ef4444' },
+  { name: 'Purple', value: '#8b5cf6' },
+  { name: 'Pink', value: '#ec4899' },
+  { name: 'Slate', value: '#94a3b8' }
+] as const;
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const findNodeDefinitionRange = (content: string, nodeId: string): TextRange | null => {
+  const pattern = new RegExp(
+    `(^|\\s)${escapeRegExp(nodeId)}\\s*(\\[|\\(|\\{|\"|:::|>|\\{\\{)`,
+    'm'
+  );
+  const match = pattern.exec(content);
+  if (!match || match.index === undefined) return null;
+
+  const lineStart = content.lastIndexOf('\n', match.index) + 1;
+  const lineEnd = content.indexOf('\n', match.index);
+  return {
+    from: lineStart,
+    to: lineEnd === -1 ? content.length : lineEnd
+  };
+};
+
+const getNodeFillColor = (content: string, nodeId: string): string | null => {
+  const styleRegex = new RegExp(`^\\s*style\\s+${escapeRegExp(nodeId)}\\s+([^\\n]+)$`, 'm');
+  const match = styleRegex.exec(content);
+  if (!match) return null;
+  const fillMatch = match[1].match(/fill:\\s*([^,\\s]+)/);
+  return fillMatch ? fillMatch[1].trim() : null;
+};
+
+const upsertNodeStyleLine = (content: string, nodeId: string, color: string | null): string => {
+  const lines = content.split('\n');
+  const styleRegex = new RegExp(`^\\s*style\\s+${escapeRegExp(nodeId)}\\s+([^\\n]+)$`);
+  const nodeRegex = new RegExp(
+    `(^|\\s)${escapeRegExp(nodeId)}\\s*(\\[|\\(|\\{|\"|:::|>|\\{\\{)`
+  );
+  const styleIndex = lines.findIndex((line) => styleRegex.test(line));
+  const nodeIndex = lines.findIndex((line) => nodeRegex.test(line));
+
+  if (color === null) {
+    if (styleIndex !== -1) {
+      lines.splice(styleIndex, 1);
+    }
+    return lines.join('\n');
+  }
+
+  const buildProps = (existing?: string) => {
+    const parts = (existing ?? '')
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    let hasFill = false;
+    let hasStroke = false;
+    let hasStrokeWidth = false;
+
+    const updated = parts.map((part) => {
+      if (part.startsWith('fill:')) {
+        hasFill = true;
+        return `fill:${color}`;
+      }
+      if (part.startsWith('stroke:')) {
+        hasStroke = true;
+        return part;
+      }
+      if (part.startsWith('stroke-width')) {
+        hasStrokeWidth = true;
+        return part;
+      }
+      return part;
+    });
+
+    if (!hasFill) updated.unshift(`fill:${color}`);
+    if (!hasStroke) updated.push('stroke:#333');
+    if (!hasStrokeWidth) updated.push('stroke-width:1px');
+
+    return updated.join(',');
+  };
+
+  if (styleIndex !== -1) {
+    const match = lines[styleIndex].match(styleRegex);
+    const props = match?.[1] ?? '';
+    lines[styleIndex] = `style ${nodeId} ${buildProps(props)}`;
+  } else {
+    const insertAt = nodeIndex !== -1 ? nodeIndex + 1 : lines.length;
+    lines.splice(insertAt, 0, `style ${nodeId} ${buildProps()}`);
+  }
+
+  return lines.join('\n');
+};
+
 export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const [diagram, setDiagram] = useState<Diagram>(initialDiagram);
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<NodeSelection | null>(null);
+  const [selectionRange, setSelectionRange] = useState<TextRange | null>(null);
   const { setTheme, theme } = useTheme();
   const settings = useDiagramStore((state) => state.settings);
   const updateDiagram = useDiagramStore((state) => state.updateDiagram);
@@ -52,6 +155,15 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!selectedNode) {
+      setSelectionRange(null);
+      return;
+    }
+    const range = findNodeDefinitionRange(diagram.content, selectedNode.id);
+    setSelectionRange(range);
+  }, [diagram.content, selectedNode]);
+
   const handleEditorChange = (value: string) => {
     setDiagram((prev) => ({ ...prev, content: value }));
   };
@@ -59,6 +171,20 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDiagram((prev) => ({ ...prev, title: e.target.value }));
   };
+
+  const handleNodeSelect = useCallback((node: NodeSelection) => {
+    setSelectedNode(node);
+    const range = findNodeDefinitionRange(diagram.content, node.id);
+    setSelectionRange(range);
+  }, [diagram.content]);
+
+  const handleNodeColorChange = useCallback((color: string | null) => {
+    if (!selectedNode) return;
+    setDiagram((prev) => {
+      const updatedContent = upsertNodeStyleLine(prev.content, selectedNode.id, color);
+      return { ...prev, content: updatedContent };
+    });
+  }, [selectedNode]);
 
   const saveChanges = useCallback(async (showToast = true) => {
     try {
@@ -164,6 +290,8 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     }
   };
 
+  const selectedNodeColor = selectedNode ? getNodeFillColor(diagram.content, selectedNode.id) : null;
+
   // Show loading state until client hydration is complete
   if (!mounted) {
     return (
@@ -245,15 +373,58 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
         <div className="flex-1 min-h-0">
           <ResizablePanelGroup direction="horizontal">
             <ResizablePanel defaultSize={45} minSize={25}>
-              <Editor value={diagram.content} onChange={handleEditorChange} />
+              <Editor
+                value={diagram.content}
+                onChange={handleEditorChange}
+                selectionRange={selectionRange}
+              />
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={55} minSize={25}>
-              <Canvas code={diagram.content} diagramId={diagram.id} title={diagram.title} />
+              <Canvas
+                code={diagram.content}
+                diagramId={diagram.id}
+                title={diagram.title}
+                selectedNodeId={selectedNode?.id}
+                onNodeSelect={handleNodeSelect}
+              />
             </ResizablePanel>
           </ResizablePanelGroup>
         </div>
       </div>
+
+      {selectedNode && (
+        <div className="fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full border bg-background/90 px-4 py-2 shadow-lg backdrop-blur">
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
+            Block {selectedNode.label || selectedNode.id}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-3"
+              onClick={() => handleNodeColorChange(null)}
+            >
+              Default
+            </Button>
+            <div className="flex items-center gap-1">
+              {COLOR_PRESETS.map((color) => {
+                const isActive = selectedNodeColor === color.value;
+                return (
+                  <button
+                    key={color.value}
+                    type="button"
+                    aria-label={`Set ${selectedNode.label ?? selectedNode.id} color to ${color.name}`}
+                    className={`h-8 w-8 rounded-full border border-border shadow-sm transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${isActive ? 'ring-2 ring-offset-2 ring-primary ring-offset-background' : ''}`}
+                    style={{ backgroundColor: color.value }}
+                    onClick={() => handleNodeColorChange(color.value)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <GlobalSearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
     </>
