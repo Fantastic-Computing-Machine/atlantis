@@ -1,6 +1,7 @@
 'use client';
 
 import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
+import { AiSettingsDialog } from '@/components/AiSettingsDialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -9,6 +10,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -20,11 +29,11 @@ import { useDiagramStore } from '@/lib/store';
 import { Checkpoint, Diagram } from '@/lib/types';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { copyToClipboard, formatDate } from '@/lib/utils';
-import { History, Info, Moon, Save, Search, Share2, Star, Sun } from 'lucide-react';
+import { History, Info, KeyRound, Moon, Save, Search, Share2, Star, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 const Canvas = dynamic(() => import('@/components/Canvas').then((mod) => mod.Canvas), {
@@ -62,6 +71,83 @@ const COLOR_PRESETS = [
 ] as const;
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+type NodeOption = { id: string; label?: string };
+
+const EDGE_RE =
+  /(-->|\s---\s|-\.-?>|==>|<--|<---|<-\.-?|<==|--\s*[^-]+\s*-->|==\s*[^=]+\s*==>)/;
+const DIRECTIVE_RE =
+  /^\s*(flowchart|graph|style|classDef|class|linkStyle|subgraph|end|click)\b/i;
+
+const extractMermaidNodes = (src: string): NodeOption[] => {
+  const nodes = new Map<string, NodeOption>();
+
+  const ensureNode = (idRaw: string, labelRaw?: string) => {
+    const id = idRaw.trim();
+    if (!id) return;
+    const cleanLabel = labelRaw?.trim();
+    const existing = nodes.get(id);
+    if (!existing) {
+      nodes.set(id, cleanLabel && cleanLabel !== id ? { id, label: cleanLabel } : { id });
+      return;
+    }
+    if ((!existing.label || existing.label === existing.id) && cleanLabel && cleanLabel !== id) {
+      nodes.set(id, { id, label: cleanLabel });
+    }
+  };
+
+  const lines = src.split(/\r?\n/);
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (DIRECTIVE_RE.test(line)) continue;
+
+    // Edge lines: collect endpoints only
+    if (EDGE_RE.test(line)) {
+      const sanitized = line
+        .replace(/\s*--\s*[^-]+?\s*-->\s*/g, ' --> ')
+        .replace(/\s*==\s*[^=]+?\s*==>\s*/g, ' ==> ');
+      const parts = sanitized.split(/\s+(?:-->|==>|---|-\.-?>|<--|<==)\s+/);
+      parts.forEach((part) => {
+        const idMatch = part.trim().match(/^[A-Za-z_][A-Za-z0-9_:-]*/);
+        if (idMatch) ensureNode(idMatch[0]);
+      });
+      continue;
+    }
+
+    // Node declarations with shapes/labels
+    const decl = line.match(
+      /^([A-Za-z_][A-Za-z0-9_:-]*)\s*(?:\(\(|\(|\[\[|\[|\{)\s*("?)(.*?)\2\s*(?:\]\]|\]|\}|\)\)|\))\s*$/
+    );
+    if (decl) {
+      const [, id, , label] = decl;
+      ensureNode(id, label);
+      continue;
+    }
+
+    // Bare node id
+    const bare = line.match(/^([A-Za-z_][A-Za-z0-9_:-]*)\s*$/);
+    if (bare) {
+      ensureNode(bare[1]);
+    }
+  }
+
+  return Array.from(nodes.values()).sort((a, b) => a.id.localeCompare(b.id));
+};
+
+const getNodeIdFromLine = (line: string): string | null => {
+  const styleMatch = line.match(/^\s*style\s+([A-Za-z0-9_:-]+)/);
+  if (styleMatch) return styleMatch[1];
+
+  // Ignore edge-only lines to avoid showing palette on connectors
+  if (/\s*[A-Za-z0-9_:-]+\s*[-.]*[-=]*>\s*[A-Za-z0-9_:-]+/.test(line)) return null;
+  if (/\s*[A-Za-z0-9_:-]+\s*---\s*[A-Za-z0-9_:-]+/.test(line)) return null;
+
+  const nodeMatch = line.match(/(^|\s)([A-Za-z0-9_:-]+)\s*(\[|\(|\{|\"|:::|>|\\{\\{)/);
+  if (nodeMatch) return nodeMatch[2];
+
+  return null;
+};
 
 const findNodeDefinitionRange = (content: string, nodeId: string): TextRange | null => {
   const pattern = new RegExp(
@@ -110,28 +196,16 @@ const upsertNodeStyleLine = (content: string, nodeId: string, color: string | nu
       .filter(Boolean);
 
     let hasFill = false;
-    let hasStroke = false;
-    let hasStrokeWidth = false;
 
     const updated = parts.map((part) => {
       if (part.startsWith('fill:')) {
         hasFill = true;
         return `fill:${color}`;
       }
-      if (part.startsWith('stroke:')) {
-        hasStroke = true;
-        return part;
-      }
-      if (part.startsWith('stroke-width')) {
-        hasStrokeWidth = true;
-        return part;
-      }
       return part;
     });
 
     if (!hasFill) updated.unshift(`fill:${color}`);
-    if (!hasStroke) updated.push('stroke:#333');
-    if (!hasStrokeWidth) updated.push('stroke-width:1px');
 
     return updated.join(',');
   };
@@ -139,10 +213,12 @@ const upsertNodeStyleLine = (content: string, nodeId: string, color: string | nu
   if (styleIndex !== -1) {
     const match = lines[styleIndex].match(styleRegex);
     const props = match?.[1] ?? '';
-    lines[styleIndex] = `style ${nodeId} ${buildProps(props)}`;
+    const indent = lines[styleIndex].match(/^\s*/)?.[0] ?? '';
+    lines[styleIndex] = `${indent}style ${nodeId} ${buildProps(props)}`;
   } else {
     const insertAt = nodeIndex !== -1 ? nodeIndex + 1 : lines.length;
-    lines.splice(insertAt, 0, `style ${nodeId} ${buildProps()}`);
+    const indent = nodeIndex !== -1 ? lines[nodeIndex].match(/^\s*/)?.[0] ?? '' : '';
+    lines.splice(insertAt, 0, `${indent}style ${nodeId} ${buildProps()}`);
   }
 
   return lines.join('\n');
@@ -153,6 +229,8 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<NodeSelection | null>(null);
+  const [selectionRange, setSelectionRange] = useState<TextRange | null>(null);
   const { shortcutHint } = useShortcutPlatform();
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [isLoadingCheckpoints, setIsLoadingCheckpoints] = useState(false);
@@ -160,10 +238,15 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const { setTheme, theme } = useTheme();
   const settings = useDiagramStore((state) => state.settings);
   const updateDiagram = useDiagramStore((state) => state.updateDiagram);
+  const setHasAiApiKey = useDiagramStore((state) => state.setHasAiApiKey);
+  const setAiProvider = useDiagramStore((state) => state.setAiProvider);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef(initialDiagram.content);
   const lastSavedTitleRef = useRef(initialDiagram.title);
   const lastSavedDescriptionRef = useRef(initialDiagram.description);
+  const selectedNodeId = selectedNode?.id ?? null;
+  const [aiChatOpen, setAiChatOpen] = useState(false);
+  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
 
   // Prevent hydration mismatch by only rendering client-dependent UI after mount
   useEffect(() => {
@@ -171,13 +254,31 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   }, []);
 
   useEffect(() => {
-    if (!selectedNode) {
+    const loadAiKey = async () => {
+      try {
+        const res = await fetch('/api/settings/ai-key');
+        const data = await res.json();
+        if (typeof data.hasKey === 'boolean') {
+          setHasAiApiKey(data.hasKey);
+        }
+        if (typeof data.provider === 'string') {
+          setAiProvider(data.provider);
+        }
+      } catch {
+        // silently ignore; AI is optional
+      }
+    };
+    loadAiKey();
+  }, [setHasAiApiKey, setAiProvider]);
+
+  useEffect(() => {
+    if (!selectedNodeId) {
       setSelectionRange(null);
       return;
     }
-    const range = findNodeDefinitionRange(diagram.content, selectedNode.id);
+    const range = findNodeDefinitionRange(diagram.content, selectedNodeId);
     setSelectionRange(range);
-  }, [diagram.content, selectedNode]);
+  }, [diagram.content, selectedNodeId]);
 
   const handleEditorChange = (value: string) => {
     setDiagram((prev) => ({ ...prev, content: value }));
@@ -190,6 +291,55 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setDiagram((prev) => ({ ...prev, description: e.target.value }));
   };
+
+  const handleNodeSelect = useCallback((node: NodeSelection) => {
+    setSelectedNode(node);
+    const range = findNodeDefinitionRange(diagram.content, node.id);
+    setSelectionRange(range);
+  }, [diagram.content]);
+
+  const nodeOptions = useMemo(() => {
+    const nodes = extractMermaidNodes(diagram.content);
+    if (selectedNode && !nodes.some((node) => node.id === selectedNode.id)) {
+      nodes.unshift(selectedNode);
+    }
+    return nodes;
+  }, [diagram.content, selectedNode]);
+
+  const handleCursorLineChange = useCallback((line: string) => {
+    const nodeId = getNodeIdFromLine(line);
+    if (!nodeId) {
+      setSelectedNode(null);
+      setSelectionRange(null);
+      return;
+    }
+    if (nodeId === selectedNodeId) return;
+    const node = nodeOptions.find((item) => item.id === nodeId) ?? { id: nodeId };
+    setSelectedNode(node);
+    const range = findNodeDefinitionRange(diagram.content, nodeId);
+    setSelectionRange(range);
+  }, [diagram.content, nodeOptions, selectedNodeId]);
+
+  const handleNodeColorChange = useCallback((color: string | null) => {
+    if (!selectedNodeId) return;
+    setDiagram((prev) => {
+      const updatedContent = upsertNodeStyleLine(prev.content, selectedNodeId, color);
+      return { ...prev, content: updatedContent };
+    });
+  }, [selectedNodeId]);
+
+  const handleToggleAiChat = useCallback(() => {
+    if (!settings.hasAiApiKey) {
+      setIsAiSettingsOpen(true);
+      return;
+    }
+    setAiChatOpen((prev) => !prev);
+  }, [settings.hasAiApiKey]);
+
+  const handleApplyAiContent = useCallback((content: string) => {
+    setDiagram((prev) => ({ ...prev, content }));
+    updateDiagram(diagram.id, { content });
+  }, [diagram.id, updateDiagram]);
 
   const saveChanges = useCallback(async (showToast = true) => {
     try {
@@ -297,6 +447,8 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
       toast.error('Failed to update favorite');
     }
   };
+
+  const selectedNodeColor = selectedNodeId ? getNodeFillColor(diagram.content, selectedNodeId) : null;
 
   const loadCheckpoints = useCallback(async () => {
     setIsLoadingCheckpoints(true);
@@ -437,6 +589,15 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
               <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             </Button>
 
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsAiSettingsOpen(true)}
+              aria-label="AI settings"
+            >
+              <KeyRound className="h-4 w-4" />
+            </Button>
+
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -486,6 +647,13 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
                 value={diagram.content}
                 onChange={handleEditorChange}
                 selectionRange={selectionRange}
+                onCursorLineChange={handleCursorLineChange}
+                onToggleAiChat={handleToggleAiChat}
+                aiEnabled={aiChatOpen}
+                hasAiKey={settings.hasAiApiKey}
+                aiChatOpen={aiChatOpen}
+                onApplyAiContent={handleApplyAiContent}
+                diagramId={diagram.id}
               />
             </ResizablePanel>
             <ResizableHandle withHandle />
@@ -494,7 +662,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
                 code={diagram.content}
                 diagramId={diagram.id}
                 title={diagram.title}
-                selectedNodeId={selectedNode?.id}
+                selectedNodeId={selectedNodeId}
                 onNodeSelect={handleNodeSelect}
               />
             </ResizablePanel>
@@ -504,9 +672,38 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
 
       {selectedNode && (
         <div className="fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full border bg-background/90 px-4 py-2 shadow-lg backdrop-blur">
-          <span className="text-sm text-muted-foreground whitespace-nowrap">
-            Block {selectedNode.label || selectedNode.id}
-          </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full bg-muted/50 px-2 py-1 text-sm text-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                aria-label="Select block"
+              >
+                <span className="whitespace-nowrap">Block {selectedNode.label || selectedNode.id}</span>
+                <span className="text-xs text-muted-foreground">▾</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56 max-h-64 overflow-auto">
+              <DropdownMenuLabel>Blocks</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {nodeOptions.length === 0 ? (
+                <DropdownMenuItem disabled>No blocks found</DropdownMenuItem>
+              ) : (
+                nodeOptions.map((node) => (
+                  <DropdownMenuItem
+                    key={node.id}
+                    onClick={() => handleNodeSelect(node)}
+                    className={node.id === selectedNode?.id ? 'bg-muted' : ''}
+                  >
+                    <span className="truncate">{node.label || node.id}</span>
+                    {node.label && (
+                      <span className="ml-auto text-xs text-muted-foreground">{node.id}</span>
+                    )}
+                  </DropdownMenuItem>
+                ))
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -532,10 +729,19 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
               })}
             </div>
           </div>
+          <button
+            type="button"
+            className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            aria-label="Close block tools"
+            onClick={() => setSelectedNode(null)}
+          >
+            ×
+          </button>
         </div>
       )}
 
       <GlobalSearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
+      <AiSettingsDialog open={isAiSettingsOpen} onOpenChange={setIsAiSettingsOpen} />
 
       <Dialog open={isInfoOpen} onOpenChange={setIsInfoOpen}>
         <DialogContent className="sm:max-w-[425px]">

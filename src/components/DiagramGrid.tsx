@@ -38,7 +38,8 @@ import { useDiagramStore } from '@/lib/store';
 import { Diagram } from '@/lib/types';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
-import { BookOpen, Download, Eye, Github, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
+import { AiSettingsDialog } from '@/components/AiSettingsDialog';
+import { BookOpen, Download, Eye, Github, KeyRound, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -71,10 +72,11 @@ export function DiagramGrid({
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [peekDiagram, setPeekDiagram] = useState<Diagram | null>(null);
   const { setTheme, theme } = useTheme();
-  const { settings, setAutoSave } = useDiagramStore();
+  const { settings, setAutoSave, setHasAiApiKey, setAiProvider } = useDiagramStore();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
 
   useEffect(() => {
     setDiagrams(initialDiagrams);
@@ -83,6 +85,24 @@ export function DiagramGrid({
     setTotal(initialTotal ?? initialDiagrams.length);
     setIsLoading(false);
   }, [initialDiagrams, initialHasMore, initialNextOffset, initialTotal]);
+
+  useEffect(() => {
+    const loadAiKey = async () => {
+      try {
+        const res = await fetch('/api/settings/ai-key');
+        const data = await res.json();
+        if (typeof data.hasKey === 'boolean') {
+          setHasAiApiKey(data.hasKey);
+        }
+        if (typeof data.provider === 'string') {
+          setAiProvider(data.provider);
+        }
+      } catch {
+        // ignore; AI optional
+      }
+    };
+    loadAiKey();
+  }, [setHasAiApiKey, setAiProvider]);
 
   const fetchNextPage = useCallback(async () => {
     if (!hasMore || isFetchingMore) return;
@@ -616,6 +636,18 @@ export function DiagramGrid({
                     <Switch checked={settings.autoSave} onCheckedChange={setAutoSave} />
                   </DropdownMenuItem>
 
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setIsAiSettingsOpen(true);
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <KeyRound className="h-4 w-4" />
+                      <span>AI settings</span>
+                    </div>
+                  </DropdownMenuItem>
+
                   <DropdownMenuSeparator />
 
                   <DropdownMenuItem
@@ -774,6 +806,7 @@ export function DiagramGrid({
         onOpenChange={setIsSearchOpen}
         initialDiagrams={diagrams}
       />
+      <AiSettingsDialog open={isAiSettingsOpen} onOpenChange={setIsAiSettingsOpen} />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>

@@ -84,6 +84,8 @@ const isNodeElement = (element: Element): boolean => {
   if (element.hasAttribute('data-id')) return true;
   if (classList.includes('node') || classList.includes('cluster')) return true;
   if (classList.some((cls) => cls.endsWith('node') || cls.includes('node'))) return true;
+  const id = element.getAttribute('id') ?? '';
+  if (/^(flowchart|graph|classDiagram|stateDiagram|erDiagram)-/i.test(id)) return true;
   return !!element.querySelector('title');
 };
 
@@ -102,6 +104,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const transformRef = useRef<ReactZoomPanPinchRef>(null);
+  const pointerDownRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState<string | null>(null);
   const lastErrorRef = useRef<string | null>(null);
@@ -243,10 +246,43 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
     const svgEl = containerRef.current?.querySelector('svg');
     if (!svgEl) return;
 
-    const handleNodeClick = (event: MouseEvent) => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      const nodeEl =
+        (target?.closest('[data-id]') as Element | null) ??
+        (target?.closest('g.node') as Element | null) ??
+        (target?.closest('g.cluster') as Element | null) ??
+        null;
+
+      pointerDownRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+        time: Date.now()
+      };
+
+      // Prevent pan start when clicking a node
+      if (nodeEl) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+    };
+
+    const handlePointerUp = (event: PointerEvent) => {
+      const start = pointerDownRef.current;
+      pointerDownRef.current = null;
+      if (!start) return;
+
+      const dx = Math.abs(event.clientX - start.x);
+      const dy = Math.abs(event.clientY - start.y);
+      if (dx > 6 || dy > 6) return;
+
       const target = event.target as Element | null;
       if (!target) return;
-      const nodeEl = findNodeElement(target, svgEl);
+      const nodeEl =
+        (target.closest('[data-id]') as Element | null) ??
+        (target.closest('g.node') as Element | null) ??
+        (target.closest('g.cluster') as Element | null) ??
+        findNodeElement(target, svgEl);
       if (!nodeEl) return;
       const nodeId = extractNodeId(nodeEl);
       if (!nodeId) return;
@@ -255,8 +291,12 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       onNodeSelect({ id: nodeId, label });
     };
 
-    svgEl.addEventListener('click', handleNodeClick);
-    return () => svgEl.removeEventListener('click', handleNodeClick);
+    svgEl.addEventListener('pointerdown', handlePointerDown);
+    svgEl.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      svgEl.removeEventListener('pointerdown', handlePointerDown);
+      svgEl.removeEventListener('pointerup', handlePointerUp);
+    };
   }, [svg, onNodeSelect]);
 
   useEffect(() => {
@@ -269,12 +309,18 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
     nodeElements.forEach((el) => {
       (el as SVGElement).style.cursor = onNodeSelect ? 'pointer' : '';
       (el as SVGElement).style.filter = '';
+      el.classList.remove('mermaid-node-selected');
+      (el as SVGElement).style.pointerEvents = onNodeSelect ? 'all' : '';
+      Array.from(el.querySelectorAll('*')).forEach((child) => {
+        (child as SVGElement).style.pointerEvents = onNodeSelect ? 'all' : '';
+      });
     });
 
     if (!selectedNodeId) return;
     const active = nodeElements.find((el) => extractNodeId(el) === selectedNodeId);
     if (active) {
       (active as SVGElement).style.filter = 'drop-shadow(0 0 8px rgba(59,130,246,0.55))';
+      active.classList.add('mermaid-node-selected');
     }
   }, [selectedNodeId, svg, onNodeSelect]);
 

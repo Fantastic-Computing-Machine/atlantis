@@ -128,3 +128,16 @@
     @apply bg-background text-foreground;
   }
 }
+
+.cm-highlight-line {
+  background-color: color-mix(in oklch, var(--primary) 18%, transparent);
+}
+
+.mermaid-node-selected rect,
+.mermaid-node-selected polygon,
+.mermaid-node-selected path,
+.mermaid-node-selected ellipse,
+.mermaid-node-selected circle {
+  stroke: color-mix(in oklch, var(--primary) 65%, black) !important;
+  stroke-width: 2px !important;
+}

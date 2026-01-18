@@ -25,6 +25,8 @@ export interface DiagramPage {
 
 export interface AppSettings {
   autoSave: boolean;
+  hasAiApiKey: boolean;
+  aiProvider?: 'openai' | 'gemini' | 'auto';
 }
 
 export interface DiagramStore {
@@ -39,4 +41,6 @@ export interface DiagramStore {
   removeDiagram: (id: string) => void;
   toggleFavorite: (id: string) => void;
   setAutoSave: (enabled: boolean) => void;
+  setHasAiApiKey: (hasKey: boolean) => void;
+  setAiProvider: (provider: AppSettings['aiProvider']) => void;
 }
