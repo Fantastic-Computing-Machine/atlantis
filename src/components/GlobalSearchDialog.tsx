@@ -46,7 +46,7 @@ export function GlobalSearchDialog({
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [viewportEl, setViewportEl] = useState<HTMLDivElement | null>(null);
   const [sentinelEl, setSentinelRef] = useState<HTMLDivElement | null>(null);
-  const { isMac, shortcutSymbol } = useShortcutPlatform();
+  const { shortcutSymbol } = useShortcutPlatform();
 
   useEffect(() => {
     if (initialDiagrams) {

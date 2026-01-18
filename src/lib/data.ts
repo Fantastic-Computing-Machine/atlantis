@@ -1,8 +1,9 @@
-import type { Prisma } from '.prisma/client';
+import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { Checkpoint, Diagram, DiagramPage } from './types';
 import { generateShortId, getRandomEmoji } from './utils';
-import { buildSearchVector } from './search';
+
+import { buildSearchVector } from '../../scripts/searchVector';
 
 const DEFAULT_PAGE_SIZE = 24;
 const MAX_PAGE_SIZE = 100;
@@ -31,6 +32,7 @@ type DiagramWithLatest = Prisma.DiagramGetPayload<{
   select: typeof diagramWithLatestSelect;
 }>;
 
+
 function normalizeLimit(limit?: number | null) {
   if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
   return Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE);
@@ -56,7 +58,7 @@ function toDiagram(diagram: DiagramWithLatest): Diagram {
   };
 }
 
-function validateLengths(title?: string, description?: string, content?: string) {
+function validateLengths(title?: string, description?: string) {
   if (typeof title === 'string' && title.length > TITLE_MAX) {
     throw new Error(`Title exceeds ${TITLE_MAX} characters`);
   }
@@ -80,9 +82,7 @@ function isNotFoundError(error: unknown): boolean {
 }
 
 async function withTx<T>(fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
-  // Prisma v7 transaction typing under bundler: use any casting for callback form
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-  return (prisma as any).$transaction(fn as any) as Promise<T>;
+  return prisma.$transaction(async (tx) => fn(tx as TransactionClient)) as Promise<T>;
 }
 
 export async function getDiagramPage({

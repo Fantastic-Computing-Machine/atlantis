@@ -35,3 +35,10 @@ model Content {
 
   @@index([diagramId, updatedAt], map: "content_diagram_updated_idx")
 }
+
+model Setting {
+  key       String   @id
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

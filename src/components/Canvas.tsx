@@ -48,6 +48,8 @@ interface CanvasProps {
   code: string;
   diagramId?: string;
   title?: string;
+  selectedNodeId?: string | null;
+  onNodeSelect?: (node: { id: string; label?: string }) => void;
 }
 
 type BgPattern = 'none' | 'dots' | 'grid';
@@ -55,10 +57,54 @@ type BgPattern = 'none' | 'dots' | 'grid';
 // Smooth animation duration in ms
 const ANIMATION_DURATION = 200;
 
-export function Canvas({ code, diagramId, title }: CanvasProps) {
+const extractNodeId = (element: Element): string | null => {
+  const dataId = element.getAttribute('data-id');
+  if (dataId) return dataId;
+
+  const title = element.querySelector('title')?.textContent?.trim();
+  if (title) return title;
+
+  const rawId = element.getAttribute('id');
+  if (!rawId) return null;
+
+  const cleaned = rawId
+    .replace(/^flowchart-/, '')
+    .replace(/^graph-/, '')
+    .replace(/^classDiagram-/, '')
+    .replace(/^stateDiagram-/, '')
+    .replace(/^erDiagram-/, '');
+
+  const trimmed = cleaned.replace(/-\d+$/, '');
+  return trimmed || null;
+};
+
+const isNodeElement = (element: Element): boolean => {
+  const classList = Array.from(element.classList);
+  if (classList.includes('edgePath') || classList.includes('edgeLabel')) return false;
+  if (element.hasAttribute('data-id')) return true;
+  if (classList.includes('node') || classList.includes('cluster')) return true;
+  if (classList.some((cls) => cls.endsWith('node') || cls.includes('node'))) return true;
+  const id = element.getAttribute('id') ?? '';
+  if (/^(flowchart|graph|classDiagram|stateDiagram|erDiagram)-/i.test(id)) return true;
+  return !!element.querySelector('title');
+};
+
+const findNodeElement = (start: Element | null, root: SVGSVGElement): Element | null => {
+  let current: Element | null = start;
+  while (current && current !== root) {
+    if (current.tagName.toLowerCase() === 'g' && isNodeElement(current)) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+  return null;
+};
+
+export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const transformRef = useRef<ReactZoomPanPinchRef>(null);
+  const pointerDownRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState<string | null>(null);
   const lastErrorRef = useRef<string | null>(null);
@@ -194,6 +240,89 @@ export function Canvas({ code, diagramId, title }: CanvasProps) {
       return () => clearTimeout(timeout);
     }
   }, [svg]);
+
+  useEffect(() => {
+    if (!svg || !onNodeSelect) return;
+    const svgEl = containerRef.current?.querySelector('svg');
+    if (!svgEl) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      const nodeEl =
+        (target?.closest('[data-id]') as Element | null) ??
+        (target?.closest('g.node') as Element | null) ??
+        (target?.closest('g.cluster') as Element | null) ??
+        null;
+
+      pointerDownRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+        time: Date.now()
+      };
+
+      // Prevent pan start when clicking a node
+      if (nodeEl) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+    };
+
+    const handlePointerUp = (event: PointerEvent) => {
+      const start = pointerDownRef.current;
+      pointerDownRef.current = null;
+      if (!start) return;
+
+      const dx = Math.abs(event.clientX - start.x);
+      const dy = Math.abs(event.clientY - start.y);
+      if (dx > 6 || dy > 6) return;
+
+      const target = event.target as Element | null;
+      if (!target) return;
+      const nodeEl =
+        (target.closest('[data-id]') as Element | null) ??
+        (target.closest('g.node') as Element | null) ??
+        (target.closest('g.cluster') as Element | null) ??
+        findNodeElement(target, svgEl);
+      if (!nodeEl) return;
+      const nodeId = extractNodeId(nodeEl);
+      if (!nodeId) return;
+      const labelNode = nodeEl.querySelector('text');
+      const label = labelNode?.textContent?.trim();
+      onNodeSelect({ id: nodeId, label });
+    };
+
+    svgEl.addEventListener('pointerdown', handlePointerDown);
+    svgEl.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      svgEl.removeEventListener('pointerdown', handlePointerDown);
+      svgEl.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [svg, onNodeSelect]);
+
+  useEffect(() => {
+    if (!svg) return;
+    const svgEl = containerRef.current?.querySelector('svg');
+    if (!svgEl) return;
+
+    const nodes = Array.from(svgEl.querySelectorAll('g'));
+    const nodeElements = nodes.filter((el) => isNodeElement(el));
+    nodeElements.forEach((el) => {
+      (el as SVGElement).style.cursor = onNodeSelect ? 'pointer' : '';
+      (el as SVGElement).style.filter = '';
+      el.classList.remove('mermaid-node-selected');
+      (el as SVGElement).style.pointerEvents = onNodeSelect ? 'all' : '';
+      Array.from(el.querySelectorAll('*')).forEach((child) => {
+        (child as SVGElement).style.pointerEvents = onNodeSelect ? 'all' : '';
+      });
+    });
+
+    if (!selectedNodeId) return;
+    const active = nodeElements.find((el) => extractNodeId(el) === selectedNodeId);
+    if (active) {
+      (active as SVGElement).style.filter = 'drop-shadow(0 0 8px rgba(59,130,246,0.55))';
+      active.classList.add('mermaid-node-selected');
+    }
+  }, [selectedNodeId, svg, onNodeSelect]);
 
   // Recenter handler
   const handleRecenter = useCallback(() => {

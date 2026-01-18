@@ -1,5 +1,7 @@
 'use client';
 
+import { AiChatPanel } from '@/components/AiChatPanel';
+import { GeminiSpark } from '@/components/icons/GeminiSpark';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -14,30 +16,73 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { EditorView } from '@codemirror/view';
+import type { Extension } from '@codemirror/state';
+import { StateEffect, StateField } from '@codemirror/state';
+import type { ViewUpdate } from '@codemirror/view';
+import { Decoration, EditorView } from '@codemirror/view';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import CodeMirror from '@uiw/react-codemirror';
 import { Copy, Settings2, WrapText } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface EditorProps {
   value: string;
   onChange: (value: string) => void;
+  selectionRange?: { from: number; to: number } | null;
+  onCursorLineChange?: (line: string) => void;
+  onToggleAiChat?: () => void;
+  aiEnabled?: boolean;
+  hasAiKey?: boolean;
+  aiChatOpen?: boolean;
+  onApplyAiContent?: (content: string) => void;
+  diagramId?: string;
 }
 
-export function Editor({ value, onChange }: EditorProps) {
+const setHighlightedLine = StateEffect.define<{ from: number; to: number } | null>();
+const highlightLineField = StateField.define({
+  create() {
+    return Decoration.none;
+  },
+  update(decorations, tr) {
+    let next = decorations.map(tr.changes);
+    for (const effect of tr.effects) {
+      if (effect.is(setHighlightedLine)) {
+        const range = effect.value;
+        if (!range) {
+          next = Decoration.none;
+          break;
+        }
+        const line = tr.state.doc.lineAt(Math.max(0, Math.min(range.from, tr.state.doc.length)));
+        next = Decoration.set([
+          Decoration.line({ class: 'cm-highlight-line' }).range(line.from)
+        ]);
+        break;
+      }
+    }
+    return next;
+  },
+  provide: (field) => EditorView.decorations.from(field),
+});
+
+export function Editor({
+  value,
+  onChange,
+  selectionRange,
+  onCursorLineChange,
+  onToggleAiChat,
+  aiEnabled,
+  hasAiKey,
+  aiChatOpen,
+  onApplyAiContent,
+  diagramId,
+}: EditorProps) {
   const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
   const [showLineNumbers, setShowLineNumbers] = useState(true);
   const [showIndentGuides, setShowIndentGuides] = useState(true);
   const [wordWrap, setWordWrap] = useState(true);
-
-  // Prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const editorViewRef = useRef<EditorView | null>(null);
 
   const handleChange = useCallback((val: string) => {
     onChange(val);
@@ -48,8 +93,32 @@ export function Editor({ value, onChange }: EditorProps) {
     toast.success('Copied to clipboard');
   }, [value]);
 
+  const handleCreateEditor = useCallback((view: EditorView) => {
+    editorViewRef.current = view;
+  }, []);
+
+  useEffect(() => {
+    if (!editorViewRef.current) return;
+    const view = editorViewRef.current;
+    if (!selectionRange) {
+      view.dispatch({ effects: setHighlightedLine.of(null) });
+      return;
+    }
+    const docLength = view.state.doc.length;
+    const from = Math.max(0, Math.min(selectionRange.from, docLength));
+    const to = Math.max(from, Math.min(selectionRange.to, docLength));
+    view.dispatch({ effects: setHighlightedLine.of({ from, to }) });
+  }, [selectionRange]);
+
+  const handleUpdate = useCallback((update: ViewUpdate) => {
+    if (!onCursorLineChange) return;
+    if (!update.selectionSet) return;
+    const line = update.state.doc.lineAt(update.state.selection.main.head).text;
+    onCursorLineChange(line);
+  }, [onCursorLineChange]);
+
   const extensions = useMemo(() => {
-    const exts = [];
+    const exts: Extension[] = [highlightLineField];
     if (wordWrap) {
       exts.push(EditorView.lineWrapping);
     }
@@ -67,6 +136,27 @@ export function Editor({ value, onChange }: EditorProps) {
           Mermaid
         </span>
         <div className="flex items-center gap-1">
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={aiEnabled ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => {
+                  if (!hasAiKey) {
+                    toast.info('Add an AI key in settings to enable the assistant');
+                  }
+                  onToggleAiChat?.();
+                }}
+              >
+                <GeminiSpark className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {aiEnabled ? 'Hide AI chat' : 'Open AI helper'}
+            </TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -96,6 +186,8 @@ export function Editor({ value, onChange }: EditorProps) {
               {wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
             </TooltipContent>
           </Tooltip>
+
+
 
           <DropdownMenu>
             <Tooltip>
@@ -134,27 +226,38 @@ export function Editor({ value, onChange }: EditorProps) {
         </div>
       </div>
 
-      {/* Code Editor */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <CodeMirror
-          value={value}
-          height="100%"
-          theme={mounted && resolvedTheme === 'dark' ? 'dark' : 'light'}
-          onChange={handleChange}
-          extensions={extensions}
-          className="h-full text-sm [&_.cm-editor]:h-full [&_.cm-scroller]:!overflow-auto"
-          basicSetup={{
-            lineNumbers: showLineNumbers,
-            foldGutter: true,
-            highlightActiveLine: true,
-            highlightActiveLineGutter: true,
-            indentOnInput: true,
-            bracketMatching: true,
-            closeBrackets: true,
-            autocompletion: false,
-            highlightSelectionMatches: true,
-          }}
-        />
+      {/* Code Editor + AI Panel */}
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0">
+          <CodeMirror
+            value={value}
+            height="100%"
+            theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
+            onChange={handleChange}
+            onCreateEditor={handleCreateEditor}
+            onUpdate={handleUpdate}
+            extensions={extensions}
+            className="h-full text-sm [&_.cm-editor]:h-full [&_.cm-scroller]:!overflow-auto"
+            basicSetup={{
+              lineNumbers: showLineNumbers,
+              foldGutter: true,
+              highlightActiveLine: true,
+              highlightActiveLineGutter: true,
+              indentOnInput: true,
+              bracketMatching: true,
+              closeBrackets: true,
+              autocompletion: false,
+              highlightSelectionMatches: true,
+            }}
+          />
+        </div>
+        {aiChatOpen && onApplyAiContent && diagramId && (
+          <AiChatPanel
+            diagramId={diagramId}
+            currentContent={value}
+            onApply={onApplyAiContent}
+          />
+        )}
       </div>
     </div>
   );
