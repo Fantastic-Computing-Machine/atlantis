@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Star, Loader2 } from 'lucide-react';
@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
+import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, formatDate } from '@/lib/utils';
 import type { Diagram } from '@/lib/types';
 
@@ -40,10 +41,18 @@ export function GlobalSearchDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [viewportEl, setViewportEl] = useState<HTMLDivElement | null>(null);
+  const [sentinelEl, setSentinelRef] = useState<HTMLDivElement | null>(null);
+  const { isMac, shortcutSymbol } = useShortcutPlatform();
 
   useEffect(() => {
     if (initialDiagrams) {
       setDiagrams(initialDiagrams);
+      setHasMore(initialDiagrams.length >= 50);
+      setOffset(initialDiagrams.length);
     }
   }, [initialDiagrams]);
 
@@ -66,10 +75,13 @@ export function GlobalSearchDialog({
     } else {
       setQuery('');
       setError(null);
+      setOffset(initialDiagrams?.length || 0);
+      setHasMore(true);
+      itemRefs.current = [];
       controllerRef.current?.abort();
       controllerRef.current = null;
     }
-  }, [open]);
+  }, [open, initialDiagrams]);
 
   useEffect(() => {
     if (!open) return;
@@ -94,6 +106,10 @@ export function GlobalSearchDialog({
         const data = await res.json();
         const items: Diagram[] = Array.isArray(data.items) ? data.items : [];
         setDiagrams(items);
+        setHasMore(Boolean(data.hasMore) || items.length >= 50);
+        setOffset(items.length);
+        setActiveIndex(0);
+        itemRefs.current = [];
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
         setError(err instanceof Error ? err.message : 'Unable to load diagrams');
@@ -135,6 +151,13 @@ export function GlobalSearchDialog({
     setActiveIndex((prev) => Math.min(prev, sortedResults.length - 1));
   }, [sortedResults]);
 
+  useEffect(() => {
+    const node = itemRefs.current[activeIndex];
+    if (node) {
+      node.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeIndex]);
+
   const handleSelect = (diagram: Diagram) => {
     onOpenChange(false);
     setQuery('');
@@ -145,6 +168,56 @@ export function GlobalSearchDialog({
       router.push(`/${diagram.id}`);
     }
   };
+
+  const fetchMore = useCallback(async () => {
+    if (!hasMore || isLoading) return;
+    const controller = new AbortController();
+    controllerRef.current?.abort();
+    controllerRef.current = controller;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ limit: '50', offset: String(offset) });
+      const normalized = query.trim();
+      if (normalized) {
+        params.set('query', normalized);
+      }
+      const res = await fetch(`/api/diagrams?${params.toString()}`, {
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error('Failed to fetch diagrams');
+      const data = await res.json();
+      const items: Diagram[] = Array.isArray(data.items) ? data.items : [];
+      setDiagrams((prev) => [...prev, ...items]);
+      setHasMore(Boolean(data.hasMore) || items.length >= 50);
+      setOffset((prev) => prev + items.length);
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Unable to load diagrams');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [hasMore, isLoading, offset, query]);
+
+  useEffect(() => {
+    if (!viewportEl || !sentinelEl) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          void fetchMore();
+        }
+      },
+      {
+        root: viewportEl,
+        rootMargin: '120px',
+      }
+    );
+
+    observer.observe(sentinelEl);
+    return () => observer.disconnect();
+  }, [viewportEl, sentinelEl, fetchMore]);
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown') {
@@ -205,33 +278,32 @@ export function GlobalSearchDialog({
               aria-label="Search diagrams"
             />
             <kbd className="hidden sm:inline-flex absolute right-3 top-1/2 -translate-y-1/2 h-6 select-none items-center gap-1 rounded border bg-muted/50 px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-              <span className="text-xs">⌘</span>K
+              <span className="text-xs">{shortcutSymbol}</span>
+              <span className="text-[11px]">K</span>
             </kbd>
           </div>
         </div>
 
         <div className="border-t border-border/50 bg-muted/5">
-          <ScrollArea className="max-h-[60vh] sm:max-h-[600px] w-full">
-            {isLoading ? (
-              <div className="p-8 flex flex-col items-center justify-center gap-3 text-muted-foreground text-sm">
-                <Loader2 className="h-6 w-6 animate-spin text-primary/60" />
-                <p>Loading diagrams...</p>
-              </div>
-            ) : error ? (
+          <ScrollArea
+            className="max-h-[60vh] sm:max-h-[600px] w-full"
+            onViewportRef={setViewportEl}
+          >
+            {error ? (
               <div className="p-6 text-sm text-destructive text-center">{error}</div>
-            ) : !sortedResults.length ? (
-              <div className="p-12 text-center">
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
-                  <Search className="h-6 w-6 text-muted-foreground" />
-                </div>
+            ) : !sortedResults.length && !isLoading ? (
+              <div className="p-12 text-center space-y-2">
                 <p className="text-sm font-medium text-foreground">No diagrams found</p>
-                <p className="text-xs text-muted-foreground mt-1">Try searching for a different term</p>
+                <p className="text-xs text-muted-foreground">Try searching for a different term</p>
               </div>
             ) : (
               <div className="p-2 space-y-1">
                 {sortedResults.map((diagram, index) => (
                   <button
                     key={diagram.id}
+                    ref={(node) => {
+                      itemRefs.current[index] = node;
+                    }}
                     type="button"
                     onClick={() => handleSelect(diagram)}
                     className={cn(
@@ -267,9 +339,17 @@ export function GlobalSearchDialog({
                     </div>
                   </button>
                 ))}
+                <div ref={setSentinelRef} className="h-1" />
+                {isLoading && (
+                  <div className="p-4 flex items-center justify-center gap-2 text-muted-foreground text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary/60" />
+                    <span>Loading more…</span>
+                  </div>
+                )}
               </div>
             )}
           </ScrollArea>
+
         </div>
 
         {!sortedResults.length && !isLoading && !error && (

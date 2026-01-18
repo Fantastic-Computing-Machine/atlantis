@@ -1,5 +1,5 @@
 import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
-import { getDiagrams, saveDiagrams } from '@/lib/data';
+import { deleteDiagramById, updateDiagramById } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 
@@ -14,21 +14,11 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const diagrams = await getDiagrams();
+    const updatedDiagram = await updateDiagramById(id, body);
 
-    const index = diagrams.findIndex((d) => d.id === id);
-    if (index === -1) {
+    if (!updatedDiagram) {
       return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });
     }
-
-    const updatedDiagram = {
-      ...diagrams[index],
-      ...body,
-      updatedAt: new Date().toISOString(),
-    };
-
-    diagrams[index] = updatedDiagram;
-    await saveDiagrams(diagrams);
 
     return NextResponse.json(updatedDiagram);
   } catch (error) {
@@ -47,10 +37,11 @@ export async function DELETE(
 
   try {
     const { id } = await params;
-    const diagrams = await getDiagrams();
+    const deleted = await deleteDiagramById(id);
 
-    const newDiagrams = diagrams.filter((d) => d.id !== id);
-    await saveDiagrams(newDiagrams);
+    if (!deleted) {
+      return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

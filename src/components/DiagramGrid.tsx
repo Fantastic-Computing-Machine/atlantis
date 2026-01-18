@@ -1,5 +1,17 @@
 'use client';
 
+import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
+import { PeekDiagramModal } from '@/components/PeekDiagramModal';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -14,34 +26,24 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
   DropdownMenuSub,
-  DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
-import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
-import { ensureCsrfToken, CSRF_HEADER_NAME } from '@/lib/csrf-client';
+import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
 import { Diagram } from '@/lib/types';
+import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
-import { Download, Moon, Plus, Share2, Star, Sun, Trash2, Upload, BookOpen, Settings2, Search, MoreHorizontal, Github } from 'lucide-react';
+import { BookOpen, Download, Eye, Github, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 interface DiagramGridProps {
   initialDiagrams: Diagram[];
@@ -63,9 +65,11 @@ export function DiagramGrid({
   const [nextOffset, setNextOffset] = useState<number>(initialNextOffset ?? initialDiagrams.length);
   const [total, setTotal] = useState<number>(initialTotal ?? initialDiagrams.length);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const { shortcutHint } = useShortcutPlatform();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [peekDiagram, setPeekDiagram] = useState<Diagram | null>(null);
   const { setTheme, theme } = useTheme();
   const { settings, setAutoSave } = useDiagramStore();
   const router = useRouter();
@@ -275,11 +279,11 @@ export function DiagramGrid({
         const parser = new DOMParser();
         const doc = parser.parseFromString(svg, 'image/svg+xml');
         const svgEl = doc.documentElement;
-        
+
         const viewBox = svgEl.getAttribute('viewBox')?.split(' ').map(Number);
         const svgWidth = viewBox ? viewBox[2] : parseFloat(svgEl.getAttribute('width') || '800');
         const svgHeight = viewBox ? viewBox[3] : parseFloat(svgEl.getAttribute('height') || '600');
-        
+
         const scale = 2;
         canvas.width = svgWidth * scale;
         canvas.height = svgHeight * scale;
@@ -385,13 +389,31 @@ export function DiagramGrid({
                   <span className="text-2xl shrink-0">{diagram.emoji || '📊'}</span>
                   <div className="min-w-0 flex-1">
                     <CardTitle className="text-base truncate">{diagram.title}</CardTitle>
-                    <CardDescription className="text-xs">
-                      {formatDate(diagram.updatedAt)}
+                    <CardDescription className="text-xs flex items-center gap-2">
+                      <span>{formatDate(diagram.updatedAt)}</span>
+                      {diagram.totalVersions > 1 && (
+                        <span className="bg-muted px-1.5 py-0.5 rounded-full text-[10px] font-medium">
+                          v{diagram.totalVersions}
+                        </span>
+                      )}
                     </CardDescription>
                   </div>
                 </div>
-                <div className="flex items-center">
-                    <DropdownMenu>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setPeekDiagram(diagram);
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span className="sr-only">Peek diagram</span>
+                  </Button>
+                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
@@ -479,6 +501,11 @@ export function DiagramGrid({
               </div>
             </CardHeader>
             <CardContent>
+              {diagram.description && (
+                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+                  {diagram.description}
+                </p>
+              )}
               <div className="bg-muted/50 rounded-md p-3 h-24 overflow-hidden">
                 <pre className="text-xs text-muted-foreground font-mono whitespace-pre-wrap line-clamp-4">
                   {diagram.content}
@@ -513,7 +540,8 @@ export function DiagramGrid({
               >
                 <Search className="h-4 w-4" />
                 <span className="hidden sm:inline">Search</span>
-                <span className="text-xs text-muted-foreground hidden lg:inline">Ctrl / Cmd + K</span>
+                <span className="text-xs text-muted-foreground hidden lg:inline">{shortcutHint}</span>
+
               </Button>
             </div>
 
@@ -681,12 +709,12 @@ export function DiagramGrid({
                   {renderDiagramGrid(starredDiagrams)}
                 </section>
               )}
-              
+
               {(otherDiagrams.length > 0 || !hasStarred) && (
                 <section>
                   {hasStarred && (
                     <h2 className="text-lg font-semibold mb-4 text-muted-foreground flex items-center gap-2">
-                      <span>Other diagrams //</span>
+                      <span>All diagrams //</span>
                       <span className="text-muted-foreground">
                         {otherDiagrams.length} of {Math.max(total - starredDiagrams.length, 0)}
                       </span>
@@ -694,7 +722,7 @@ export function DiagramGrid({
                   )}
                   {!hasStarred && (
                     <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <span>Other diagrams //</span>
+                      <span>All diagrams //</span>
                       <span className="text-muted-foreground">
                         {otherDiagrams.length} of {Math.max(total - starredDiagrams.length, 0)}
                       </span>
@@ -768,6 +796,15 @@ export function DiagramGrid({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <PeekDiagramModal
+        diagram={peekDiagram}
+        onClose={() => setPeekDiagram(null)}
+        onDelete={(id) => {
+          setPeekDiagram(null);
+          setDeleteId(id);
+        }}
+      />
     </>
   );
 }

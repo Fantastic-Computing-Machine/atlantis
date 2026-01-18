@@ -1,8 +1,6 @@
 import { ensureCsrfCookie, csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
-import { getDiagramPage, getDiagrams, saveDiagrams } from '@/lib/data';
+import { createDiagram, getDiagramPage } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
-import { Diagram } from '@/lib/types';
-import { generateShortId, getRandomEmoji } from '@/lib/utils';
 import { NextResponse } from 'next/server';
 
 const DEFAULT_LIMIT = 24;
@@ -33,24 +31,12 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const diagrams = await getDiagrams();
+    const newDiagram = await createDiagram({
+      title: body.title,
+      content: body.content,
+      emoji: body.emoji,
+    });
 
-    let id = generateShortId();
-    while (diagrams.some((d) => d.id === id)) {
-      id = generateShortId();
-    }
-
-    const newDiagram: Diagram = {
-      id,
-      title: body.title || 'Untitled Diagram',
-      content: body.content || 'graph TD\n    A[Start] --> B[End]',
-      emoji: getRandomEmoji(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isFavorite: false,
-    };
-
-    await saveDiagrams([newDiagram, ...diagrams]);
     return NextResponse.json(newDiagram);
   } catch (error) {
     logApiError('POST /api/diagrams', error);

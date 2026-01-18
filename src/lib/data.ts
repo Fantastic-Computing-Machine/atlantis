@@ -1,46 +1,73 @@
-import fs from 'fs/promises';
-import path from 'path';
-import { Diagram, DiagramPage } from './types';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DATA_FILE = path.join(DATA_DIR, 'diagrams.json');
-const TEMP_FILE = `${DATA_FILE}.tmp`;
+import type { Prisma } from '.prisma/client';
+import { prisma } from './prisma';
+import { Checkpoint, Diagram, DiagramPage } from './types';
+import { generateShortId, getRandomEmoji } from './utils';
 
 const DEFAULT_PAGE_SIZE = 24;
 const MAX_PAGE_SIZE = 100;
+const MAX_CHECKPOINTS = 15;
+const TITLE_MAX = 100;
+const DESCRIPTION_MAX = 400;
 
-// Simple in-memory mutex to serialize writes and avoid file corruption under concurrent requests
-let writeLock: Promise<void> = Promise.resolve();
+type TransactionClient = typeof prisma;
+type DiagramWithLatest = Prisma.DiagramGetPayload<{
+  include: { contents: { orderBy: { updatedAt: 'desc' }; take: 1 } };
+}>;
 
-async function runWithWriteLock<T>(operation: () => Promise<T>): Promise<T> {
-  let release: () => void;
-  const previousLock = writeLock;
-  const nextLock = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  writeLock = previousLock.then(() => nextLock);
-  await previousLock;
+function normalizeLimit(limit?: number | null) {
+  if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
+  return Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE);
+}
 
-  try {
-    return await operation();
-  } finally {
-    release!();
+function normalizeOffset(offset?: number | null) {
+  if (!Number.isFinite(offset)) return 0;
+  return Math.max(Math.trunc(offset as number), 0);
+}
+
+function buildSearchVector(title: string, description: string, content: string) {
+  return `${title} ${description} ${content}`.toLowerCase();
+}
+
+function toDiagram(diagram: DiagramWithLatest): Diagram {
+  const latest = diagram.contents[0];
+  return {
+    id: diagram.id,
+    title: diagram.title,
+    description: diagram.description,
+    content: latest?.content ?? '',
+    emoji: diagram.emoji,
+    createdAt: diagram.createdAt.toISOString(),
+    updatedAt: diagram.updatedAt.toISOString(),
+    isFavorite: diagram.isFavorite,
+    totalVersions: diagram.totalVersions,
+  };
+}
+
+function validateLengths(title?: string, description?: string, content?: string) {
+  if (typeof title === 'string' && title.length > TITLE_MAX) {
+    throw new Error(`Title exceeds ${TITLE_MAX} characters`);
+  }
+  if (typeof description === 'string' && description.length > DESCRIPTION_MAX) {
+    throw new Error(`Description exceeds ${DESCRIPTION_MAX} characters`);
   }
 }
 
-export async function getDiagrams(): Promise<Diagram[]> {
-  // Wait for any in-flight writes to complete to ensure consistent reads
-  await writeLock;
-
-  try {
-    await fs.access(DATA_FILE);
-    const data = await fs.readFile(DATA_FILE, 'utf-8');
-    return JSON.parse(data);
-  } catch {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    await fs.writeFile(DATA_FILE, '[]', 'utf-8');
-    return [];
+async function ensureUniqueId(check: (id: string) => Promise<boolean>) {
+  let id = generateShortId();
+  while (await check(id)) {
+    id = generateShortId();
   }
+  return id;
+}
+
+function isNotFoundError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2025';
+}
+
+async function withTx<T>(fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
+  // Prisma v7 transaction typing under bundler: use any casting for callback form
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  return (prisma as any).$transaction(fn as any) as Promise<T>;
 }
 
 export async function getDiagramPage({
@@ -52,44 +79,334 @@ export async function getDiagramPage({
   offset?: number;
   query?: string;
 }): Promise<DiagramPage> {
-  const normalizedLimit = Number.isFinite(limit)
-    ? Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE)
-    : DEFAULT_PAGE_SIZE;
-  const normalizedOffset = Number.isFinite(offset) ? Math.max(Math.trunc(offset as number), 0) : 0;
-  const diagrams = await getDiagrams();
+  const normalizedLimit = normalizeLimit(limit);
+  const normalizedOffset = normalizeOffset(offset);
 
-  const normalizedQuery = query?.trim().toLowerCase();
-  const filtered = normalizedQuery
-    ? diagrams.filter((diagram) => {
-        const haystack = `${diagram.title} ${diagram.content}`.toLowerCase();
-        return haystack.includes(normalizedQuery);
-      })
-    : diagrams;
+  const where: Prisma.DiagramWhereInput | undefined = query?.trim()
+    ? { searchVector: { contains: query.trim().toLowerCase() } }
+    : undefined;
 
-  const sorted = [...filtered].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  );
+  const [diagrams, total] = await Promise.all([
+    prisma.diagram.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      skip: normalizedOffset,
+      take: normalizedLimit,
+      include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
+    }),
+    prisma.diagram.count({ where }),
+  ]);
 
-  const items = sorted.slice(normalizedOffset, normalizedOffset + normalizedLimit);
-  const total = sorted.length;
+  const items = diagrams.map(toDiagram);
   const nextOffset = normalizedOffset + items.length;
   const hasMore = nextOffset < total;
 
-  return {
-    items,
-    total,
-    hasMore,
-    nextOffset,
-  };
+  return { items, total, hasMore, nextOffset };
 }
 
-export async function saveDiagrams(diagrams: Diagram[]): Promise<void> {
-  const payload = JSON.stringify(diagrams, null, 2);
+export async function getDiagramById(id: string): Promise<Diagram | null> {
+  const diagram = await prisma.diagram.findUnique({
+    where: { id },
+    include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
+  });
 
-  await runWithWriteLock(async () => {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    // Write to a temp file first, then move into place to keep writes atomic
-    await fs.writeFile(TEMP_FILE, payload, 'utf-8');
-    await fs.rename(TEMP_FILE, DATA_FILE);
+  if (!diagram) return null;
+  return toDiagram(diagram);
+}
+
+export async function getDiagrams(): Promise<Diagram[]> {
+  const diagrams = await prisma.diagram.findMany({
+    orderBy: { updatedAt: 'desc' },
+    include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
+  });
+  return diagrams.map(toDiagram);
+}
+
+export async function createDiagram({
+  title,
+  description,
+  content,
+  emoji,
+}: {
+  title?: string;
+  description?: string;
+  content?: string;
+  emoji?: string;
+}): Promise<Diagram> {
+  const now = new Date();
+  validateLengths(title, description);
+
+  const diagramId = await ensureUniqueId(async (id) => {
+    const existing = await prisma.diagram.findUnique({ where: { id }, select: { id: true } });
+    return Boolean(existing);
+  });
+
+  const contentId = await ensureUniqueId(async (id) => {
+    const existing = await prisma.content.findUnique({ where: { id }, select: { id: true } });
+    return Boolean(existing);
+  });
+
+  const diagram = await withTx(async (tx: TransactionClient) => {
+    const nextTitle = title || 'Untitled Diagram';
+    const nextDescription = description || '';
+    const nextContent = content || 'graph TD\n    A[Start] --> B[End]';
+
+    const createdDiagram = await tx.diagram.create({
+      data: {
+        id: diagramId,
+        title: nextTitle,
+        description: nextDescription,
+        emoji: emoji || getRandomEmoji(),
+        createdAt: now,
+        updatedAt: now,
+        isFavorite: false,
+        totalVersions: 1,
+        searchVector: buildSearchVector(nextTitle, nextDescription, nextContent),
+      },
+    });
+
+    await tx.content.create({
+      data: {
+        id: contentId,
+        diagramId,
+        content: nextContent,
+        updatedAt: now,
+      },
+    });
+
+    const latest = await tx.diagram.findUnique({
+      where: { id: createdDiagram.id },
+      include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
+    });
+
+    return latest as DiagramWithLatest;
+  });
+
+  return toDiagram(diagram);
+}
+
+export async function updateDiagramById(
+  id: string,
+  updates: Partial<Pick<Diagram, 'title' | 'description' | 'content' | 'emoji' | 'isFavorite'>>
+): Promise<Diagram | null> {
+  const existing = await prisma.diagram.findUnique({ where: { id } });
+  if (!existing) return null;
+
+  validateLengths(updates.title, updates.description);
+
+  const now = new Date();
+  const hasContentUpdate = typeof updates.content === 'string';
+
+  const diagram = await withTx(async (tx: TransactionClient) => {
+    const latestContent = await tx.content.findFirst({
+      where: { diagramId: id },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const nextTitle = updates.title ?? existing.title;
+    const nextDescription = updates.description ?? existing.description;
+    let nextContent = latestContent?.content ?? '';
+
+    if (hasContentUpdate) {
+      nextContent = updates.content ?? nextContent;
+      if (latestContent) {
+        await tx.content.update({
+          where: { id: latestContent.id },
+          data: {
+            content: nextContent,
+            updatedAt: now,
+          },
+        });
+      } else {
+        const contentId = await ensureUniqueId(async (candidate) => {
+          const found = await tx.content.findUnique({ where: { id: candidate }, select: { id: true } });
+          return Boolean(found);
+        });
+
+        await tx.content.create({
+          data: {
+            id: contentId,
+            diagramId: id,
+            content: nextContent,
+            updatedAt: now,
+          },
+        });
+        
+        // If we created a new content row where there was none (rare edge case), we should update count
+        // But usually updateDiagram updates the *latest* content row, so count doesn't change.
+        // If latestContent existed, count is same. If not, it increases.
+        if (!latestContent) {
+             const totalVersions = await tx.content.count({ where: { diagramId: id } });
+             await tx.diagram.update({ where: { id }, data: { totalVersions } });
+        }
+      }
+    }
+
+    await tx.diagram.update({
+      where: { id },
+      data: {
+        title: nextTitle,
+        description: nextDescription,
+        emoji: updates.emoji ?? existing.emoji,
+        isFavorite: typeof updates.isFavorite === 'boolean' ? updates.isFavorite : existing.isFavorite,
+        updatedAt: now,
+        searchVector: buildSearchVector(nextTitle, nextDescription, nextContent),
+      },
+    });
+
+    const latest = await tx.diagram.findUnique({
+      where: { id },
+      include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
+    });
+
+    return latest as DiagramWithLatest | null;
+  });
+
+  return diagram ? toDiagram(diagram) : null;
+}
+
+export async function listCheckpoints(diagramId: string): Promise<Checkpoint[]> {
+  const rows = await prisma.content.findMany({
+    where: { diagramId },
+    orderBy: { updatedAt: 'desc' },
+    take: MAX_CHECKPOINTS,
+  });
+
+  return rows.map((row: { id: string; content: string; updatedAt: Date }) => ({
+    id: row.id,
+    content: row.content,
+    updatedAt: row.updatedAt.toISOString(),
+  }));
+}
+
+export async function createCheckpoint(
+  diagramId: string,
+  payload: { content: string; title?: string; description?: string; emoji?: string; isFavorite?: boolean }
+): Promise<{ checkpoint: Checkpoint; diagram: Diagram } | null> {
+  const existing = await prisma.diagram.findUnique({ where: { id: diagramId } });
+  if (!existing) return null;
+
+  validateLengths(payload.title, payload.description);
+
+  const now = new Date();
+
+  const result = await withTx(async (tx: TransactionClient) => {
+    const nextTitle = payload.title ?? existing.title;
+    const nextDescription = payload.description ?? existing.description;
+    const nextContent = payload.content;
+
+    await tx.diagram.update({
+      where: { id: diagramId },
+      data: {
+        title: nextTitle,
+        description: nextDescription,
+        emoji: payload.emoji ?? existing.emoji,
+        isFavorite:
+          typeof payload.isFavorite === 'boolean' ? payload.isFavorite : existing.isFavorite,
+        updatedAt: now,
+        searchVector: buildSearchVector(nextTitle, nextDescription, nextContent),
+      },
+    });
+
+    const checkpointId = await ensureUniqueId(async (candidate) => {
+      const found = await tx.content.findUnique({ where: { id: candidate }, select: { id: true } });
+      return Boolean(found);
+    });
+
+    await tx.content.create({
+      data: {
+        id: checkpointId,
+        diagramId,
+        content: nextContent,
+        updatedAt: now,
+      },
+    });
+
+    const extraContents = await tx.content.findMany({
+      where: { diagramId },
+      orderBy: { updatedAt: 'desc' },
+      skip: MAX_CHECKPOINTS,
+      select: { id: true },
+    });
+
+    if (extraContents.length > 0) {
+      await tx.content.deleteMany({ where: { id: { in: extraContents.map((c: { id: string }) => c.id) } } });
+    }
+
+    const totalVersions = await tx.content.count({ where: { diagramId } });
+    await tx.diagram.update({
+      where: { id: diagramId },
+      data: { totalVersions },
+    });
+
+    const latest = await tx.diagram.findUnique({
+      where: { id: diagramId },
+      include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
+    });
+
+    const checkpoint: Checkpoint = {
+      id: checkpointId,
+      content: payload.content,
+      updatedAt: now.toISOString(),
+    };
+
+    return { diagram: latest as DiagramWithLatest, checkpoint };
+  });
+
+  return { checkpoint: result.checkpoint, diagram: toDiagram(result.diagram) };
+}
+
+export async function deleteDiagramById(id: string): Promise<boolean> {
+  try {
+    await prisma.diagram.delete({ where: { id } });
+    return true;
+  } catch (error: unknown) {
+    if (isNotFoundError(error)) {
+      return false;
+    }
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to delete diagram');
+  }
+}
+
+export async function restoreDiagrams(diagrams: Diagram[]): Promise<void> {
+  await withTx(async (tx: TransactionClient) => {
+    await tx.content.deleteMany();
+    await tx.diagram.deleteMany();
+
+    for (const diagram of diagrams) {
+      const createdAt = diagram.createdAt ? new Date(diagram.createdAt) : new Date();
+      const updatedAt = diagram.updatedAt ? new Date(diagram.updatedAt) : createdAt;
+
+      const searchVector = buildSearchVector(diagram.title, diagram.description, diagram.content);
+
+      await tx.diagram.create({
+        data: {
+          id: diagram.id,
+          title: diagram.title,
+          description: diagram.description,
+          emoji: diagram.emoji,
+          createdAt,
+          updatedAt,
+          isFavorite: diagram.isFavorite,
+          totalVersions: 1,
+          searchVector,
+        },
+      });
+
+      await tx.content.create({
+        data: {
+          id: await ensureUniqueId(async (candidate) => {
+            const found = await tx.content.findUnique({ where: { id: candidate }, select: { id: true } });
+            return Boolean(found);
+          }),
+          diagramId: diagram.id,
+          content: diagram.content,
+          updatedAt,
+        },
+      });
+    }
   });
 }

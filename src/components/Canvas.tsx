@@ -104,6 +104,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
   const transformRef = useRef<ReactZoomPanPinchRef>(null);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const lastErrorRef = useRef<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [bgPattern, setBgPattern] = useState<BgPattern>('dots');
   const [bgColorClass, setBgColorClass] = useState<string>('bg-muted/30');
@@ -124,6 +125,18 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
         state: { useMaxWidth: false },
         er: { useMaxWidth: false },
         pie: { useMaxWidth: false },
+        // Suppress built-in error SVG/banner; handle errors ourselves
+        suppressErrorRendering: true,
+        // @ts-expect-error parseError exists at runtime in Mermaid 11
+        parseError: (err: unknown) => {
+          const message =
+            typeof err === 'string'
+              ? err
+              : (err as { str?: string; message?: string }).str ||
+                (err as { str?: string; message?: string }).message ||
+                'Mermaid parse error';
+          throw new Error(message);
+        },
       });
     });
   }, [resolvedTheme]);
@@ -159,17 +172,44 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
     let isMounted = true;
     const renderDiagram = async () => {
       try {
-        setError(null);
+        if (isMounted) {
+          setError(null);
+          setSvg('');
+        }
         const id = `mermaid-${Date.now()}`;
         const mermaid = (await import('mermaid')).default;
+        // Validate before render to surface parser errors cleanly
+        try {
+          mermaid.parse(code);
+        } catch (parseErr) {
+          if (isMounted) {
+            const message = parseErr instanceof Error ? parseErr.message : String(parseErr);
+            setError(message || 'Mermaid parse error');
+            setSvg('');
+          }
+          return;
+        }
+
         const { svg } = await mermaid.render(id, code);
+        // Mermaid can return an error SVG; guard against it
+        if (svg.includes('Syntax error in text') || svg.includes('Parse error')) {
+          if (isMounted) {
+            setError('Mermaid parse error');
+            setSvg('');
+          }
+          return;
+        }
+
         if (isMounted) setSvg(svg);
       } catch (err) {
         if (isMounted) {
-          console.error('Mermaid render error:', err);
-          setError(
-            err instanceof Error ? err.message : String(err)
-          );
+          const message = err instanceof Error ? err.message : String(err);
+          if (lastErrorRef.current !== message) {
+            console.error('Mermaid render error:', err);
+            lastErrorRef.current = message;
+          }
+          setError(message);
+          setSvg('');
         }
       }
     };
@@ -178,6 +218,10 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       const timeout = setTimeout(renderDiagram, 300);
       return () => clearTimeout(timeout);
     }
+
+    // If code is empty, clear previous output and errors
+    setSvg('');
+    setError(null);
 
     return () => {
       isMounted = false;
