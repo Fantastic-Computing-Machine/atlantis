@@ -1,9 +1,9 @@
 'use client';
 
+import { GeminiSpark } from '@/components/icons/GeminiSpark';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
-import { GeminiSpark } from '@/components/icons/GeminiSpark';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -78,13 +78,21 @@ export function AiChatPanel({ diagramId, currentContent, onApply }: AiChatPanelP
           {errorText}
         </p>
       )}
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" size="sm" onClick={() => setPrompt('')} disabled={isLoading}>
-          Clear
-        </Button>
-        <Button size="sm" onClick={handleSend} disabled={isLoading || !prompt.trim()}>
-          {isLoading ? 'Sending...' : 'Ask AI'}
-        </Button>
+      <div className="flex flex-col items-end gap-1">
+
+        <div className="flex w-full items-center justify-between">
+          <p className="text-xs text-muted-foreground/70 text-center flex-1">
+            AI can make mistakes. Please cross-check the output.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setPrompt('')} disabled={isLoading}>
+              Clear
+            </Button>
+            <Button size="sm" onClick={handleSend} disabled={isLoading || !prompt.trim()}>
+              {isLoading ? 'Sending...' : 'Ask AI'}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
