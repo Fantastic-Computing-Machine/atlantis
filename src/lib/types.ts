@@ -10,6 +10,8 @@ export interface Diagram {
   totalVersions: number;
 }
 
+export type SortOption = 'recent' | 'old' | 'alphabetical' | 'versions';
+
 export interface Checkpoint {
   id: string;
   content: string;
