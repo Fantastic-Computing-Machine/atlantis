@@ -3,21 +3,47 @@ import { logApiError } from '@/lib/logger';
 import { getAiApiKey, getAiProvider } from '@/lib/settings';
 import { NextResponse } from 'next/server';
 
-function ensureDomPurifyStub() {
+async function ensureDomPurifyStub() {
   const g = globalThis as any;
-  if (!g.DOMPurify || typeof g.DOMPurify.addHook !== 'function') {
-    g.DOMPurify = {
-      addHook: () => {},
-      removeHook: () => {},
-      sanitize: (input: unknown) => input,
-    };
+
+  // Patch the actual dompurify module (mermaid imports it directly).
+  try {
+    const dompurifyModule = await import('dompurify');
+    const dompurifyDefault = dompurifyModule?.default as any;
+
+    if (dompurifyDefault) {
+      // The ESM build exports a factory function; mermaid expects an instance with hooks.
+      if (typeof dompurifyDefault.addHook !== 'function') {
+        dompurifyDefault.addHook = () => {};
+      }
+      if (typeof dompurifyDefault.removeHook !== 'function') {
+        dompurifyDefault.removeHook = () => {};
+      }
+      if (typeof dompurifyDefault.sanitize !== 'function') {
+        dompurifyDefault.sanitize = (input: unknown) => input;
+      }
+
+      // Expose on global for any fallback lookups mermaid may perform.
+      if (!g.DOMPurify) {
+        g.DOMPurify = dompurifyDefault;
+      }
+    }
+  } catch {
+    // As a last resort, provide a minimal global stub so mermaid import does not crash.
+    if (!g.DOMPurify || typeof g.DOMPurify.addHook !== 'function') {
+      g.DOMPurify = {
+        addHook: () => {},
+        removeHook: () => {},
+        sanitize: (input: unknown) => input,
+      };
+    }
   }
 }
 
 let mermaidInstance: any = null;
 async function getMermaid() {
   if (mermaidInstance) return mermaidInstance;
-  ensureDomPurifyStub();
+  await ensureDomPurifyStub();
   const imported = (await import('mermaid')).default as any;
   const m = imported?.mermaid ?? imported;
   try {
