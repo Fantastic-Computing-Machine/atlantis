@@ -15,8 +15,7 @@ import { ExternalLink, Eye, Focus, RotateCcw, Share2, Trash2, ZoomIn, ZoomOut } 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 const TransformWrapper = dynamic(

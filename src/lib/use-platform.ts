@@ -7,7 +7,9 @@ export function useShortcutPlatform() {
     if (typeof window === 'undefined') return;
     const nav = window.navigator as Navigator & { userAgentData?: { platform?: string } };
     const platform = nav.userAgentData?.platform || nav.platform || nav.userAgent || '';
-    setIsMac(/mac/i.test(platform));
+    const nextIsMac = /mac/i.test(platform);
+    // Update after mount to avoid sync setState warning
+    requestAnimationFrame(() => setIsMac(nextIsMac));
   }, []);
 
   return {

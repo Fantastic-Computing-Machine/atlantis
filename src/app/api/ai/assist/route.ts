@@ -3,16 +3,23 @@ import { logApiError } from '@/lib/logger';
 import { getAiApiKey, getAiProvider } from '@/lib/settings';
 import { NextResponse } from 'next/server';
 
-async function ensureDomPurifyStub() {
-  const g = globalThis as any;
+type DomPurifyLike = {
+  addHook: (hook: string, fn: () => void) => void;
+  removeHook: (hook: string) => void;
+  sanitize: (input: unknown) => unknown;
+};
 
-  // Patch the actual dompurify module (mermaid imports it directly).
+type GlobalWithDomPurify = typeof globalThis & { DOMPurify?: DomPurifyLike };
+
+async function ensureDomPurifyStub() {
+
+  const g = globalThis as GlobalWithDomPurify;
+
   try {
     const dompurifyModule = await import('dompurify');
-    const dompurifyDefault = dompurifyModule?.default as any;
+    const dompurifyDefault = dompurifyModule?.default as DomPurifyLike | undefined;
 
     if (dompurifyDefault) {
-      // The ESM build exports a factory function; mermaid expects an instance with hooks.
       if (typeof dompurifyDefault.addHook !== 'function') {
         dompurifyDefault.addHook = () => {};
       }
@@ -23,13 +30,11 @@ async function ensureDomPurifyStub() {
         dompurifyDefault.sanitize = (input: unknown) => input;
       }
 
-      // Expose on global for any fallback lookups mermaid may perform.
       if (!g.DOMPurify) {
         g.DOMPurify = dompurifyDefault;
       }
     }
   } catch {
-    // As a last resort, provide a minimal global stub so mermaid import does not crash.
     if (!g.DOMPurify || typeof g.DOMPurify.addHook !== 'function') {
       g.DOMPurify = {
         addHook: () => {},
@@ -40,12 +45,23 @@ async function ensureDomPurifyStub() {
   }
 }
 
-let mermaidInstance: any = null;
-async function getMermaid() {
+
+type MermaidInstance = {
+  parse: (content: string) => void;
+  render: (id: string, content: string) => Promise<{ svg: string }>;
+  initialize: (config: Record<string, unknown>) => void;
+};
+
+let mermaidInstance: MermaidInstance | null = null;
+async function getMermaid(): Promise<MermaidInstance> {
   if (mermaidInstance) return mermaidInstance;
   await ensureDomPurifyStub();
-  const imported = (await import('mermaid')).default as any;
-  const m = imported?.mermaid ?? imported;
+  const imported = (await import('mermaid')).default as { mermaid?: MermaidInstance } | MermaidInstance;
+  const candidate = imported as MermaidInstance;
+  const m = typeof candidate.parse === 'function' ? candidate : (imported as { mermaid?: MermaidInstance }).mermaid;
+  if (!m) {
+    throw new Error('Mermaid import failed');
+  }
   try {
     m.initialize({ startOnLoad: false, securityLevel: 'strict' });
   } catch {
@@ -239,12 +255,18 @@ function sanitizeMermaidResponse(text: string): string {
 
 async function validateMermaid(content: string): Promise<void> {
   const mermaid = await getMermaid();
-  // mermaid.parse throws on invalid syntax
+  if (!mermaid) throw new Error('Mermaid not initialized');
   mermaid.parse(content);
 }
 
-async function attemptSelfHeal(apiKey: string, provider: Provider | 'auto', prompt: string, originalContent: string, candidate: string, errorMessage: string): Promise<string | null> {
-  // Wrap the parse error and ask the model to fix its own output
+async function attemptSelfHeal(
+  apiKey: string,
+  provider: Provider | 'auto',
+  prompt: string,
+  originalContent: string,
+  candidate: string,
+  errorMessage: string
+): Promise<string | null> {
   const healInstruction = `Your previous Mermaid output failed to parse with error: ${errorMessage}. Produce a corrected Mermaid diagram following all prior rules.`;
   const healPrompt = `${prompt}\n\n${healInstruction}`;
   try {
@@ -252,7 +274,7 @@ async function attemptSelfHeal(apiKey: string, provider: Provider | 'auto', prom
     const sanitized = sanitizeMermaidResponse(healed);
     await validateMermaid(sanitized);
     return sanitized;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -285,7 +307,6 @@ export async function POST(request: Request) {
       const message =
         error instanceof Error && error.message ? error.message : 'Mermaid validation failed';
 
-      // Attempt self-heal up to MAX_SELF_HEAL_ATTEMPTS
       for (let attempt = 0; attempt < MAX_SELF_HEAL_ATTEMPTS; attempt += 1) {
         const healed = await attemptSelfHeal(apiKey, storedProvider, prompt, content, sanitized, message);
         if (healed) {

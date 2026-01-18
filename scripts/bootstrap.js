@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* eslint-disable no-console */
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -7,10 +7,11 @@ const { buildSearchVector } = require('./searchVector');
 
 // Try to load .env if present
 try {
-  // eslint-disable-next-line global-require, import/no-extraneous-dependencies
   require('dotenv').config();
-} catch (_) {
-  // dotenv not installed; ignore
+} catch (err) {
+  if (err && typeof err === 'object') {
+    // dotenv not installed; ignore
+  }
 }
 
 const root = process.cwd();
@@ -18,11 +19,16 @@ const lifecycle = process.env.npm_lifecycle_event;
 const isProd = process.env.NODE_ENV === 'production';
 const isCI = process.env.CI === 'true';
 const isDevScript = lifecycle === 'dev';
+if (!process.env.DATABASE_URL && process.env.DB_CONNECTION) {
+  process.env.DATABASE_URL = process.env.DB_CONNECTION;
+}
 const autoApplyEnv = process.env.PRISMA_AUTO_APPLY;
 const skipAutoPush = process.env.PRISMA_SKIP_AUTOPUSH === 'true';
+const forceGenerate = process.env.PRISMA_FORCE_GENERATE === 'true';
 const shouldAutoApply =
   autoApplyEnv === 'true' ||
   (autoApplyEnv !== 'false' && isDevScript && !isCI && !isProd);
+const shouldGenerate = forceGenerate || !isProd;
 
 function run(cmd, args, options = {}) {
   const result = spawnSync(cmd, args, {
@@ -51,12 +57,25 @@ function ensureDataDir() {
 function createAdapter(url) {
   if (url.startsWith('file:')) {
     ensureDataDir();
-    const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
-    return new PrismaBetterSqlite3({ url });
+    try {
+      // Optional dependency in some builds
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
+      return new PrismaBetterSqlite3({ url });
+    } catch (err) {
+      if (err?.code !== 'MODULE_NOT_FOUND') throw err;
+      return undefined;
+    }
   }
   if (url.startsWith('postgres')) {
-    const { PrismaPg } = require('@prisma/adapter-pg');
-    return new PrismaPg({ connectionString: url });
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { PrismaPg } = require('@prisma/adapter-pg');
+      return new PrismaPg({ connectionString: url });
+    } catch (err) {
+      if (err?.code !== 'MODULE_NOT_FOUND') throw err;
+      return undefined;
+    }
   }
   return undefined;
 }
@@ -65,15 +84,15 @@ async function backfillSearchVectors(url) {
   if (process.env.PRISMA_SKIP_BACKFILL === 'true') return;
 
   const adapter = createAdapter(url);
-  // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
+  if (!adapter) {
+    console.warn('[bootstrap] skipping backfill; no Prisma adapter available');
+    return;
+  }
   const { PrismaClient } = require('@prisma/client');
   const client = new PrismaClient(adapter ? { adapter } : {});
 
   try {
-    // Only diagrams missing searchVector
-    // Batch to avoid long locks
     const batchSize = 500;
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       const batch = await client.diagram.findMany({
         where: { searchVector: '' },
@@ -101,8 +120,10 @@ async function main() {
   // Step 1: ensure provider-substituted schema
   run('node', ['scripts/prepare-prisma-schema.js']);
 
-  // Step 2: generate client
-  run('npx', ['prisma', 'generate']);
+  // Step 2: generate client (skip in prod unless forced)
+  if (shouldGenerate) {
+    run('npx', ['prisma', 'generate']);
+  }
 
   // Step 3: apply schema to DB in dev (or when explicitly enabled)
   if (!skipAutoPush && shouldAutoApply) {
