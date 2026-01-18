@@ -35,6 +35,7 @@ ARG PRISMA_PROVIDER=sqlite
 ARG DATABASE_URL=file:./data/atlantis.db
 ENV PRISMA_PROVIDER=${PRISMA_PROVIDER}
 ENV DATABASE_URL=${DATABASE_URL}
+ENV PRISMA_SKIP_BACKFILL=true
 
 # Copy dependencies and Prisma artifacts from deps stage
 COPY --from=deps /app/node_modules ./node_modules
