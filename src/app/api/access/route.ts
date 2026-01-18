@@ -14,8 +14,10 @@ try {
   // though parse is what we care about.
 }
 
+const apiAccessEnabled = process.env.ENABLE_API_ACCESS?.trim().toLowerCase() === 'true';
+
 export async function GET(request: Request) {
-  if (process.env.ENABLE_API_ACCESS !== 'true') {
+  if (!apiAccessEnabled) {
     return new NextResponse('API Access Disabled', { status: 403 });
   }
 
@@ -49,7 +51,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (process.env.ENABLE_API_ACCESS !== 'true') {
+  if (!apiAccessEnabled) {
     return new NextResponse('API Access Disabled', { status: 403 });
   }
 

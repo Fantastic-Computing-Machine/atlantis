@@ -77,7 +77,7 @@ async function backfillSearchVectors(url) {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const batch = await client.diagram.findMany({
-        where: { OR: [{ searchVector: '' }, { searchVector: null }] },
+        where: { searchVector: '' },
         take: batchSize,
         include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
       });
@@ -107,7 +107,7 @@ async function main() {
 
   // Step 3: apply schema to DB in dev (or when explicitly enabled)
   if (!skipAutoPush && shouldAutoApply) {
-    run('npx', ['prisma', 'db', 'push', '--skip-generate']);
+    run('npx', ['prisma', 'db', 'push']);
   }
 
   // Step 4: backfill search vectors for legacy rows (idempotent)

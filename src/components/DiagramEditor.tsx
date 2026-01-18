@@ -9,6 +9,7 @@ import {
 import { ensureCsrfToken, CSRF_HEADER_NAME } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
 import { Checkpoint, Diagram } from '@/lib/types';
+import { useShortcutPlatform } from '@/lib/use-platform';
 import { copyToClipboard } from '@/lib/utils';
 import { History, Moon, Save, Search, Share2, Star, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -42,6 +43,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const [diagram, setDiagram] = useState<Diagram>(initialDiagram);
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const { shortcutHint } = useShortcutPlatform();
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [isLoadingCheckpoints, setIsLoadingCheckpoints] = useState(false);
   const [isSavingCheckpoint, setIsSavingCheckpoint] = useState(false);
@@ -271,7 +273,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
             >
               <Search className="h-4 w-4" />
               <span className="hidden sm:inline">Search</span>
-              <span className="text-[11px] text-muted-foreground hidden lg:inline">Ctrl / Cmd + K</span>
+              <span className="text-[11px] text-muted-foreground hidden lg:inline">{shortcutHint}</span>
             </Button>
           </div>
 

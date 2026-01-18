@@ -35,6 +35,7 @@ import { Switch } from '@/components/ui/switch';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
 import { Diagram } from '@/lib/types';
+import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
 import { BookOpen, Download, Github, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -63,6 +64,7 @@ export function DiagramGrid({
   const [nextOffset, setNextOffset] = useState<number>(initialNextOffset ?? initialDiagrams.length);
   const [total, setTotal] = useState<number>(initialTotal ?? initialDiagrams.length);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const { shortcutHint } = useShortcutPlatform();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -513,7 +515,8 @@ export function DiagramGrid({
               >
                 <Search className="h-4 w-4" />
                 <span className="hidden sm:inline">Search</span>
-                <span className="text-xs text-muted-foreground hidden lg:inline">Ctrl / Cmd + K</span>
+                 <span className="text-xs text-muted-foreground hidden lg:inline">{shortcutHint}</span>
+
               </Button>
             </div>
 
