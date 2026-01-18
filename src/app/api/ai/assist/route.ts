@@ -163,8 +163,8 @@ async function callOpenAI(apiKey: string, prompt: string, content: string): Prom
           content: userPrompt,
         },
       ],
-      max_tokens: 1500,
-      temperature: 0.5,
+      max_tokens: 8000,
+      temperature: 0.3,
     }),
   });
 
@@ -196,8 +196,8 @@ async function callGemini(apiKey: string, prompt: string, content: string): Prom
           },
         ],
         generationConfig: {
-          temperature: 0.5,
-          maxOutputTokens: 1500,
+          temperature: 0.3,
+          maxOutputTokens: 8000,
         },
       }),
     });
