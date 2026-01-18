@@ -140,8 +140,8 @@ export function PeekDiagramModal({
                         <span className="text-xl">{diagram?.emoji || '📊'}</span>
                         {diagram?.title || 'Untitled Diagram'}
                     </DialogTitle>
-                    <DialogDescription className="sr-only">
-                        Preview of the diagram
+                    <DialogDescription className="text-muted-foreground text-sm mt-1.5 line-clamp-2">
+                        {diagram?.description || 'No description provided.'}
                     </DialogDescription>
                 </DialogHeader>
 

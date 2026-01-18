@@ -389,8 +389,13 @@ export function DiagramGrid({
                   <span className="text-2xl shrink-0">{diagram.emoji || '📊'}</span>
                   <div className="min-w-0 flex-1">
                     <CardTitle className="text-base truncate">{diagram.title}</CardTitle>
-                    <CardDescription className="text-xs">
-                      {formatDate(diagram.updatedAt)}
+                    <CardDescription className="text-xs flex items-center gap-2">
+                      <span>{formatDate(diagram.updatedAt)}</span>
+                      {diagram.totalVersions > 1 && (
+                        <span className="bg-muted px-1.5 py-0.5 rounded-full text-[10px] font-medium">
+                          v{diagram.totalVersions}
+                        </span>
+                      )}
                     </CardDescription>
                   </div>
                 </div>
@@ -496,6 +501,11 @@ export function DiagramGrid({
               </div>
             </CardHeader>
             <CardContent>
+              {diagram.description && (
+                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+                  {diagram.description}
+                </p>
+              )}
               <div className="bg-muted/50 rounded-md p-3 h-24 overflow-hidden">
                 <pre className="text-xs text-muted-foreground font-mono whitespace-pre-wrap line-clamp-4">
                   {diagram.content}

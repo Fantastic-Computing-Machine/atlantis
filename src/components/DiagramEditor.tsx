@@ -6,12 +6,20 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { ensureCsrfToken, CSRF_HEADER_NAME } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
 import { Checkpoint, Diagram } from '@/lib/types';
 import { useShortcutPlatform } from '@/lib/use-platform';
-import { copyToClipboard } from '@/lib/utils';
-import { History, Moon, Save, Search, Share2, Star, Sun } from 'lucide-react';
+import { copyToClipboard, formatDate } from '@/lib/utils';
+import { History, Info, Moon, Save, Search, Share2, Star, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -43,6 +51,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const [diagram, setDiagram] = useState<Diagram>(initialDiagram);
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
   const { shortcutHint } = useShortcutPlatform();
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [isLoadingCheckpoints, setIsLoadingCheckpoints] = useState(false);
@@ -53,6 +62,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef(initialDiagram.content);
   const lastSavedTitleRef = useRef(initialDiagram.title);
+  const lastSavedDescriptionRef = useRef(initialDiagram.description);
 
   // Prevent hydration mismatch by only rendering client-dependent UI after mount
   useEffect(() => {
@@ -65,6 +75,10 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDiagram((prev) => ({ ...prev, title: e.target.value }));
+  };
+
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setDiagram((prev) => ({ ...prev, description: e.target.value }));
   };
 
   const saveChanges = useCallback(async (showToast = true) => {
@@ -83,11 +97,13 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
       setDiagram((prev) => ({ ...prev, updatedAt: updated.updatedAt }));
       updateDiagram(diagram.id, {
         title: diagram.title,
+        description: diagram.description,
         content: diagram.content,
         updatedAt: updated.updatedAt
       });
       lastSavedContentRef.current = diagram.content;
       lastSavedTitleRef.current = diagram.title;
+      lastSavedDescriptionRef.current = diagram.description;
       if (showToast) {
         toast.success('Changes saved');
       }
@@ -114,8 +130,9 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
 
     const hasContentChanged = diagram.content !== lastSavedContentRef.current;
     const hasTitleChanged = diagram.title !== lastSavedTitleRef.current;
+    const hasDescriptionChanged = diagram.description !== lastSavedDescriptionRef.current;
 
-    if (!hasContentChanged && !hasTitleChanged) return;
+    if (!hasContentChanged && !hasTitleChanged && !hasDescriptionChanged) return;
 
     // Clear existing timer
     if (autoSaveTimerRef.current) {
@@ -132,7 +149,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [diagram.content, diagram.title, settings.autoSave, saveChanges]);
+  }, [diagram.content, diagram.title, diagram.description, settings.autoSave, saveChanges]);
 
   // Save on blur for title (if auto-save is off)
   const handleTitleBlur = () => {
@@ -278,6 +295,15 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
           </div>
 
           <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsInfoOpen(true)}
+              aria-label="Diagram Info"
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+
             <Button variant="ghost" size="icon" onClick={handleShare}>
               <Share2 className="h-4 w-4" />
             </Button>
@@ -357,6 +383,62 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
       </div>
 
       <GlobalSearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
+
+      <Dialog open={isInfoOpen} onOpenChange={setIsInfoOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Diagram Info</DialogTitle>
+            <DialogDescription>
+              View and edit diagram details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="title" className="text-sm font-medium">
+                Title
+              </label>
+              <input
+                id="title"
+                value={diagram.title}
+                onChange={handleTitleChange}
+                onBlur={handleTitleBlur}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="description" className="text-sm font-medium">
+                Description
+              </label>
+              <Textarea
+                id="description"
+                value={diagram.description}
+                onChange={handleDescriptionChange}
+                onBlur={handleTitleBlur}
+                maxLength={400}
+                className="h-32 resize-none"
+                placeholder="Add a description..."
+              />
+              <p className="text-xs text-muted-foreground text-right">
+                {diagram.description?.length || 0}/400
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm mt-2">
+              <div className="flex flex-col gap-1">
+                <span className="text-muted-foreground">Created</span>
+                <span>{formatDate(diagram.createdAt)}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-muted-foreground">Updated</span>
+                <span>{formatDate(diagram.updatedAt)}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-muted-foreground">Versions</span>
+                <span>{diagram.totalVersions}</span>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
