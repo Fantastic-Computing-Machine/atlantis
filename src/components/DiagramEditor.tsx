@@ -13,6 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { ensureCsrfToken, CSRF_HEADER_NAME } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
@@ -327,7 +333,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
               <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
             </Button>
 
-            <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -370,15 +376,36 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
         </div>
 
         <div className="flex-1 min-h-0">
-          <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={45} minSize={25}>
-              <Editor value={diagram.content} onChange={handleEditorChange} />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={55} minSize={25}>
-              <Canvas code={diagram.content} diagramId={diagram.id} title={diagram.title} />
-            </ResizablePanel>
-          </ResizablePanelGroup>
+          {/* Mobile View: Tabs */}
+          <div className="block md:hidden h-full">
+            <Tabs defaultValue="preview" className="h-full flex flex-col">
+              <div className="px-4 py-2 border-b">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="code">Code</TabsTrigger>
+                  <TabsTrigger value="preview">Preview</TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="code" className="flex-1 min-h-0 mt-0">
+                <Editor value={diagram.content} onChange={handleEditorChange} />
+              </TabsContent>
+              <TabsContent value="preview" className="flex-1 min-h-0 mt-0 relative">
+                <Canvas code={diagram.content} diagramId={diagram.id} title={diagram.title} />
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Desktop View: Split Pane */}
+          <div className="hidden md:block h-full">
+            <ResizablePanelGroup direction="horizontal">
+              <ResizablePanel defaultSize={45} minSize={25}>
+                <Editor value={diagram.content} onChange={handleEditorChange} />
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={55} minSize={25}>
+                <Canvas code={diagram.content} diagramId={diagram.id} title={diagram.title} />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </div>
         </div>
       </div>
 

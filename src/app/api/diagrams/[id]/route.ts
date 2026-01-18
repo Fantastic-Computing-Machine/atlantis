@@ -1,6 +1,7 @@
 import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { deleteDiagramById, updateDiagramById } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
+import { diagramSchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
 
 export async function PUT(
@@ -13,8 +14,17 @@ export async function PUT(
 
   try {
     const { id } = await params;
-    const body = await request.json();
-    const updatedDiagram = await updateDiagramById(id, body);
+    const json = await request.json();
+    const result = diagramSchema.safeParse(json);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: result.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const updatedDiagram = await updateDiagramById(id, result.data);
 
     if (!updatedDiagram) {
       return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });

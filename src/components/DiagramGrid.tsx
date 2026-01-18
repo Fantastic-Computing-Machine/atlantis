@@ -40,7 +40,7 @@ import { useDiagramStore } from '@/lib/store';
 import { Diagram, SortOption } from '@/lib/types';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
-import { BookOpen, Download, Eye, Github, ListFilter, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
+import { BookOpen, Download, Eye, Github, ListFilter, Loader2, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -74,6 +74,7 @@ export function DiagramGrid({
   const [peekDiagram, setPeekDiagram] = useState<Diagram | null>(null);
   const [sortMode, setSortMode] = useState<SortOption>('recent');
   const { setTheme, theme } = useTheme();
+  const [isCreating, setIsCreating] = useState(false);
   const { settings, setAutoSave } = useDiagramStore();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -189,6 +190,7 @@ export function DiagramGrid({
   const hasStarred = starredDiagrams.length > 0;
 
   const handleCreate = async () => {
+    setIsCreating(true);
     try {
       const csrfToken = await ensureCsrfToken();
       const res = await fetch('/api/diagrams', {
@@ -207,11 +209,20 @@ export function DiagramGrid({
       router.push(`/${newDiagram.id}`);
     } catch {
       toast.error('Failed to create diagram');
+      setIsCreating(false);
     }
   };
 
   const handleDelete = async () => {
     if (!deleteId) return;
+
+    // Optimistically update UI
+    const previousDiagrams = [...diagrams];
+    const previousTotal = total;
+    
+    setDiagrams((prev) => prev.filter((d) => d.id !== deleteId));
+    setTotal((prev) => Math.max(prev - 1, 0));
+    setDeleteId(null); // Close modal immediately
 
     try {
       const csrfToken = await ensureCsrfToken();
@@ -225,14 +236,13 @@ export function DiagramGrid({
       if (!res.ok) {
         throw new Error('Failed to delete');
       }
-
-      setDiagrams((prev) => prev.filter((d) => d.id !== deleteId));
-      setTotal((prev) => Math.max(prev - 1, 0));
+      
       toast.success('Diagram deleted');
     } catch {
+      // Revert on failure
+      setDiagrams(previousDiagrams);
+      setTotal(previousTotal);
       toast.error('Failed to delete diagram');
-    } finally {
-      setDeleteId(null);
     }
   };
 
@@ -592,9 +602,9 @@ export function DiagramGrid({
                 className="hidden"
               />
 
-              <Button onClick={handleCreate} className="gap-2">
-                <Plus size={18} />
-                <span className="hidden sm:inline">New Diagram</span>
+              <Button onClick={handleCreate} className="gap-2" disabled={isCreating}>
+                {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus size={18} />}
+                <span className="hidden sm:inline">{isCreating ? 'Creating...' : 'New Diagram'}</span>
               </Button>
 
               <DropdownMenu>

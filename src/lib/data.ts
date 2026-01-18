@@ -2,9 +2,7 @@ import type { Prisma } from '.prisma/client';
 import { prisma } from './prisma';
 import { Checkpoint, Diagram, DiagramPage } from './types';
 import { generateShortId, getRandomEmoji } from './utils';
-
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { buildSearchVector } = require('../../scripts/searchVector');
+import { buildSearchVector } from './search';
 
 const DEFAULT_PAGE_SIZE = 24;
 const MAX_PAGE_SIZE = 100;

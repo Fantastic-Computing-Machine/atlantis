@@ -6,7 +6,7 @@ Purpose: equip agentic coders with reliable, high-signal defaults for this Next.
 - Framework: Next.js 16 App Router (TypeScript strict, `moduleResolution: bundler`).
 - Styling: Tailwind 4 + Shadcn UI primitives under `src/components/ui`.
 - State: Zustand (`src/lib/store.ts`), persisted settings only.
-- Diagrams: Mermaid content, stored on disk at `data/diagrams.json` via `src/lib/data.ts`.
+- Diagrams: Mermaid content, stored in SQLite/Postgres via Prisma (`src/lib/data.ts`).
 - Icons: lucide-react, import named icons only.
 - Fonts/themes: `next/font` + `next-themes` (light/dark switch).
 
