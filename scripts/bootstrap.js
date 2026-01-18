@@ -3,6 +3,7 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { buildSearchVector } = require('./searchVector');
 
 // Try to load .env if present
 try {
@@ -45,9 +46,7 @@ function ensureDataDir() {
   }
 }
 
-function buildSearchVector(title, content) {
-  return `${title} ${content}`.toLowerCase();
-}
+
 
 function createAdapter(url) {
   if (url.startsWith('file:')) {
@@ -86,7 +85,7 @@ async function backfillSearchVectors(url) {
 
       for (const diagram of batch) {
         const latestContent = diagram.contents[0]?.content ?? '';
-        const vector = buildSearchVector(diagram.title, latestContent);
+        const vector = buildSearchVector(diagram.title, '', latestContent);
         if (vector === (diagram.searchVector ?? '')) continue;
         await client.diagram.update({ where: { id: diagram.id }, data: { searchVector: vector } });
       }

@@ -12,11 +12,12 @@ export async function GET(request: Request) {
     const limit = url.searchParams.get('limit');
     const offset = url.searchParams.get('offset');
     const query = url.searchParams.get('query') || undefined;
+    const sort = (url.searchParams.get('sort') as import('@/lib/types').SortOption) || 'recent';
 
     const limitNumber = limit ? Number.parseInt(limit, 10) : DEFAULT_LIMIT;
     const offsetNumber = offset ? Number.parseInt(offset, 10) : 0;
 
-    const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query });
+    const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query, sort });
     return NextResponse.json(page);
   } catch (error) {
     logApiError('GET /api/diagrams', error);
