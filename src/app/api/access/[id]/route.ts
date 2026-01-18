@@ -1,22 +1,22 @@
 import { ensureCsrfCookie } from '@/lib/csrf';
-import { getDiagrams } from '@/lib/data';
+import { getDiagramById } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
+
+const apiAccessEnabled = process.env.ENABLE_API_ACCESS?.trim().toLowerCase() === 'true';
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (process.env.ENABLE_API_ACCESS !== 'true') {
+  if (!apiAccessEnabled) {
     return new NextResponse('API Access Disabled', { status: 403 });
   }
 
   try {
     await ensureCsrfCookie();
     const { id } = await params;
-    const diagrams = await getDiagrams();
-
-    const diagram = diagrams.find((d) => d.id === id);
+    const diagram = await getDiagramById(id);
 
     if (!diagram) {
       return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });

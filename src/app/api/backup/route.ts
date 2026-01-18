@@ -1,5 +1,5 @@
 import { csrfFailureResponse, ensureCsrfCookie, validateCsrfToken } from '@/lib/csrf';
-import { getDiagrams, saveDiagrams } from '@/lib/data';
+import { getDiagrams, restoreDiagrams } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       throw new Error('Invalid diagram data in backup');
     }
 
-    await saveDiagrams(body);
+    await restoreDiagrams(body);
     return NextResponse.json({ success: true, count: body.length });
   } catch (error) {
     logApiError('POST /api/backup', error);
