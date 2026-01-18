@@ -7,6 +7,7 @@ const DEFAULT_PAGE_SIZE = 24;
 const MAX_PAGE_SIZE = 100;
 const MAX_CHECKPOINTS = 15;
 const TITLE_MAX = 100;
+const DESCRIPTION_MAX = 400;
 
 type TransactionClient = typeof prisma;
 type DiagramWithLatest = Prisma.DiagramGetPayload<{
@@ -23,8 +24,8 @@ function normalizeOffset(offset?: number | null) {
   return Math.max(Math.trunc(offset as number), 0);
 }
 
-function buildSearchVector(title: string, content: string) {
-  return `${title} ${content}`.toLowerCase();
+function buildSearchVector(title: string, description: string, content: string) {
+  return `${title} ${description} ${content}`.toLowerCase();
 }
 
 function toDiagram(diagram: DiagramWithLatest): Diagram {
@@ -32,17 +33,22 @@ function toDiagram(diagram: DiagramWithLatest): Diagram {
   return {
     id: diagram.id,
     title: diagram.title,
+    description: diagram.description,
     content: latest?.content ?? '',
     emoji: diagram.emoji,
     createdAt: diagram.createdAt.toISOString(),
     updatedAt: diagram.updatedAt.toISOString(),
     isFavorite: diagram.isFavorite,
+    totalVersions: diagram.totalVersions,
   };
 }
 
-function validateLengths(title?: string, content?: string) {
+function validateLengths(title?: string, description?: string, content?: string) {
   if (typeof title === 'string' && title.length > TITLE_MAX) {
     throw new Error(`Title exceeds ${TITLE_MAX} characters`);
+  }
+  if (typeof description === 'string' && description.length > DESCRIPTION_MAX) {
+    throw new Error(`Description exceeds ${DESCRIPTION_MAX} characters`);
   }
 }
 
@@ -118,14 +124,18 @@ export async function getDiagrams(): Promise<Diagram[]> {
 
 export async function createDiagram({
   title,
+  description,
   content,
   emoji,
 }: {
   title?: string;
+  description?: string;
   content?: string;
   emoji?: string;
 }): Promise<Diagram> {
   const now = new Date();
+  validateLengths(title, description);
+
   const diagramId = await ensureUniqueId(async (id) => {
     const existing = await prisma.diagram.findUnique({ where: { id }, select: { id: true } });
     return Boolean(existing);
@@ -138,17 +148,20 @@ export async function createDiagram({
 
   const diagram = await withTx(async (tx: TransactionClient) => {
     const nextTitle = title || 'Untitled Diagram';
+    const nextDescription = description || '';
     const nextContent = content || 'graph TD\n    A[Start] --> B[End]';
 
     const createdDiagram = await tx.diagram.create({
       data: {
         id: diagramId,
         title: nextTitle,
+        description: nextDescription,
         emoji: emoji || getRandomEmoji(),
         createdAt: now,
         updatedAt: now,
         isFavorite: false,
-        searchVector: buildSearchVector(nextTitle, nextContent),
+        totalVersions: 1,
+        searchVector: buildSearchVector(nextTitle, nextDescription, nextContent),
       },
     });
 
@@ -174,12 +187,12 @@ export async function createDiagram({
 
 export async function updateDiagramById(
   id: string,
-  updates: Partial<Pick<Diagram, 'title' | 'content' | 'emoji' | 'isFavorite'>>
+  updates: Partial<Pick<Diagram, 'title' | 'description' | 'content' | 'emoji' | 'isFavorite'>>
 ): Promise<Diagram | null> {
   const existing = await prisma.diagram.findUnique({ where: { id } });
   if (!existing) return null;
 
-  validateLengths(updates.title);
+  validateLengths(updates.title, updates.description);
 
   const now = new Date();
   const hasContentUpdate = typeof updates.content === 'string';
@@ -191,6 +204,7 @@ export async function updateDiagramById(
     });
 
     const nextTitle = updates.title ?? existing.title;
+    const nextDescription = updates.description ?? existing.description;
     let nextContent = latestContent?.content ?? '';
 
     if (hasContentUpdate) {
@@ -217,6 +231,14 @@ export async function updateDiagramById(
             updatedAt: now,
           },
         });
+        
+        // If we created a new content row where there was none (rare edge case), we should update count
+        // But usually updateDiagram updates the *latest* content row, so count doesn't change.
+        // If latestContent existed, count is same. If not, it increases.
+        if (!latestContent) {
+             const totalVersions = await tx.content.count({ where: { diagramId: id } });
+             await tx.diagram.update({ where: { id }, data: { totalVersions } });
+        }
       }
     }
 
@@ -224,10 +246,11 @@ export async function updateDiagramById(
       where: { id },
       data: {
         title: nextTitle,
+        description: nextDescription,
         emoji: updates.emoji ?? existing.emoji,
         isFavorite: typeof updates.isFavorite === 'boolean' ? updates.isFavorite : existing.isFavorite,
         updatedAt: now,
-        searchVector: buildSearchVector(nextTitle, nextContent),
+        searchVector: buildSearchVector(nextTitle, nextDescription, nextContent),
       },
     });
 
@@ -258,28 +281,30 @@ export async function listCheckpoints(diagramId: string): Promise<Checkpoint[]> 
 
 export async function createCheckpoint(
   diagramId: string,
-  payload: { content: string; title?: string; emoji?: string; isFavorite?: boolean }
+  payload: { content: string; title?: string; description?: string; emoji?: string; isFavorite?: boolean }
 ): Promise<{ checkpoint: Checkpoint; diagram: Diagram } | null> {
   const existing = await prisma.diagram.findUnique({ where: { id: diagramId } });
   if (!existing) return null;
 
-  validateLengths(payload.title);
+  validateLengths(payload.title, payload.description);
 
   const now = new Date();
 
   const result = await withTx(async (tx: TransactionClient) => {
     const nextTitle = payload.title ?? existing.title;
+    const nextDescription = payload.description ?? existing.description;
     const nextContent = payload.content;
 
     await tx.diagram.update({
       where: { id: diagramId },
       data: {
         title: nextTitle,
+        description: nextDescription,
         emoji: payload.emoji ?? existing.emoji,
         isFavorite:
           typeof payload.isFavorite === 'boolean' ? payload.isFavorite : existing.isFavorite,
         updatedAt: now,
-        searchVector: buildSearchVector(nextTitle, nextContent),
+        searchVector: buildSearchVector(nextTitle, nextDescription, nextContent),
       },
     });
 
@@ -307,6 +332,12 @@ export async function createCheckpoint(
     if (extraContents.length > 0) {
       await tx.content.deleteMany({ where: { id: { in: extraContents.map((c: { id: string }) => c.id) } } });
     }
+
+    const totalVersions = await tx.content.count({ where: { diagramId } });
+    await tx.diagram.update({
+      where: { id: diagramId },
+      data: { totalVersions },
+    });
 
     const latest = await tx.diagram.findUnique({
       where: { id: diagramId },
@@ -349,16 +380,18 @@ export async function restoreDiagrams(diagrams: Diagram[]): Promise<void> {
       const createdAt = diagram.createdAt ? new Date(diagram.createdAt) : new Date();
       const updatedAt = diagram.updatedAt ? new Date(diagram.updatedAt) : createdAt;
 
-      const searchVector = buildSearchVector(diagram.title, diagram.content);
+      const searchVector = buildSearchVector(diagram.title, diagram.description, diagram.content);
 
       await tx.diagram.create({
         data: {
           id: diagram.id,
           title: diagram.title,
+          description: diagram.description,
           emoji: diagram.emoji,
           createdAt,
           updatedAt,
           isFavorite: diagram.isFavorite,
+          totalVersions: 1,
           searchVector,
         },
       });

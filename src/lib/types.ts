@@ -1,11 +1,13 @@
 export interface Diagram {
   id: string;
   title: string;
+  description: string;
   content: string;
   emoji: string;
   createdAt: string;
   updatedAt: string;
   isFavorite: boolean;
+  totalVersions: number;
 }
 
 export interface Checkpoint {
