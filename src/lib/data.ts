@@ -3,6 +3,9 @@ import { prisma } from './prisma';
 import { Checkpoint, Diagram, DiagramPage } from './types';
 import { generateShortId, getRandomEmoji } from './utils';
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { buildSearchVector } = require('../../scripts/searchVector');
+
 const DEFAULT_PAGE_SIZE = 24;
 const MAX_PAGE_SIZE = 100;
 const MAX_CHECKPOINTS = 15;
@@ -22,10 +25,6 @@ function normalizeLimit(limit?: number | null) {
 function normalizeOffset(offset?: number | null) {
   if (!Number.isFinite(offset)) return 0;
   return Math.max(Math.trunc(offset as number), 0);
-}
-
-function buildSearchVector(title: string, description: string, content: string) {
-  return `${title} ${description} ${content}`.toLowerCase();
 }
 
 function toDiagram(diagram: DiagramWithLatest): Diagram {
@@ -231,13 +230,13 @@ export async function updateDiagramById(
             updatedAt: now,
           },
         });
-        
+
         // If we created a new content row where there was none (rare edge case), we should update count
         // But usually updateDiagram updates the *latest* content row, so count doesn't change.
         // If latestContent existed, count is same. If not, it increases.
         if (!latestContent) {
-             const totalVersions = await tx.content.count({ where: { diagramId: id } });
-             await tx.diagram.update({ where: { id }, data: { totalVersions } });
+          const totalVersions = await tx.content.count({ where: { diagramId: id } });
+          await tx.diagram.update({ where: { id }, data: { totalVersions } });
         }
       }
     }
