@@ -25,6 +25,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -35,10 +37,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
-import { Diagram } from '@/lib/types';
+import { Diagram, SortOption } from '@/lib/types';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
-import { BookOpen, Download, Eye, Github, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
+import { BookOpen, Download, Eye, Github, ListFilter, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -70,6 +72,7 @@ export function DiagramGrid({
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [peekDiagram, setPeekDiagram] = useState<Diagram | null>(null);
+  const [sortMode, setSortMode] = useState<SortOption>('recent');
   const { setTheme, theme } = useTheme();
   const { settings, setAutoSave } = useDiagramStore();
   const router = useRouter();
@@ -89,7 +92,7 @@ export function DiagramGrid({
 
     setIsFetchingMore(true);
     try {
-      const res = await fetch(`/api/diagrams?limit=24&offset=${nextOffset}`);
+      const res = await fetch(`/api/diagrams?limit=24&offset=${nextOffset}&sort=${sortMode}`);
       if (!res.ok) {
         throw new Error('Failed to load more');
       }
@@ -114,7 +117,7 @@ export function DiagramGrid({
     } finally {
       setIsFetchingMore(false);
     }
-  }, [hasMore, isFetchingMore, nextOffset, total]);
+  }, [hasMore, isFetchingMore, nextOffset, sortMode, total]);
 
   useEffect(() => {
     if (!hasMore || isFetchingMore) return;
@@ -135,10 +138,11 @@ export function DiagramGrid({
     return () => observer.disconnect();
   }, [fetchNextPage, hasMore, isFetchingMore]);
 
-  const reloadFirstPage = useCallback(async () => {
+  const reloadFirstPage = useCallback(async (overrideSort?: SortOption) => {
+    const sortToUse = overrideSort ?? sortMode;
     setIsLoading(true);
     try {
-      const res = await fetch('/api/diagrams?limit=24&offset=0');
+      const res = await fetch(`/api/diagrams?limit=24&offset=0&sort=${sortToUse}`);
       if (!res.ok) {
         throw new Error('Failed to load diagrams');
       }
@@ -154,7 +158,13 @@ export function DiagramGrid({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [sortMode]);
+
+  const handleSortChange = (newSort: SortOption) => {
+    if (newSort === sortMode) return;
+    setSortMode(newSort);
+    reloadFirstPage(newSort);
+  };
 
   const starredDiagrams = diagrams
     .filter((d) => d.isFavorite)
@@ -162,7 +172,19 @@ export function DiagramGrid({
 
   const otherDiagrams = diagrams
     .filter((d) => !d.isFavorite)
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    .sort((a, b) => {
+      switch (sortMode) {
+        case 'old':
+          return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        case 'alphabetical':
+          return a.title.localeCompare(b.title);
+        case 'versions':
+          return b.totalVersions - a.totalVersions;
+        case 'recent':
+        default:
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      }
+    });
 
   const hasStarred = starredDiagrams.length > 0;
 
@@ -712,22 +734,31 @@ export function DiagramGrid({
 
               {(otherDiagrams.length > 0 || !hasStarred) && (
                 <section>
-                  {hasStarred && (
-                    <h2 className="text-lg font-semibold mb-4 text-muted-foreground flex items-center gap-2">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className={cn("text-lg font-semibold flex items-center gap-2", hasStarred && "text-muted-foreground")}>
                       <span>All diagrams //</span>
                       <span className="text-muted-foreground">
                         {otherDiagrams.length} of {Math.max(total - starredDiagrams.length, 0)}
                       </span>
                     </h2>
-                  )}
-                  {!hasStarred && (
-                    <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <span>All diagrams //</span>
-                      <span className="text-muted-foreground">
-                        {otherDiagrams.length} of {Math.max(total - starredDiagrams.length, 0)}
-                      </span>
-                    </h2>
-                  )}
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="gap-2">
+                          <ListFilter className="h-4 w-4" />
+                          <span className="hidden sm:inline">Sort</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuRadioGroup value={sortMode} onValueChange={(v) => handleSortChange(v as SortOption)}>
+                          <DropdownMenuRadioItem value="recent">Recent</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="old">Oldest</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="alphabetical">Alphabetical</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="versions">Versions</DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                   {renderDiagramGrid(otherDiagrams)}
                 </section>
               )}

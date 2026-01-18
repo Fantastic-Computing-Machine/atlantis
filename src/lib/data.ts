@@ -73,10 +73,12 @@ export async function getDiagramPage({
   limit = DEFAULT_PAGE_SIZE,
   offset = 0,
   query,
+  sort = 'recent',
 }: {
   limit?: number;
   offset?: number;
   query?: string;
+  sort?: import('./types').SortOption;
 }): Promise<DiagramPage> {
   const normalizedLimit = normalizeLimit(limit);
   const normalizedOffset = normalizeOffset(offset);
@@ -85,10 +87,27 @@ export async function getDiagramPage({
     ? { searchVector: { contains: query.trim().toLowerCase() } }
     : undefined;
 
+  let orderBy: Prisma.DiagramOrderByWithRelationInput = { updatedAt: 'desc' };
+  switch (sort) {
+    case 'old':
+      orderBy = { updatedAt: 'asc' };
+      break;
+    case 'alphabetical':
+      orderBy = { title: 'asc' };
+      break;
+    case 'versions':
+      orderBy = { totalVersions: 'desc' };
+      break;
+    case 'recent':
+    default:
+      orderBy = { updatedAt: 'desc' };
+      break;
+  }
+
   const [diagrams, total] = await Promise.all([
     prisma.diagram.findMany({
       where,
-      orderBy: { updatedAt: 'desc' },
+      orderBy,
       skip: normalizedOffset,
       take: normalizedLimit,
       include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
