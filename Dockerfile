@@ -1,9 +1,15 @@
 # syntax=docker/dockerfile:1
 
 # ============================================
+# Base image with security updates
+# ============================================
+FROM node:20-alpine AS base
+RUN apk update && apk upgrade --no-cache
+
+# ============================================
 # Stage 1: Install dependencies + Prisma client
 # ============================================
-FROM node:20-alpine AS deps
+FROM base AS deps
 WORKDIR /app
 
 # Install libc6-compat for Alpine compatibility
@@ -19,11 +25,11 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 COPY scripts/prepare-prisma-schema.js ./scripts/prepare-prisma-schema.js
 
-# Install all dependencies (including devDependencies for build)
-RUN --mount=type=cache,target=/root/.npm npm ci
-
-# Prepare Prisma schema (provider-aware) and generate client
-RUN npm run prisma:prepare && npx prisma generate
+# Install all dependencies (including devDependencies for build) and generate Prisma client
+RUN --mount=type=cache,target=/root/.npm \
+  npm ci && \
+  npm run prisma:prepare && \
+  npx prisma generate
 
 # ============================================
 # Stage 1b: Prune dev dependencies for runtime
@@ -34,7 +40,7 @@ RUN npm prune --omit=dev && rm -rf /root/.npm
 # ============================================
 # Stage 2: Build the application
 # ============================================
-FROM node:20-alpine AS builder
+FROM base AS builder
 WORKDIR /app
 
 ARG PRISMA_PROVIDER=sqlite
@@ -55,19 +61,17 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_OUTPUT=standalone
 
-# Ensure schema matches build args and regenerate client (no-op if unchanged)
-RUN npm run prisma:prepare && npx prisma generate
-
-# Prepare a baseline SQLite database for prerender/runtime (Next build queries it)
-RUN mkdir -p /app/data && npx prisma db push
-
-# Build the application with standalone output
-RUN npm run build
+# Prepare schema/client, seed empty DB, and build app (fewer layers)
+RUN npm run prisma:prepare && \
+  npx prisma generate && \
+  mkdir -p /app/data && \
+  npx prisma db push && \
+  npm run build
 
 # ============================================
 # Stage 3: Production runner (minimal image)
 # ============================================
-FROM node:20-alpine AS runner
+FROM base AS runner
 WORKDIR /app
 
 ARG PRISMA_PROVIDER=sqlite
