@@ -26,6 +26,12 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 RUN npm run prisma:prepare && npx prisma generate
 
 # ============================================
+# Stage 1b: Prune dev dependencies for runtime
+# ============================================
+FROM deps AS prod-deps
+RUN npm prune --omit=dev && rm -rf /root/.npm
+
+# ============================================
 # Stage 2: Build the application
 # ============================================
 FROM node:20-alpine AS builder
@@ -52,11 +58,11 @@ ENV NEXT_OUTPUT=standalone
 # Ensure schema matches build args and regenerate client (no-op if unchanged)
 RUN npm run prisma:prepare && npx prisma generate
 
+# Prepare a baseline SQLite database for prerender/runtime (Next build queries it)
+RUN mkdir -p /app/data && npx prisma db push
+
 # Build the application with standalone output
 RUN npm run build
-
-# Prepare a baseline SQLite database for runtime
-RUN mkdir -p /app/data && npx prisma db push
 
 # ============================================
 # Stage 3: Production runner (minimal image)
@@ -88,8 +94,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 # 2. Standalone server (includes minimal node_modules)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 
-# 2b. Full node_modules for Prisma CLI + adapters (ensures runtime DB setup works)
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+# 2b. Pruned node_modules for Prisma CLI + adapters (ensures runtime DB setup works)
+COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # 3. Static files
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static

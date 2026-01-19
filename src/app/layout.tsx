@@ -3,10 +3,10 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ConsoleWelcome } from "@/components/ConsoleWelcome";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+// Use Tailwind's sans stack to avoid network font downloads during offline builds
+const inter = { className: "font-sans" };
 
 export const metadata: Metadata = {
   title: "atlantis",
