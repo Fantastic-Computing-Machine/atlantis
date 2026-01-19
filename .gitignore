@@ -43,3 +43,4 @@ next-env.d.ts
 # Atlantis Data
 /data
 TODO.md
+build.log

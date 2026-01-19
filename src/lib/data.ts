@@ -12,8 +12,24 @@ const TITLE_MAX = 100;
 const DESCRIPTION_MAX = 400;
 
 type TransactionClient = typeof prisma;
+const diagramWithLatestSelect = {
+  id: true,
+  title: true,
+  description: true,
+  emoji: true,
+  createdAt: true,
+  updatedAt: true,
+  isFavorite: true,
+  totalVersions: true,
+  searchVector: true,
+  contents: {
+    orderBy: { updatedAt: 'desc' as const },
+    take: 1,
+    select: { id: true, content: true, updatedAt: true },
+  },
+} satisfies Prisma.DiagramSelect;
 type DiagramWithLatest = Prisma.DiagramGetPayload<{
-  include: { contents: { orderBy: { updatedAt: 'desc' }; take: 1 } };
+  select: typeof diagramWithLatestSelect;
 }>;
 
 
@@ -42,7 +58,7 @@ function toDiagram(diagram: DiagramWithLatest): Diagram {
   };
 }
 
-function validateLengths(title?: string, description?: string, content?: string) {
+function validateLengths(title?: string, description?: string) {
   if (typeof title === 'string' && title.length > TITLE_MAX) {
     throw new Error(`Title exceeds ${TITLE_MAX} characters`);
   }
@@ -60,7 +76,9 @@ async function ensureUniqueId(check: (id: string) => Promise<boolean>) {
 }
 
 function isNotFoundError(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2025';
+  return (
+    typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2025'
+  );
 }
 
 async function withTx<T>(fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
@@ -108,7 +126,7 @@ export async function getDiagramPage({
       orderBy,
       skip: normalizedOffset,
       take: normalizedLimit,
-      include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
+      select: diagramWithLatestSelect,
     }),
     prisma.diagram.count({ where }),
   ]);
@@ -123,17 +141,17 @@ export async function getDiagramPage({
 export async function getDiagramById(id: string): Promise<Diagram | null> {
   const diagram = await prisma.diagram.findUnique({
     where: { id },
-    include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
+    select: diagramWithLatestSelect,
   });
 
   if (!diagram) return null;
-  return toDiagram(diagram);
+  return toDiagram(diagram as DiagramWithLatest);
 }
 
 export async function getDiagrams(): Promise<Diagram[]> {
   const diagrams = await prisma.diagram.findMany({
     orderBy: { updatedAt: 'desc' },
-    include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
+    select: diagramWithLatestSelect,
   });
   return diagrams.map(toDiagram);
 }
@@ -178,27 +196,21 @@ export async function createDiagram({
         isFavorite: false,
         totalVersions: 1,
         searchVector: buildSearchVector(nextTitle, nextDescription, nextContent),
+        contents: {
+          create: {
+            id: contentId,
+            content: nextContent,
+            updatedAt: now,
+          },
+        },
       },
+      select: diagramWithLatestSelect,
     });
 
-    await tx.content.create({
-      data: {
-        id: contentId,
-        diagramId,
-        content: nextContent,
-        updatedAt: now,
-      },
-    });
-
-    const latest = await tx.diagram.findUnique({
-      where: { id: createdDiagram.id },
-      include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
-    });
-
-    return latest as DiagramWithLatest;
+    return createdDiagram as DiagramWithLatest;
   });
 
-  return toDiagram(diagram);
+  return toDiagram(diagram as DiagramWithLatest);
 }
 
 export async function updateDiagramById(
@@ -235,7 +247,10 @@ export async function updateDiagramById(
         });
       } else {
         const contentId = await ensureUniqueId(async (candidate) => {
-          const found = await tx.content.findUnique({ where: { id: candidate }, select: { id: true } });
+          const found = await tx.content.findUnique({
+            where: { id: candidate },
+            select: { id: true },
+          });
           return Boolean(found);
         });
 
@@ -248,9 +263,6 @@ export async function updateDiagramById(
           },
         });
 
-        // If we created a new content row where there was none (rare edge case), we should update count
-        // But usually updateDiagram updates the *latest* content row, so count doesn't change.
-        // If latestContent existed, count is same. If not, it increases.
         if (!latestContent) {
           const totalVersions = await tx.content.count({ where: { diagramId: id } });
           await tx.diagram.update({ where: { id }, data: { totalVersions } });
@@ -264,7 +276,8 @@ export async function updateDiagramById(
         title: nextTitle,
         description: nextDescription,
         emoji: updates.emoji ?? existing.emoji,
-        isFavorite: typeof updates.isFavorite === 'boolean' ? updates.isFavorite : existing.isFavorite,
+        isFavorite:
+          typeof updates.isFavorite === 'boolean' ? updates.isFavorite : existing.isFavorite,
         updatedAt: now,
         searchVector: buildSearchVector(nextTitle, nextDescription, nextContent),
       },
@@ -272,13 +285,13 @@ export async function updateDiagramById(
 
     const latest = await tx.diagram.findUnique({
       where: { id },
-      include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
+      select: diagramWithLatestSelect,
     });
 
     return latest as DiagramWithLatest | null;
   });
 
-  return diagram ? toDiagram(diagram) : null;
+  return diagram ? toDiagram(diagram as DiagramWithLatest) : null;
 }
 
 export async function listCheckpoints(diagramId: string): Promise<Checkpoint[]> {
@@ -297,18 +310,34 @@ export async function listCheckpoints(diagramId: string): Promise<Checkpoint[]> 
 
 export async function createCheckpoint(
   diagramId: string,
-  payload: { content: string; title?: string; description?: string; emoji?: string; isFavorite?: boolean }
+  payload: {
+    content: string;
+    title?: string;
+    description?: string;
+    emoji?: string;
+    isFavorite?: boolean;
+  }
 ): Promise<{ checkpoint: Checkpoint; diagram: Diagram } | null> {
-  const existing = await prisma.diagram.findUnique({ where: { id: diagramId } });
-  if (!existing) return null;
-
   validateLengths(payload.title, payload.description);
 
   const now = new Date();
 
   const result = await withTx(async (tx: TransactionClient) => {
-    const nextTitle = payload.title ?? existing.title;
-    const nextDescription = payload.description ?? existing.description;
+    const current = await tx.diagram.findUnique({
+      where: { id: diagramId },
+      select: {
+        title: true,
+        description: true,
+        emoji: true,
+        isFavorite: true,
+        totalVersions: true,
+      },
+    });
+
+    if (!current) return null;
+
+    const nextTitle = payload.title ?? current.title;
+    const nextDescription = payload.description ?? current.description;
     const nextContent = payload.content;
 
     await tx.diagram.update({
@@ -316,9 +345,9 @@ export async function createCheckpoint(
       data: {
         title: nextTitle,
         description: nextDescription,
-        emoji: payload.emoji ?? existing.emoji,
+        emoji: payload.emoji ?? current.emoji,
         isFavorite:
-          typeof payload.isFavorite === 'boolean' ? payload.isFavorite : existing.isFavorite,
+          typeof payload.isFavorite === 'boolean' ? payload.isFavorite : current.isFavorite,
         updatedAt: now,
         searchVector: buildSearchVector(nextTitle, nextDescription, nextContent),
       },
@@ -346,19 +375,24 @@ export async function createCheckpoint(
     });
 
     if (extraContents.length > 0) {
-      await tx.content.deleteMany({ where: { id: { in: extraContents.map((c: { id: string }) => c.id) } } });
+      await tx.content.deleteMany({
+        where: { id: { in: extraContents.map((c: { id: string }) => c.id) } },
+      });
     }
 
-    const totalVersions = await tx.content.count({ where: { diagramId } });
+    const prunedCount = extraContents.length;
+
     await tx.diagram.update({
       where: { id: diagramId },
-      data: { totalVersions },
+      data: { totalVersions: current.totalVersions + 1 - prunedCount },
     });
 
     const latest = await tx.diagram.findUnique({
       where: { id: diagramId },
-      include: { contents: { orderBy: { updatedAt: 'desc' }, take: 1 } },
+      select: diagramWithLatestSelect,
     });
+
+    if (!latest) return null;
 
     const checkpoint: Checkpoint = {
       id: checkpointId,
@@ -368,6 +402,8 @@ export async function createCheckpoint(
 
     return { diagram: latest as DiagramWithLatest, checkpoint };
   });
+
+  if (!result) return null;
 
   return { checkpoint: result.checkpoint, diagram: toDiagram(result.diagram) };
 }
@@ -415,7 +451,10 @@ export async function restoreDiagrams(diagrams: Diagram[]): Promise<void> {
       await tx.content.create({
         data: {
           id: await ensureUniqueId(async (candidate) => {
-            const found = await tx.content.findUnique({ where: { id: candidate }, select: { id: true } });
+            const found = await tx.content.findUnique({
+              where: { id: candidate },
+              select: { id: true },
+            });
             return Boolean(found);
           }),
           diagramId: diagram.id,

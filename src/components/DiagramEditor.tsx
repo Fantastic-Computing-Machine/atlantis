@@ -247,6 +247,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const selectedNodeId = selectedNode?.id ?? null;
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
+  const [activePane, setActivePane] = useState<'editor' | 'preview'>('preview');
 
   // Prevent hydration mismatch by only rendering client-dependent UI after mount
   useEffect(() => {
@@ -640,34 +641,79 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0">
-          <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={45} minSize={25}>
-              <Editor
-                value={diagram.content}
-                onChange={handleEditorChange}
-                selectionRange={selectionRange}
-                onCursorLineChange={handleCursorLineChange}
-                onToggleAiChat={handleToggleAiChat}
-                aiEnabled={aiChatOpen}
-                hasAiKey={settings.hasAiApiKey}
-                aiChatOpen={aiChatOpen}
-                onApplyAiContent={handleApplyAiContent}
-                diagramId={diagram.id}
-              />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={55} minSize={25}>
-              <Canvas
-                code={diagram.content}
-                diagramId={diagram.id}
-                title={diagram.title}
-                selectedNodeId={selectedNodeId}
-                onNodeSelect={handleNodeSelect}
-              />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </div>
+         <div className="flex-1 min-h-0">
+           <div className="sm:hidden border-b bg-muted/30 px-3 py-2 flex items-center gap-2">
+             <button
+               type="button"
+               className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${activePane === 'preview' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted'}`}
+               onClick={() => setActivePane('preview')}
+             >
+               Preview
+             </button>
+             <button
+               type="button"
+               className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${activePane === 'editor' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted'}`}
+               onClick={() => setActivePane('editor')}
+             >
+               Editor
+             </button>
+           </div>
+
+           <div className="hidden sm:block h-full">
+             <ResizablePanelGroup direction="horizontal">
+               <ResizablePanel defaultSize={45} minSize={25}>
+                 <Editor
+                   value={diagram.content}
+                   onChange={handleEditorChange}
+                   selectionRange={selectionRange}
+                   onCursorLineChange={handleCursorLineChange}
+                   onToggleAiChat={handleToggleAiChat}
+                   aiEnabled={aiChatOpen}
+                   hasAiKey={settings.hasAiApiKey}
+                   aiChatOpen={aiChatOpen}
+                   onApplyAiContent={handleApplyAiContent}
+                   diagramId={diagram.id}
+                 />
+               </ResizablePanel>
+               <ResizableHandle withHandle />
+               <ResizablePanel defaultSize={55} minSize={25}>
+                 <Canvas
+                   code={diagram.content}
+                   diagramId={diagram.id}
+                   title={diagram.title}
+                   selectedNodeId={selectedNodeId}
+                   onNodeSelect={handleNodeSelect}
+                 />
+               </ResizablePanel>
+             </ResizablePanelGroup>
+           </div>
+
+           <div className="sm:hidden h-full">
+             {activePane === 'preview' ? (
+               <Canvas
+                 code={diagram.content}
+                 diagramId={diagram.id}
+                 title={diagram.title}
+                 selectedNodeId={selectedNodeId}
+                 onNodeSelect={handleNodeSelect}
+               />
+             ) : (
+               <Editor
+                 value={diagram.content}
+                 onChange={handleEditorChange}
+                 selectionRange={selectionRange}
+                 onCursorLineChange={handleCursorLineChange}
+                 onToggleAiChat={handleToggleAiChat}
+                 aiEnabled={aiChatOpen}
+                 hasAiKey={settings.hasAiApiKey}
+                 aiChatOpen={aiChatOpen}
+                 onApplyAiContent={handleApplyAiContent}
+                 diagramId={diagram.id}
+               />
+             )}
+           </div>
+         </div>
+
       </div>
 
       {selectedNode && (

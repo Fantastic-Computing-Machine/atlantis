@@ -59,7 +59,6 @@ function createAdapter(url) {
     ensureDataDir();
     try {
       // Optional dependency in some builds
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
       return new PrismaBetterSqlite3({ url });
     } catch (err) {
@@ -69,7 +68,6 @@ function createAdapter(url) {
   }
   if (url.startsWith('postgres')) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { PrismaPg } = require('@prisma/adapter-pg');
       return new PrismaPg({ connectionString: url });
     } catch (err) {

@@ -1,6 +1,7 @@
 import { ensureCsrfCookie, csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { createDiagram, getDiagramPage } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
+import { diagramSchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
 
 const DEFAULT_LIMIT = 24;
@@ -31,11 +32,23 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json();
+    const json = await request.json();
+    const result = diagramSchema.safeParse(json);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: result.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const { title, content, emoji, description } = result.data;
+
     const newDiagram = await createDiagram({
-      title: body.title,
-      content: body.content,
-      emoji: body.emoji,
+      title,
+      content,
+      emoji,
+      description,
     });
 
     return NextResponse.json(newDiagram);
