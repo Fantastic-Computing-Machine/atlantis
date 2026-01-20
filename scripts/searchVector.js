@@ -8,3 +8,5 @@ function buildSearchVector(title, description, content) {
 }
 
 module.exports = { buildSearchVector };
+
+// NOTE: When modifying this logic, also update src/lib/search.ts

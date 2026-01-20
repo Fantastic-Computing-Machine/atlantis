@@ -42,7 +42,7 @@ import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
 
 import { AiSettingsDialog } from '@/components/AiSettingsDialog';
-import { BookOpen, Download, Eye, Github, KeyRound, ListFilter, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
+import { BookOpen, Download, Eye, Github, KeyRound, ListFilter, Loader2, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
 
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
@@ -82,6 +82,7 @@ export function DiagramGrid({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     setDiagrams(initialDiagrams);
@@ -211,6 +212,7 @@ export function DiagramGrid({
   const hasStarred = starredDiagrams.length > 0;
 
   const handleCreate = async () => {
+    setIsCreating(true);
     try {
       const csrfToken = await ensureCsrfToken();
       const res = await fetch('/api/diagrams', {
@@ -229,11 +231,21 @@ export function DiagramGrid({
       router.push(`/diagram/${newDiagram.id}`);
     } catch {
       toast.error('Failed to create diagram');
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const handleDelete = async () => {
     if (!deleteId) return;
+
+    // Optimistically update UI
+    const previousDiagrams = [...diagrams];
+    const previousTotal = total;
+
+    setDiagrams((prev) => prev.filter((d) => d.id !== deleteId));
+    setTotal((prev) => Math.max(prev - 1, 0));
+    setDeleteId(null); // Close modal immediately
 
     try {
       const csrfToken = await ensureCsrfToken();
@@ -248,13 +260,12 @@ export function DiagramGrid({
         throw new Error('Failed to delete');
       }
 
-      setDiagrams((prev) => prev.filter((d) => d.id !== deleteId));
-      setTotal((prev) => Math.max(prev - 1, 0));
       toast.success('Diagram deleted');
     } catch {
+      // Revert on failure
+      setDiagrams(previousDiagrams);
+      setTotal(previousTotal);
       toast.error('Failed to delete diagram');
-    } finally {
-      setDeleteId(null);
     }
   };
 
@@ -616,9 +627,9 @@ export function DiagramGrid({
                 className="hidden"
               />
 
-              <Button onClick={handleCreate} className="gap-2">
-                <Plus size={18} />
-                <span className="hidden sm:inline">New Diagram</span>
+              <Button onClick={handleCreate} className="gap-2" disabled={isCreating}>
+                {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus size={18} />}
+                <span className="hidden sm:inline">{isCreating ? 'Creating...' : 'New Diagram'}</span>
               </Button>
 
               <DropdownMenu>

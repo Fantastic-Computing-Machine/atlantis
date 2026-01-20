@@ -9,7 +9,9 @@ import { formatDate, cn } from '@/lib/utils';
 import { Diagram, Note } from '@/lib/types';
 import { DashboardHeader } from '@/components/DashboardHeader';
 
-export const dynamic = 'force-dynamic';
+// Cache for 30 seconds to improve speed while keeping data relatively fresh
+// Users creating diagrams will see them instantly via client-side routing
+export const revalidate = 30;
 
 export default async function Page() {
   const [
