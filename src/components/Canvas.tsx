@@ -136,8 +136,8 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
             typeof err === 'string'
               ? err
               : (err as { str?: string; message?: string }).str ||
-                (err as { str?: string; message?: string }).message ||
-                'Mermaid parse error';
+              (err as { str?: string; message?: string }).message ||
+              'Mermaid parse error';
           throw new Error(message);
         },
       });
@@ -370,7 +370,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       const viewBox = svgEl.getAttribute('viewBox')?.split(' ').map(Number);
       const svgWidth = viewBox ? viewBox[2] : svgEl.clientWidth;
       const svgHeight = viewBox ? viewBox[3] : svgEl.clientHeight;
-      
+
       // Use high DPI for better quality
       const scale = 2;
       canvas.width = svgWidth * scale;
@@ -388,7 +388,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
 
       ctx.scale(scale, scale);
       ctx.drawImage(img, 0, 0, svgWidth, svgHeight);
-      
+
       const a = document.createElement('a');
       a.href = canvas.toDataURL('image/png');
       a.download = sanitizeFilename('png');
@@ -417,9 +417,9 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       const viewBox = svgEl.getAttribute('viewBox')?.split(' ').map(Number);
       const svgWidth = viewBox ? viewBox[2] : svgEl.clientWidth;
       const svgHeight = viewBox ? viewBox[3] : svgEl.clientHeight;
-      
+
       // Scale for PDF quality
-      const scale = 2; 
+      const scale = 2;
       canvas.width = svgWidth * scale;
       canvas.height = svgHeight * scale;
 
@@ -533,8 +533,8 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
-            <div className="absolute bottom-6 right-6 z-20 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <div className="flex flex-col gap-1 bg-background/80 backdrop-blur-sm border rounded-lg p-1 shadow-sm">
+            <div className="absolute z-20 flex gap-2 md:flex-col md:bottom-6 md:right-6 top-4 right-3 md:top-auto md:right-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
+              <div className="hidden md:flex flex-col gap-1 bg-background/80 backdrop-blur-sm border rounded-lg p-1 shadow-sm">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -588,7 +588,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                 </Tooltip>
               </div>
 
-              <div className="flex flex-col gap-1 bg-background/80 backdrop-blur-sm border rounded-lg p-1 shadow-sm">
+              <div className="flex flex-row md:flex-col gap-1 bg-background/80 backdrop-blur-sm border rounded-lg p-1 shadow-sm">
                 {diagramId && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -636,62 +636,64 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <DropdownMenu>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <Settings2 className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent side="left">Canvas settings</TooltipContent>
-                  </Tooltip>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuLabel>Background</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setBgPattern('none')}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 border rounded bg-transparent" />
-                        <span>None</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setBgPattern('dots')}>
-                      <div className="flex items-center gap-2">
-                        <Grid3x3 className="w-4 h-4" />
-                        <span>Dots</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setBgPattern('grid')}>
-                      <div className="flex items-center gap-2">
-                        <Grid3x3 className="w-4 h-4 opacity-50" />
-                        <span>Grid</span>
-                      </div>
-                    </DropdownMenuItem>
+                <div className="hidden md:block">
+                  <DropdownMenu>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <Settings2 className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">Canvas settings</TooltipContent>
+                    </Tooltip>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuLabel>Background</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setBgPattern('none')}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border rounded bg-transparent" />
+                          <span>None</span>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBgPattern('dots')}>
+                        <div className="flex items-center gap-2">
+                          <Grid3x3 className="w-4 h-4" />
+                          <span>Dots</span>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBgPattern('grid')}>
+                        <div className="flex items-center gap-2">
+                          <Grid3x3 className="w-4 h-4 opacity-50" />
+                          <span>Grid</span>
+                        </div>
+                      </DropdownMenuItem>
 
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel>Color</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setBgColorClass('bg-muted/30')}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full border bg-muted" />
-                        Default
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setBgColorClass('bg-background')}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full border bg-background" />
-                        Plain
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setBgColorClass('bg-blue-50/50 dark:bg-blue-950/20')}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 rounded-full border bg-blue-100 dark:bg-blue-900" />
-                        Blue Tint
-                      </div>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel>Color</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setBgColorClass('bg-muted/30')}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded-full border bg-muted" />
+                          Default
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBgColorClass('bg-background')}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded-full border bg-background" />
+                          Plain
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setBgColorClass('bg-blue-50/50 dark:bg-blue-950/20')}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded-full border bg-blue-100 dark:bg-blue-900" />
+                          Blue Tint
+                        </div>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
 
                 <Tooltip>
                   <TooltipTrigger asChild>

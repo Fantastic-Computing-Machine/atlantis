@@ -90,18 +90,24 @@ export async function getDiagramPage({
   offset = 0,
   query,
   sort = 'recent',
+  favoritesOnly = false,
 }: {
   limit?: number;
   offset?: number;
   query?: string;
   sort?: import('./types').SortOption;
+  favoritesOnly?: boolean;
 }): Promise<DiagramPage> {
   const normalizedLimit = normalizeLimit(limit);
   const normalizedOffset = normalizeOffset(offset);
 
-  const where: Prisma.DiagramWhereInput | undefined = query?.trim()
-    ? { searchVector: { contains: query.trim().toLowerCase() } }
-    : undefined;
+  const where: Prisma.DiagramWhereInput = {};
+  if (query?.trim()) {
+    where.searchVector = { contains: query.trim().toLowerCase() };
+  }
+  if (favoritesOnly) {
+    where.isFavorite = true;
+  }
 
   let orderBy: Prisma.DiagramOrderByWithRelationInput = { updatedAt: 'desc' };
   switch (sort) {
