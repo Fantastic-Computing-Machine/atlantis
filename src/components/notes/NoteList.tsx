@@ -48,7 +48,7 @@ export function NoteList() {
                                     <span className="text-lg">🔱</span>
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Back to Diagrams</TooltipContent>
+                            <TooltipContent>Home</TooltipContent>
                         </Tooltip>
                     </Link>
                     <span className="text-muted-foreground">//</span>

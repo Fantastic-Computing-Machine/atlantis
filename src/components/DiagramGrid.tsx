@@ -569,10 +569,12 @@ export function DiagramGrid({
         <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm shrink-0">
           <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-2xl" role="img" aria-label="atlantis logo">
-                🔱
-              </span>
-              <h1 className="text-xl font-bold">atlantis // Diagrams</h1>
+              <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <span className="text-2xl" role="img" aria-label="atlantis logo">
+                  🔱
+                </span>
+                <h1 className="text-xl font-bold">atlantis // Diagrams</h1>
+              </Link>
             </div>
 
             <div className="flex-1 max-w-md flex justify-center">

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { NoteEditor } from '@/components/notes/NoteEditor';
@@ -24,9 +25,10 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Note } from '@/lib/types';
 import { ensureCsrfToken, withCsrfHeader } from '@/lib/csrf-client';
+import { cn } from '@/lib/utils';
 import { useDiagramStore } from '@/lib/store';
 import { useNotes } from '@/components/notes/NotesContext';
-import { ArrowLeft, Star, Trash2, ChevronDown, Save, Download, Plus, Moon, Sun } from 'lucide-react';
+import { ArrowLeft, Star, Trash2, ChevronDown, Save, Download, Plus, Moon, Sun, MoreVertical } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -210,9 +212,9 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     return (
         <div className="h-full flex flex-col">
             {/* Header */}
-            <div className="h-14 border-b flex items-center justify-between px-4 bg-background shrink-0">
-                <div className="flex items-center gap-3">
-                    <Link href="/notes">
+            <div className="h-14 border-b flex items-center justify-between px-4 bg-background shrink-0 gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <Link href="/notes" className="shrink-0">
                         <Button variant="ghost" size="icon" className="h-8 w-8">
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
@@ -222,13 +224,13 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         onBlur={handleSave}
-                        className="h-8 w-64 text-sm font-medium border-transparent hover:border-input focus:border-input"
+                        className="h-8 min-w-[100px] flex-1 text-sm font-medium border-transparent hover:border-input focus:border-input px-2 truncate"
                         placeholder="Note title..."
                     />
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 text-xs">
+                            <Button variant="outline" size="sm" className="h-8 text-xs shrink-0 hidden md:flex">
                                 {SUPPORTED_LANGUAGES.find((l) => l.value === language)?.label || language}
                                 <ChevronDown className="h-3 w-3 ml-1" />
                             </Button>
@@ -249,78 +251,138 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
                     </DropdownMenu>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 shrink-0">
                     {hasChanges && (
-                        <span className="text-xs text-muted-foreground">Unsaved changes</span>
+                        <span className="text-xs text-muted-foreground mr-1 hidden sm:inline">Unsaved changes</span>
                     )}
 
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={handleDownload}
-                        title="Download file"
-                    >
-                        <Download className="h-4 w-4" />
-                    </Button>
+                    {/* Desktop Actions */}
+                    <div className="hidden md:flex items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={handleDownload}
+                            title="Download file"
+                        >
+                            <Download className="h-4 w-4" />
+                        </Button>
 
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={toggleStarred}
-                    >
-                        <Star
-                            className={`h-4 w-4 ${starred ? 'text-yellow-500 fill-yellow-500' : ''}`}
-                        />
-                    </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={toggleStarred}
+                        >
+                            <Star
+                                className={`h-4 w-4 ${starred ? 'text-yellow-500 fill-yellow-500' : ''}`}
+                            />
+                        </Button>
 
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8"
-                        onClick={handleSave}
-                        disabled={!hasChanges || isSaving}
-                    >
-                        <Save className="h-3.5 w-3.5 mr-1" />
-                        {isSaving ? 'Saving...' : 'Save'}
-                    </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                            onClick={handleSave}
+                            disabled={!hasChanges || isSaving}
+                        >
+                            <Save className="h-3.5 w-3.5 mr-1" />
+                            {isSaving ? 'Saving...' : 'Save'}
+                        </Button>
 
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => setShowDeleteDialog(true)}
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => setShowDeleteDialog(true)}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
 
-                    <div className="w-px h-6 bg-border mx-1" />
+                        <div className="w-px h-6 bg-border mx-1" />
 
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                            >
-                                {theme === 'dark' ? (
-                                    <Sun className="h-4 w-4" />
-                                ) : (
-                                    <Moon className="h-4 w-4" />
-                                )}
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-                        </TooltipContent>
-                    </Tooltip>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                                >
+                                    {theme === 'dark' ? (
+                                        <Sun className="h-4 w-4" />
+                                    ) : (
+                                        <Moon className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                            </TooltipContent>
+                        </Tooltip>
 
-                    <Button size="sm" onClick={handleCreateNote} className="h-8">
-                        <Plus className="h-4 w-4 mr-1" />
-                        New
-                    </Button>
+                        <Button size="sm" onClick={handleCreateNote} className="h-8">
+                            <Plus className="h-4 w-4 mr-1" />
+                            New
+                        </Button>
+                    </div>
+
+                    {/* Mobile Actions Menu */}
+                    <div className="md:hidden flex items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={handleSave}
+                            disabled={!hasChanges || isSaving}
+                        >
+                            <Save className={hasChanges ? "h-4 w-4 text-primary" : "h-4 w-4"} />
+                        </Button>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={toggleStarred}>
+                                    <Star className={cn("h-4 w-4 mr-2", starred && "text-yellow-500 fill-yellow-500")} />
+                                    {starred ? 'Unstar' : 'Star'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleDownload}>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Download
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+                                    {theme === 'dark' ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+                                    Toggle Theme
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel>Language</DropdownMenuLabel>
+                                {SUPPORTED_LANGUAGES.map((lang) => (
+                                    <DropdownMenuItem
+                                        key={lang.value}
+                                        onClick={() => setLanguage(lang.value)}
+                                        className={language === lang.value ? 'bg-muted' : ''}
+                                    >
+                                        {lang.label}
+                                    </DropdownMenuItem>
+                                ))}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive">
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Note
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <Button size="icon" variant="ghost" onClick={handleCreateNote} className="h-8 w-8">
+                            <Plus className="h-5 w-5" />
+                        </Button>
+                    </div>
                 </div>
             </div>
 

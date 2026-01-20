@@ -1,8 +1,11 @@
+
 'use client';
 
 import { NoteList } from '@/components/notes/NoteList';
 import { NotesProvider } from '@/components/notes/NotesContext';
 import type { Note } from '@/lib/types';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 type NoteListItem = Omit<Note, 'content'>;
 
@@ -12,20 +15,32 @@ interface NotesLayoutClientProps {
 }
 
 export function NotesLayoutClient({ children, initialNotes }: NotesLayoutClientProps) {
+    const pathname = usePathname();
+    const isNoteSelected = pathname !== '/notes';
+
     return (
         <NotesProvider initialNotes={initialNotes}>
-            <div className="h-screen flex">
+            <div className="flex h-[100dvh] w-full overflow-hidden bg-background">
                 {/* Sidebar */}
-                <div className="w-72 shrink-0">
+                <aside
+                    className={cn(
+                        "w-full flex-col border-r bg-background md:w-72 md:flex",
+                        isNoteSelected ? "hidden" : "flex"
+                    )}
+                >
                     <NoteList />
-                </div>
+                </aside>
 
                 {/* Main Content */}
-                <div className="flex-1 min-w-0">
+                <main
+                    className={cn(
+                        "h-full w-full flex-1 flex-col overflow-hidden",
+                        !isNoteSelected ? "hidden md:flex" : "flex"
+                    )}
+                >
                     {children}
-                </div>
+                </main>
             </div>
         </NotesProvider>
     );
 }
-
