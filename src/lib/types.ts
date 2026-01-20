@@ -25,6 +25,27 @@ export interface DiagramPage {
   nextOffset: number;
 }
 
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  language: string;
+  emoji: string;
+  starred: boolean;
+  private: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type NoteSortOption = 'recent' | 'old' | 'alphabetical';
+
+export interface NotePage {
+  items: Omit<Note, 'content'>[];
+  total: number;
+  hasMore: boolean;
+  nextOffset: number;
+}
+
 export interface AppSettings {
   autoSave: boolean;
   hasAiApiKey: boolean;
