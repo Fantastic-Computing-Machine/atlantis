@@ -1,5 +1,9 @@
 import { FileText, Plus } from 'lucide-react';
 
+export const metadata = {
+    title: 'atlantis // Notes',
+};
+
 export default function NotesPage() {
     return (
         <div className="h-full flex items-center justify-center bg-muted/20">

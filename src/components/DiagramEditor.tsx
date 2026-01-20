@@ -419,7 +419,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/${diagram.id}`;
+    const url = `${window.location.origin}/diagram/${diagram.id}`;
     const success = await copyToClipboard(url);
     if (success) {
       toast.success('Link copied to clipboard');

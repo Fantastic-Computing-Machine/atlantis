@@ -226,7 +226,7 @@ export function DiagramGrid({
       }
       const newDiagram = await res.json();
       toast.success('New diagram created');
-      router.push(`/${newDiagram.id}`);
+      router.push(`/diagram/${newDiagram.id}`);
     } catch {
       toast.error('Failed to create diagram');
     }
@@ -282,7 +282,7 @@ export function DiagramGrid({
   const handleShare = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
-    const url = `${window.location.origin}/${id}`;
+    const url = `${window.location.origin}/diagram/${id}`;
     const success = await copyToClipboard(url);
     if (success) {
       toast.success('Link copied to clipboard');
@@ -420,7 +420,7 @@ export function DiagramGrid({
   const renderDiagramGrid = (list: Diagram[]) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {list.map((diagram) => (
-        <Link key={diagram.id} href={`/${diagram.id}`} className="group">
+        <Link key={diagram.id} href={`/diagram/${diagram.id}`} className="group">
           <Card
             className={cn(
               'overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-primary/50 h-full',
@@ -572,7 +572,7 @@ export function DiagramGrid({
               <span className="text-2xl" role="img" aria-label="atlantis logo">
                 🔱
               </span>
-              <h1 className="text-xl font-bold">atlantis</h1>
+              <h1 className="text-xl font-bold">atlantis // Diagrams</h1>
             </div>
 
             <div className="flex-1 max-w-md flex justify-center">

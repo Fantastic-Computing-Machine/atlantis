@@ -165,7 +165,7 @@ export function GlobalSearchDialog({
     if (onSelect) {
       onSelect(diagram);
     } else {
-      router.push(`/${diagram.id}`);
+      router.push(`/diagram/${diagram.id}`);
     }
   };
 
@@ -308,8 +308,8 @@ export function GlobalSearchDialog({
                     onClick={() => handleSelect(diagram)}
                     className={cn(
                       'w-full text-left px-3 py-3 rounded-lg transition-all flex items-start gap-3.5 focus:outline-none group',
-                      index === activeIndex 
-                        ? 'bg-primary/10 ring-1 ring-primary/20' 
+                      index === activeIndex
+                        ? 'bg-primary/10 ring-1 ring-primary/20'
                         : 'hover:bg-muted/80'
                     )}
                   >
@@ -358,7 +358,7 @@ export function GlobalSearchDialog({
               className="w-full gap-2 shadow-sm"
               onClick={() => {
                 onOpenChange(false);
-                router.push('/');
+                router.push('/diagram');
               }}
             >
               <span className="text-lg">+</span> Create New Diagram
