@@ -155,7 +155,7 @@ export function Editor({
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              {aiEnabled ? 'Hide AI chat' : 'Open AI helper'}
+              {aiEnabled ? 'Hide AI chat' : 'AI helper'}
             </TooltipContent>
           </Tooltip>
           <Tooltip>

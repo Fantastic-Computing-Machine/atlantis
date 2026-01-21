@@ -6,6 +6,11 @@ const DEFAULT_SETTINGS = {
   autoSave: true,
   hasAiApiKey: false,
   aiProvider: 'auto' as const,
+  aiModel: undefined as string | undefined,
+  maxCheckpoints: 15,
+  autoSaveDelay: 2000,
+  defaultExportFormat: 'svg' as const,
+  exportScale: 2 as const,
 };
 
 export const useDiagramStore = create<DiagramStore>()(
@@ -57,6 +62,26 @@ export const useDiagramStore = create<DiagramStore>()(
         set((state) => ({
           settings: { ...state.settings, aiProvider: provider ?? 'auto' },
         })),
+      setAiModel: (model) =>
+        set((state) => ({
+          settings: { ...state.settings, aiModel: model },
+        })),
+      setMaxCheckpoints: (value) =>
+        set((state) => ({
+          settings: { ...state.settings, maxCheckpoints: value },
+        })),
+      setAutoSaveDelay: (value) =>
+        set((state) => ({
+          settings: { ...state.settings, autoSaveDelay: value },
+        })),
+      setDefaultExportFormat: (format) =>
+        set((state) => ({
+          settings: { ...state.settings, defaultExportFormat: format },
+        })),
+      setExportScale: (scale) =>
+        set((state) => ({
+          settings: { ...state.settings, exportScale: scale },
+        })),
     }),
     {
       name: 'atlantis-settings',
@@ -65,3 +90,4 @@ export const useDiagramStore = create<DiagramStore>()(
     }
   )
 );
+

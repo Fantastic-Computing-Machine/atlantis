@@ -50,6 +50,11 @@ export interface AppSettings {
   autoSave: boolean;
   hasAiApiKey: boolean;
   aiProvider?: 'openai' | 'gemini' | 'auto';
+  aiModel?: string;
+  maxCheckpoints?: number;
+  autoSaveDelay?: number;
+  defaultExportFormat?: 'svg' | 'png' | 'pdf';
+  exportScale?: 1 | 2 | 3;
 }
 
 export interface DiagramStore {
@@ -66,4 +71,9 @@ export interface DiagramStore {
   setAutoSave: (enabled: boolean) => void;
   setHasAiApiKey: (hasKey: boolean) => void;
   setAiProvider: (provider: AppSettings['aiProvider']) => void;
+  setAiModel: (model: string | undefined) => void;
+  setMaxCheckpoints: (value: number) => void;
+  setAutoSaveDelay: (value: number) => void;
+  setDefaultExportFormat: (format: AppSettings['defaultExportFormat']) => void;
+  setExportScale: (scale: AppSettings['exportScale']) => void;
 }

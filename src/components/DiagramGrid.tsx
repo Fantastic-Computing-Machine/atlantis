@@ -24,7 +24,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -34,15 +33,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
 import { Diagram, SortOption } from '@/lib/types';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
 
-import { AiSettingsDialog } from '@/components/AiSettingsDialog';
-import { BookOpen, Download, Eye, Github, KeyRound, ListFilter, Loader2, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
+import { Download, Eye, Github, ListFilter, Loader2, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Trash2 } from 'lucide-react';
 
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
@@ -76,12 +73,10 @@ export function DiagramGrid({
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [peekDiagram, setPeekDiagram] = useState<Diagram | null>(null);
   const [sortMode, setSortMode] = useState<SortOption>('recent');
-  const { setTheme, theme } = useTheme();
-  const { settings, setAutoSave, setHasAiApiKey, setAiProvider } = useDiagramStore();
+  const { theme } = useTheme();
+  const { settings, setHasAiApiKey, setAiProvider } = useDiagramStore();
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
@@ -387,44 +382,7 @@ export function DiagramGrid({
     }
   };
 
-  const handleBackup = () => {
-    window.location.href = '/api/backup';
-  };
 
-  const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const json = JSON.parse(event.target?.result as string);
-        const csrfToken = await ensureCsrfToken();
-        const res = await fetch('/api/backup', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            [CSRF_HEADER_NAME]: csrfToken,
-          },
-          body: JSON.stringify(json),
-        });
-        if (res.ok) {
-          await reloadFirstPage();
-          toast.success('Backup restored successfully');
-        } else {
-          throw new Error('Restore failed');
-        }
-      } catch {
-        toast.error('Failed to restore backup');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
-  const openRestorePicker = () => {
-    fileInputRef.current?.click();
-  };
 
   const diagramToDelete = deleteId ? diagrams.find((d) => d.id === deleteId) : null;
 
@@ -619,111 +577,22 @@ export function DiagramGrid({
                 </a>
               </Button>
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={handleRestore}
-                className="hidden"
-              />
+
 
               <Button onClick={handleCreate} className="gap-2" disabled={isCreating}>
                 {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus size={18} />}
                 <span className="hidden sm:inline">{isCreating ? 'Creating...' : 'New Diagram'}</span>
               </Button>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Settings2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Settings</span>
-                    <span className="text-xs text-muted-foreground hidden lg:inline">
-                      Auto-save {settings.autoSave ? 'On' : 'Off'}
-                    </span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64">
-                  <DropdownMenuLabel>Quick settings</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault();
-                      setTheme(theme === 'dark' ? 'light' : 'dark');
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      {theme === 'dark' ? (
-                        <Sun className="h-4 w-4" />
-                      ) : (
-                        <Moon className="h-4 w-4" />
-                      )}
-                      <span>{theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}</span>
-                    </div>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem
-                    className="flex items-center justify-between gap-4"
-                    onSelect={(event) => event.preventDefault()}
-                  >
-                    <div className="flex flex-col">
-                      <span>Auto-save</span>
-                      <span className="text-xs text-muted-foreground">Platform-wide 2s debounce</span>
-                    </div>
-                    <Switch checked={settings.autoSave} onCheckedChange={setAutoSave} />
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault();
-                      setIsAiSettingsOpen(true);
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <KeyRound className="h-4 w-4" />
-                      <span>AI settings</span>
-                    </div>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault();
-                      handleBackup();
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Download className="h-4 w-4" />
-                      <span>Backup diagrams</span>
-                    </div>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault();
-                      openRestorePicker();
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Upload className="h-4 w-4" />
-                      <span>Restore from backup</span>
-                    </div>
-                  </DropdownMenuItem>
-
-                  {enableApiAccess && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link href="/docs" className="flex items-center gap-2">
-                          <BookOpen className="h-4 w-4" />
-                          <span>API Documentation</span>
-                        </Link>
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Button variant="outline" className="gap-2" asChild>
+                <Link href="/settings">
+                  <Settings2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Settings</span>
+                  <span className="text-xs text-muted-foreground hidden lg:inline">
+                    Auto-save {settings.autoSave ? 'On' : 'Off'}
+                  </span>
+                </Link>
+              </Button>
             </div>
           </div>
         </header>
@@ -852,7 +721,7 @@ export function DiagramGrid({
         onOpenChange={setIsSearchOpen}
         initialDiagrams={diagrams}
       />
-      <AiSettingsDialog open={isAiSettingsOpen} onOpenChange={setIsAiSettingsOpen} />
+
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>

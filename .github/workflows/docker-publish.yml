@@ -49,7 +49,7 @@ jobs:
             runs-on: ubuntu-24.04
             platform: linux/amd64
           - arch: arm64
-            runs-on: ubuntu-24.04-arm64
+            runs-on: ubuntu-24.04
             platform: linux/arm64
     runs-on: ${{ matrix.runs-on }}
     steps:
@@ -61,6 +61,9 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

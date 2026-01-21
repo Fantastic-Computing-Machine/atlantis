@@ -23,7 +23,7 @@ How to turn on and use Atlantis AI help for Mermaid diagrams.
 
 ## Use the Assistant
 
-- In the editor, open the AI panel (`Open AI helper`).
+- In the editor, open the AI panel (`AI helper`).
 - Type a simple instruction, e.g., "Add error state after payment" or "Make this a sequence diagram with three actors".
 - Click `Ask AI`. The reply replaces the diagram text.
 - If the AI output is invalid Mermaid, the server tries twice to fix it before showing an error.

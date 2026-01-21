@@ -61,6 +61,7 @@ export function NoteEditor({
     onTogglePrivate,
 }: NoteEditorProps) {
     const { resolvedTheme } = useTheme();
+    const [mounted, setMounted] = useState(false);
     const [showLineNumbers, setShowLineNumbers] = useState(true);
     const [showIndentGuides, setShowIndentGuides] = useState(true);
     const [wordWrap, setWordWrap] = useState(true);
@@ -69,6 +70,10 @@ export function NoteEditor({
     const editorViewRef = useRef<EditorView | null>(null);
 
     const isMarkdown = language === 'markdown' || language === 'md';
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const handleChange = useCallback((val: string) => {
         onChange(val);
@@ -118,6 +123,8 @@ export function NoteEditor({
 
         return exts;
     }, [wordWrap, showIndentGuides, language]);
+
+    const editorTheme = mounted && resolvedTheme === 'dark' ? 'dark' : 'light';
 
     return (
         <div className="h-full w-full overflow-hidden bg-background flex flex-col">
@@ -252,7 +259,7 @@ export function NoteEditor({
                     <CodeMirror
                         value={value}
                         height="100%"
-                        theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
+                        theme={editorTheme}
                         onChange={handleChange}
                         onCreateEditor={handleCreateEditor}
                         extensions={extensions}

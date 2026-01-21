@@ -1,6 +1,7 @@
 import { csrfFailureResponse, ensureCsrfCookie, validateCsrfToken } from '@/lib/csrf';
 import { getDiagrams, restoreDiagrams } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
+import { backupSchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
@@ -26,16 +27,17 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    if (!Array.isArray(body)) {
-      throw new Error('Invalid backup format');
-    }
-    const isValid = body.every((d) => d.id && d.title && d.content);
-    if (!isValid) {
-      throw new Error('Invalid diagram data in backup');
+    const result = backupSchema.safeParse(body);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Invalid backup format', details: result.error.flatten() },
+        { status: 400 }
+      );
     }
 
-    await restoreDiagrams(body);
-    return NextResponse.json({ success: true, count: body.length });
+    await restoreDiagrams(result.data as import('@/lib/types').Diagram[]);
+    return NextResponse.json({ success: true, count: result.data.length });
   } catch (error) {
     logApiError('POST /api/backup', error);
     return NextResponse.json({ error: 'Failed to restore backup' }, { status: 400 });
