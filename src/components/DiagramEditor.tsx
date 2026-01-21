@@ -1,7 +1,6 @@
 'use client';
 
 import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
-import { AiSettingsDialog } from '@/components/AiSettingsDialog';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -29,7 +28,7 @@ import { useDiagramStore } from '@/lib/store';
 import { Checkpoint, Diagram } from '@/lib/types';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { copyToClipboard, formatDate, cn } from '@/lib/utils';
-import { History, Info, KeyRound, Moon, Save, Search, Share2, Star, Sun, Menu } from 'lucide-react';
+import { History, Info, Moon, Save, Search, Share2, Star, Sun, Menu, Settings2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -246,7 +245,6 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const lastSavedDescriptionRef = useRef(initialDiagram.description);
   const selectedNodeId = selectedNode?.id ?? null;
   const [aiChatOpen, setAiChatOpen] = useState(false);
-  const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
   const [activePane, setActivePane] = useState<'editor' | 'preview'>('preview');
 
   // Prevent hydration mismatch by only rendering client-dependent UI after mount
@@ -330,12 +328,8 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   }, [selectedNodeId]);
 
   const handleToggleAiChat = useCallback(() => {
-    if (!settings.hasAiApiKey) {
-      setIsAiSettingsOpen(true);
-      return;
-    }
     setAiChatOpen((prev) => !prev);
-  }, [settings.hasAiApiKey]);
+  }, []);
 
   const handleApplyAiContent = useCallback((content: string) => {
     setDiagram((prev) => ({ ...prev, content }));
@@ -630,10 +624,12 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setIsAiSettingsOpen(true)}
-                aria-label="AI settings"
+                asChild
+                aria-label="Settings"
               >
-                <KeyRound className="h-4 w-4" />
+                <Link href="/settings">
+                  <Settings2 className="h-4 w-4" />
+                </Link>
               </Button>
             </div>
 
@@ -662,9 +658,11 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
                     {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
                     <span>Switch Theme</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setIsAiSettingsOpen(true)}>
-                    <KeyRound className="mr-2 h-4 w-4" />
-                    <span>AI Settings</span>
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings" className="flex items-center">
+                      <Settings2 className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -871,7 +869,6 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
       )}
 
       <GlobalSearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
-      <AiSettingsDialog open={isAiSettingsOpen} onOpenChange={setIsAiSettingsOpen} />
 
       <Dialog open={isInfoOpen} onOpenChange={setIsInfoOpen}>
         <DialogContent className="sm:max-w-[425px]">

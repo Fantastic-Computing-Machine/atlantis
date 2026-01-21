@@ -3,11 +3,26 @@ import { getAiApiKey, getAiProvider, setAiApiKey, setAiProvider } from '@/lib/se
 import { logApiError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 
+const OPENAI_MODEL = 'gpt-4o-mini';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
+function resolveModel(apiKey: string | null, provider: 'openai' | 'gemini' | 'auto'): string | null {
+  if (!apiKey) return null;
+  if (provider === 'gemini') return GEMINI_MODEL;
+  if (provider === 'openai') return OPENAI_MODEL;
+  // Auto-detect based on key prefix
+  if (apiKey.startsWith('AIza') || apiKey.startsWith('AI') || apiKey.startsWith('gsk_')) {
+    return GEMINI_MODEL;
+  }
+  return OPENAI_MODEL;
+}
+
 export async function GET() {
   try {
     const value = await getAiApiKey();
     const provider = await getAiProvider();
-    return NextResponse.json({ hasKey: Boolean(value), provider });
+    const aiModel = resolveModel(value, provider);
+    return NextResponse.json({ hasKey: Boolean(value), provider, aiModel });
   } catch (error) {
     logApiError('GET /api/settings/ai-key', error);
     return NextResponse.json({ error: 'Failed to load AI key' }, { status: 500 });

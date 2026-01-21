@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useNotes } from '@/components/notes/NotesContext';
 import { cn, formatDate } from '@/lib/utils';
-import { Search, Star, Lock } from 'lucide-react';
+import { Search, Star, Lock, Settings2 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -53,6 +53,17 @@ export function NoteList() {
                     </Link>
                     <span className="text-muted-foreground">//</span>
                     <h2 className="font-semibold text-sm truncate flex-1">{headerTitle}</h2>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild>
+                                <Link href="/settings">
+                                    <Settings2 className="h-4 w-4" />
+                                    <span className="sr-only">Settings</span>
+                                </Link>
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Settings</TooltipContent>
+                    </Tooltip>
                 </div>
 
                 {/* Search */}
