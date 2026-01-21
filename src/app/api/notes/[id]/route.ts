@@ -1,6 +1,7 @@
 import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { getNoteById, updateNoteById, deleteNoteById } from '@/lib/notes-data';
 import { logApiError } from '@/lib/logger';
+import { noteUpdateSchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
 
 const PRIVATE_CONTENT_MESSAGE = 'Content policy in effect.';
@@ -49,13 +50,21 @@ export async function PATCH(
     try {
         const { id } = await params;
         const body = await request.json();
+        const result = noteUpdateSchema.safeParse(body);
+
+        if (!result.success) {
+            return NextResponse.json(
+                { error: 'Invalid input', details: result.error.flatten() },
+                { status: 400 }
+            );
+        }
 
         const updatedNote = await updateNoteById(id, {
-            title: body.title,
-            content: body.content,
-            language: body.language,
-            starred: body.starred,
-            private: body.private,
+            title: result.data.title,
+            content: result.data.content,
+            language: result.data.language,
+            starred: result.data.starred,
+            private: result.data.private,
         });
 
         if (!updatedNote) {
