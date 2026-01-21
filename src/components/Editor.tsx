@@ -22,6 +22,7 @@ import type { ViewUpdate } from '@codemirror/view';
 import { Decoration, EditorView } from '@codemirror/view';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import CodeMirror from '@uiw/react-codemirror';
+import { mermaid } from 'codemirror-lang-mermaid';
 import { Copy, Settings2, WrapText } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -118,7 +119,7 @@ export function Editor({
   }, [onCursorLineChange]);
 
   const extensions = useMemo(() => {
-    const exts: Extension[] = [highlightLineField];
+    const exts: Extension[] = [highlightLineField, mermaid()];
     if (wordWrap) {
       exts.push(EditorView.lineWrapping);
     }

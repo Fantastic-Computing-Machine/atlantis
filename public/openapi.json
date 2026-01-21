@@ -10,9 +10,22 @@
       "url": "/"
     }
   ],
+  "tags": [
+    {
+      "name": "Diagrams",
+      "description": "See and manage your Mermaid diagrams"
+    },
+    {
+      "name": "Notes",
+      "description": "Manage your code notes and snippets"
+    }
+  ],
   "paths": {
     "/api/access": {
       "get": {
+        "tags": [
+          "Diagrams"
+        ],
         "summary": "List all diagrams",
         "description": "Retrieve a paginated list of all stored diagrams. Requires `ENABLE_API_ACCESS=true`.",
         "parameters": [
@@ -52,6 +65,9 @@
         }
       },
       "post": {
+        "tags": [
+          "Diagrams"
+        ],
         "summary": "Create a new diagram",
         "description": "Create a new diagram with Mermaid content. Validates syntax before saving. Requires `ENABLE_API_ACCESS=true`.",
         "requestBody": {
@@ -86,6 +102,9 @@
     },
     "/api/access/{id}": {
       "get": {
+        "tags": [
+          "Diagrams"
+        ],
         "summary": "Get a single diagram",
         "description": "Retrieve the full details of a specific diagram by ID. Requires `ENABLE_API_ACCESS=true`.",
         "parameters": [
@@ -115,6 +134,204 @@
           },
           "403": {
             "description": "API Access Disabled"
+          }
+        }
+      }
+    },
+    "/api/notes": {
+      "get": {
+        "tags": [
+          "Notes"
+        ],
+        "summary": "List all notes",
+        "description": "Retrieve a list of notes with optional filtering and sorting. Content is omitted from the list for performance.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 24
+            },
+            "description": "Number of notes to return"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            },
+            "description": "Pagination offset"
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search query"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recent",
+                "old",
+                "alphabetical"
+              ],
+              "default": "recent"
+            },
+            "description": "Sort option"
+          },
+          {
+            "name": "starred",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filter by starred status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of notes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoteList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Notes"
+        ],
+        "summary": "Create a new note",
+        "description": "Create a new note.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Note created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notes/{id}": {
+      "get": {
+        "tags": [
+          "Notes"
+        ],
+        "summary": "Get a note",
+        "description": "Retrieve a specific note by ID.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Note ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Note details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Note not found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Notes"
+        ],
+        "summary": "Update a note",
+        "description": "Update a note's content or metadata.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Note ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNoteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Note updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Note"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Notes"
+        ],
+        "summary": "Delete a note",
+        "description": "Delete a note by ID.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Note ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Note deleted successfully"
           }
         }
       }
@@ -157,7 +374,9 @@
       },
       "CreateDiagramRequest": {
         "type": "object",
-        "required": ["content"],
+        "required": [
+          "content"
+        ],
         "properties": {
           "title": {
             "type": "string",
@@ -177,19 +396,121 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "string" },
-                "title": { "type": "string" }
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
               }
             }
           },
           "pagination": {
             "type": "object",
             "properties": {
-              "page": { "type": "integer" },
-              "limit": { "type": "integer" },
-              "total": { "type": "integer" },
-              "totalPages": { "type": "integer" }
+              "page": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              },
+              "totalPages": {
+                "type": "integer"
+              }
             }
+          }
+        }
+      },
+      "Note": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "note_123"
+          },
+          "title": {
+            "type": "string",
+            "example": "Meeting Notes"
+          },
+          "content": {
+            "type": "string",
+            "example": "# Agenda\n- Discuss project"
+          },
+          "language": {
+            "type": "string",
+            "example": "markdown"
+          },
+          "emoji": {
+            "type": "string",
+            "example": "📝"
+          },
+          "starred": {
+            "type": "boolean",
+            "example": true
+          },
+          "private": {
+            "type": "boolean",
+            "example": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateNoteRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Untitled Note"
+          }
+        }
+      },
+      "UpdateNoteRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "starred": {
+            "type": "boolean"
+          },
+          "private": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoteList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Note"
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "hasMore": {
+            "type": "boolean"
+          },
+          "nextOffset": {
+            "type": "integer"
           }
         }
       }

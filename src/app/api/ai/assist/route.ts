@@ -256,7 +256,8 @@ function sanitizeMermaidResponse(text: string): string {
 async function validateMermaid(content: string): Promise<void> {
   const mermaid = await getMermaid();
   if (!mermaid) throw new Error('Mermaid not initialized');
-  mermaid.parse(content);
+  // mermaid.parse returns a promise in v11; ensure we await so rejections are caught
+  await mermaid.parse(content);
 }
 
 async function attemptSelfHeal(

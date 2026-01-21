@@ -109,14 +109,14 @@ export function PeekDiagramModal({
 
     const handleView = () => {
         if (diagram) {
-            router.push(`/${diagram.id}`);
+            router.push(`/diagram/${diagram.id}`);
             onClose();
         }
     };
 
     const handleShare = async () => {
         if (!diagram) return;
-        const url = `${window.location.origin}/${diagram.id}`;
+        const url = `${window.location.origin}/diagram/${diagram.id}`;
         const success = await copyToClipboard(url);
         if (success) {
             toast.success('Link copied to clipboard');

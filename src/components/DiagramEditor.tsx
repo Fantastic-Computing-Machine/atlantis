@@ -28,8 +28,8 @@ import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
 import { Checkpoint, Diagram } from '@/lib/types';
 import { useShortcutPlatform } from '@/lib/use-platform';
-import { copyToClipboard, formatDate } from '@/lib/utils';
-import { History, Info, KeyRound, Moon, Save, Search, Share2, Star, Sun } from 'lucide-react';
+import { copyToClipboard, formatDate, cn } from '@/lib/utils';
+import { History, Info, KeyRound, Moon, Save, Search, Share2, Star, Sun, Menu } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -109,7 +109,7 @@ const extractMermaidNodes = (src: string): NodeOption[] => {
         .replace(/\s*==\s*[^=]+?\s*==>\s*/g, ' ==> ');
       const parts = sanitized.split(/\s+(?:-->|==>|---|-\.-?>|<--|<==)\s+/);
       parts.forEach((part) => {
-        const idMatch = part.trim().match(/^[A-Za-z_][A-Za-z0-9_:-]*/);
+        const idMatch = part.trim().match(/^[A-Za-z0-9_][A-Za-z0-9_:-]*/);
         if (idMatch) ensureNode(idMatch[0]);
       });
       continue;
@@ -117,7 +117,7 @@ const extractMermaidNodes = (src: string): NodeOption[] => {
 
     // Node declarations with shapes/labels
     const decl = line.match(
-      /^([A-Za-z_][A-Za-z0-9_:-]*)\s*(?:\(\(|\(|\[\[|\[|\{)\s*("?)(.*?)\2\s*(?:\]\]|\]|\}|\)\)|\))\s*$/
+      /^([A-Za-z0-9_][A-Za-z0-9_:-]*)\s*(?:\(\(|\(|\[\[|\[|\{)\s*("?)(.*?)\2\s*(?:\]\]|\]|\}|\)\)|\))\s*$/
     );
     if (decl) {
       const [, id, , label] = decl;
@@ -126,7 +126,7 @@ const extractMermaidNodes = (src: string): NodeOption[] => {
     }
 
     // Bare node id
-    const bare = line.match(/^([A-Za-z_][A-Za-z0-9_:-]*)\s*$/);
+    const bare = line.match(/^([A-Za-z0-9_][A-Za-z0-9_:-]*)\s*$/);
     if (bare) {
       ensureNode(bare[1]);
     }
@@ -247,6 +247,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const selectedNodeId = selectedNode?.id ?? null;
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
+  const [activePane, setActivePane] = useState<'editor' | 'preview'>('preview');
 
   // Prevent hydration mismatch by only rendering client-dependent UI after mount
   useEffect(() => {
@@ -419,7 +420,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/${diagram.id}`;
+    const url = `${window.location.origin}/diagram/${diagram.id}`;
     const success = await copyToClipboard(url);
     if (success) {
       toast.success('Link copied to clipboard');
@@ -523,26 +524,50 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
 
   return (
     <>
-      <div className="h-screen w-screen overflow-hidden bg-background text-foreground flex flex-col">
-        <div className="h-14 border-b grid grid-cols-[1fr_auto_1fr] items-center px-4 bg-background/50 backdrop-blur-sm z-10 shrink-0 gap-3">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="flex items-center gap-2 min-w-0 text-lg font-medium">
-              <Link href="/" className="shrink-0 hover:opacity-80 transition-opacity">
-                🔱atlantis //
+      <div className="h-screen w-screen overflow-hidden bg-background text-foreground flex flex-col pb-24 sm:pb-0">
+        {/* Header */}
+        <div className="h-14 border-b flex sm:grid sm:grid-cols-[1fr_auto_1fr] items-center px-3 sm:px-4 bg-background/50 backdrop-blur-sm z-10 shrink-0 gap-2 sm:gap-3 justify-between">
+
+          {/* Left: Logo & Title */}
+          <div className="flex items-center gap-2 sm:gap-3 overflow-hidden flex-1 sm:flex-initial min-w-0">
+            {/* Mobile formatted title */}
+            <div className="flex sm:hidden items-center gap-2 min-w-0 text-base font-semibold">
+              <Link href="/" className="shrink-0 hover:opacity-80 transition-opacity flex items-center gap-1">
+                <span className="text-2xl">🔱</span>
               </Link>
+              <span className="text-muted-foreground">{'//'}</span>
               <span className="text-xl shrink-0">{diagram.emoji || '📊'}</span>
               <input
                 value={diagram.title}
                 onChange={handleTitleChange}
                 onBlur={handleTitleBlur}
                 maxLength={60}
-                className="bg-transparent border-none focus:outline-none focus:ring-0 px-0 w-48 sm:w-64 truncate"
+                className="bg-transparent border-none focus:outline-none focus:ring-0 px-0 w-full min-w-[40px] max-w-[65vw] truncate text-base"
+                placeholder="Untitled Diagram"
+              />
+            </div>
+
+            {/* Desktop layout */}
+            <div className="hidden sm:flex items-center gap-2 min-w-0 text-lg font-medium flex-1 sm:flex-initial">
+              <Link href="/" className="shrink-0 hover:opacity-80 transition-opacity flex items-center gap-1">
+                <span className="hidden sm:inline">🔱atlantis //</span>
+              </Link>
+
+              <span className="text-xl shrink-0 hidden sm:inline">{diagram.emoji || '📊'}</span>
+
+              <input
+                value={diagram.title}
+                onChange={handleTitleChange}
+                onBlur={handleTitleBlur}
+                maxLength={60}
+                className="bg-transparent border-none focus:outline-none focus:ring-0 px-0 w-full min-w-[60px] max-w-[75vw] truncate font-semibold sm:font-normal"
                 placeholder="Untitled Diagram"
               />
             </div>
           </div>
 
-          <div className="flex justify-center">
+          {/* Center: Search (Desktop only) */}
+          <div className="hidden sm:flex justify-center">
             <Button
               variant="outline"
               size="sm"
@@ -556,47 +581,94 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
             </Button>
           </div>
 
-          <div className="flex items-center justify-end gap-2">
+          {/* Right: Actions */}
+          <div className="flex items-center justify-end gap-2 shrink-0">
+            {/* Mobile Search Button */}
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setIsInfoOpen(true)}
-              aria-label="Diagram Info"
+              className="sm:hidden"
+              onClick={() => setIsSearchOpen(true)}
             >
-              <Info className="h-4 w-4" />
+              <Search className="h-4 w-4" />
             </Button>
 
-            <Button variant="ghost" size="icon" onClick={handleShare}>
-              <Share2 className="h-4 w-4" />
-            </Button>
+            {/* Desktop Actions Group */}
+            <div className="hidden md:flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsInfoOpen(true)}
+                aria-label="Diagram Info"
+              >
+                <Info className="h-4 w-4" />
+              </Button>
 
-            <Button
-              variant={diagram.isFavorite ? 'default' : 'ghost'}
-              size="icon"
-              onClick={handleFavorite}
-              aria-pressed={diagram.isFavorite}
-              className={diagram.isFavorite ? 'bg-amber-500 text-amber-50 hover:bg-amber-500/90' : ''}
-            >
-              <Star className={diagram.isFavorite ? 'h-4 w-4 fill-current' : 'h-4 w-4'} />
-            </Button>
+              <Button variant="ghost" size="icon" onClick={handleShare}>
+                <Share2 className="h-4 w-4" />
+              </Button>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            >
-              <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            </Button>
+              <Button
+                variant={diagram.isFavorite ? 'default' : 'ghost'}
+                size="icon"
+                onClick={handleFavorite}
+                aria-pressed={diagram.isFavorite}
+                className={diagram.isFavorite ? 'bg-amber-500 text-amber-50 hover:bg-amber-500/90' : ''}
+              >
+                <Star className={diagram.isFavorite ? 'h-4 w-4 fill-current' : 'h-4 w-4'} />
+              </Button>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsAiSettingsOpen(true)}
-              aria-label="AI settings"
-            >
-              <KeyRound className="h-4 w-4" />
-            </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              >
+                <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsAiSettingsOpen(true)}
+                aria-label="AI settings"
+              >
+                <KeyRound className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Mobile Actions Menu */}
+            <div className="md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Menu className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setIsInfoOpen(true)}>
+                    <Info className="mr-2 h-4 w-4" />
+                    <span>Info</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleShare}>
+                    <Share2 className="mr-2 h-4 w-4" />
+                    <span>Share</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleFavorite}>
+                    <Star className={cn("mr-2 h-4 w-4", diagram.isFavorite && "fill-amber-400 text-amber-400")} />
+                    <span>{diagram.isFavorite ? 'Unfavorite' : 'Favorite'}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+                    {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                    <span>Switch Theme</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsAiSettingsOpen(true)}>
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    <span>AI Settings</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
             <div className="flex items-center gap-2">
               <Button
@@ -640,9 +712,73 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
           </div>
         </div>
 
+        {/* Mobile quick nav */}
+        <div className="sm:hidden border-b bg-background/80 backdrop-blur px-4 py-2 flex items-center justify-between text-sm">
+          <Link href="/" className="text-primary font-medium hover:underline">
+            Home
+          </Link>
+          <Link href="/diagram" className="text-foreground hover:underline">
+            All diagrams
+          </Link>
+        </div>
+
         <div className="flex-1 min-h-0">
-          <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={45} minSize={25}>
+          <div className="sm:hidden border-b bg-muted/30 px-3 py-2 flex items-center gap-2">
+            <button
+              type="button"
+              className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${activePane === 'preview' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted'}`}
+              onClick={() => setActivePane('preview')}
+            >
+              Preview
+            </button>
+            <button
+              type="button"
+              className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${activePane === 'editor' ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted'}`}
+              onClick={() => setActivePane('editor')}
+            >
+              Editor
+            </button>
+          </div>
+
+          <div className="hidden sm:block h-full">
+            <ResizablePanelGroup direction="horizontal">
+              <ResizablePanel defaultSize={45} minSize={25}>
+                <Editor
+                  value={diagram.content}
+                  onChange={handleEditorChange}
+                  selectionRange={selectionRange}
+                  onCursorLineChange={handleCursorLineChange}
+                  onToggleAiChat={handleToggleAiChat}
+                  aiEnabled={aiChatOpen}
+                  hasAiKey={settings.hasAiApiKey}
+                  aiChatOpen={aiChatOpen}
+                  onApplyAiContent={handleApplyAiContent}
+                  diagramId={diagram.id}
+                />
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={55} minSize={25}>
+                <Canvas
+                  code={diagram.content}
+                  diagramId={diagram.id}
+                  title={diagram.title}
+                  selectedNodeId={selectedNodeId}
+                  onNodeSelect={handleNodeSelect}
+                />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </div>
+
+          <div className="sm:hidden h-full pb-14">
+            {activePane === 'preview' ? (
+              <Canvas
+                code={diagram.content}
+                diagramId={diagram.id}
+                title={diagram.title}
+                selectedNodeId={selectedNodeId}
+                onNodeSelect={handleNodeSelect}
+              />
+            ) : (
               <Editor
                 value={diagram.content}
                 onChange={handleEditorChange}
@@ -655,65 +791,58 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
                 onApplyAiContent={handleApplyAiContent}
                 diagramId={diagram.id}
               />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={55} minSize={25}>
-              <Canvas
-                code={diagram.content}
-                diagramId={diagram.id}
-                title={diagram.title}
-                selectedNodeId={selectedNodeId}
-                onNodeSelect={handleNodeSelect}
-              />
-            </ResizablePanel>
-          </ResizablePanelGroup>
+            )}
+          </div>
         </div>
+
       </div>
 
       {selectedNode && (
-        <div className="fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full border bg-background/90 px-4 py-2 shadow-lg backdrop-blur">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-full bg-muted/50 px-2 py-1 text-sm text-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                aria-label="Select block"
-              >
-                <span className="whitespace-nowrap">Block {selectedNode.label || selectedNode.id}</span>
-                <span className="text-xs text-muted-foreground">▾</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56 max-h-64 overflow-auto">
-              <DropdownMenuLabel>Blocks</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {nodeOptions.length === 0 ? (
-                <DropdownMenuItem disabled>No blocks found</DropdownMenuItem>
-              ) : (
-                nodeOptions.map((node) => (
-                  <DropdownMenuItem
-                    key={node.id}
-                    onClick={() => handleNodeSelect(node)}
-                    className={node.id === selectedNode?.id ? 'bg-muted' : ''}
-                  >
-                    <span className="truncate">{node.label || node.id}</span>
-                    {node.label && (
-                      <span className="ml-auto text-xs text-muted-foreground">{node.id}</span>
-                    )}
-                  </DropdownMenuItem>
-                ))
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <div className="flex items-center gap-2">
+        <div className="fixed left-0 right-0 sm:left-1/2 sm:right-auto bottom-3 sm:bottom-4 z-30 sm:-translate-x-1/2 px-2 sm:px-0 pb-[env(safe-area-inset-bottom)]">
+          <div className="mx-auto max-w-full sm:max-w-3xl min-w-0 flex items-center gap-2 rounded-full border bg-background/95 px-2.5 sm:px-4 py-2 shadow-lg backdrop-blur overflow-x-auto sm:justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5 text-xs sm:text-sm text-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary shrink-0"
+                  aria-label="Select block"
+                >
+                  <span className="whitespace-nowrap">Block {selectedNode.label || selectedNode.id}</span>
+                  <span className="text-[11px] text-muted-foreground">▾</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 max-h-64 overflow-auto">
+                <DropdownMenuLabel>Blocks</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {nodeOptions.length === 0 ? (
+                  <DropdownMenuItem disabled>No blocks found</DropdownMenuItem>
+                ) : (
+                  nodeOptions.map((node) => (
+                    <DropdownMenuItem
+                      key={node.id}
+                      onClick={() => handleNodeSelect(node)}
+                      className={node.id === selectedNode?.id ? 'bg-muted' : ''}
+                    >
+                      <span className="truncate">{node.label || node.id}</span>
+                      {node.label && (
+                        <span className="ml-auto text-xs text-muted-foreground">{node.id}</span>
+                      )}
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 px-3"
+              className="h-8 px-3 text-xs sm:text-sm whitespace-nowrap shrink-0"
               onClick={() => handleNodeColorChange(null)}
             >
               Default
             </Button>
-            <div className="flex items-center gap-1">
+
+            <div className="flex items-center gap-1 sm:gap-1.5 pr-2">
               {COLOR_PRESETS.map((color) => {
                 const isActive = selectedNodeColor === color.value;
                 return (
@@ -721,22 +850,23 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
                     key={color.value}
                     type="button"
                     aria-label={`Set ${selectedNode.label ?? selectedNode.id} color to ${color.name}`}
-                    className={`h-8 w-8 rounded-full border border-border shadow-sm transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${isActive ? 'ring-2 ring-offset-2 ring-primary ring-offset-background' : ''}`}
+                    className={`h-7 w-7 sm:h-8 sm:w-8 rounded-full border border-border shadow-sm transition-transform duration-150 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary shrink-0 ${isActive ? 'ring-2 ring-offset-1 sm:ring-offset-2 ring-primary ring-offset-background' : ''}`}
                     style={{ backgroundColor: color.value }}
                     onClick={() => handleNodeColorChange(color.value)}
                   />
                 );
               })}
             </div>
+
+            <button
+              type="button"
+              className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              aria-label="Close block tools"
+              onClick={() => setSelectedNode(null)}
+            >
+              ×
+            </button>
           </div>
-          <button
-            type="button"
-            className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            aria-label="Close block tools"
-            onClick={() => setSelectedNode(null)}
-          >
-            ×
-          </button>
         </div>
       )}
 

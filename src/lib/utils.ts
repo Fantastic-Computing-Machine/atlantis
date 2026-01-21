@@ -49,6 +49,19 @@ export function generateShortId(): string {
 }
 
 /**
+ * Generate a unique 7-character alphanumeric ID for notes
+ * Uses lowercase letters and numbers for URL-friendliness
+ */
+export function generateNoteId(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 7; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
  * Copy text to clipboard with fallback for older browsers and mobile devices
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
@@ -66,20 +79,20 @@ export async function copyToClipboard(text: string): Promise<boolean> {
   try {
     const textArea = document.createElement('textarea');
     textArea.value = text;
-    
+
     // Avoid scrolling to bottom
     textArea.style.position = 'fixed';
     textArea.style.left = '-999999px';
     textArea.style.top = '-999999px';
     textArea.style.opacity = '0';
-    
+
     document.body.appendChild(textArea);
     textArea.focus();
     textArea.select();
-    
+
     // For iOS
     textArea.setSelectionRange(0, text.length);
-    
+
     const success = document.execCommand('copy');
     document.body.removeChild(textArea);
     return success;

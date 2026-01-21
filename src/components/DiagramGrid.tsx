@@ -42,7 +42,7 @@ import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
 
 import { AiSettingsDialog } from '@/components/AiSettingsDialog';
-import { BookOpen, Download, Eye, Github, KeyRound, ListFilter, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
+import { BookOpen, Download, Eye, Github, KeyRound, ListFilter, Loader2, Moon, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Sun, Trash2, Upload } from 'lucide-react';
 
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
@@ -82,6 +82,7 @@ export function DiagramGrid({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [isAiSettingsOpen, setIsAiSettingsOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     setDiagrams(initialDiagrams);
@@ -211,6 +212,7 @@ export function DiagramGrid({
   const hasStarred = starredDiagrams.length > 0;
 
   const handleCreate = async () => {
+    setIsCreating(true);
     try {
       const csrfToken = await ensureCsrfToken();
       const res = await fetch('/api/diagrams', {
@@ -226,14 +228,24 @@ export function DiagramGrid({
       }
       const newDiagram = await res.json();
       toast.success('New diagram created');
-      router.push(`/${newDiagram.id}`);
+      router.push(`/diagram/${newDiagram.id}`);
     } catch {
       toast.error('Failed to create diagram');
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const handleDelete = async () => {
     if (!deleteId) return;
+
+    // Optimistically update UI
+    const previousDiagrams = [...diagrams];
+    const previousTotal = total;
+
+    setDiagrams((prev) => prev.filter((d) => d.id !== deleteId));
+    setTotal((prev) => Math.max(prev - 1, 0));
+    setDeleteId(null); // Close modal immediately
 
     try {
       const csrfToken = await ensureCsrfToken();
@@ -248,13 +260,12 @@ export function DiagramGrid({
         throw new Error('Failed to delete');
       }
 
-      setDiagrams((prev) => prev.filter((d) => d.id !== deleteId));
-      setTotal((prev) => Math.max(prev - 1, 0));
       toast.success('Diagram deleted');
     } catch {
+      // Revert on failure
+      setDiagrams(previousDiagrams);
+      setTotal(previousTotal);
       toast.error('Failed to delete diagram');
-    } finally {
-      setDeleteId(null);
     }
   };
 
@@ -282,7 +293,7 @@ export function DiagramGrid({
   const handleShare = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
-    const url = `${window.location.origin}/${id}`;
+    const url = `${window.location.origin}/diagram/${id}`;
     const success = await copyToClipboard(url);
     if (success) {
       toast.success('Link copied to clipboard');
@@ -420,7 +431,7 @@ export function DiagramGrid({
   const renderDiagramGrid = (list: Diagram[]) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {list.map((diagram) => (
-        <Link key={diagram.id} href={`/${diagram.id}`} className="group">
+        <Link key={diagram.id} href={`/diagram/${diagram.id}`} className="group">
           <Card
             className={cn(
               'overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-primary/50 h-full',
@@ -569,10 +580,12 @@ export function DiagramGrid({
         <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm shrink-0">
           <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-2xl" role="img" aria-label="atlantis logo">
-                🔱
-              </span>
-              <h1 className="text-xl font-bold">atlantis</h1>
+              <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <span className="text-2xl" role="img" aria-label="atlantis logo">
+                  🔱
+                </span>
+                <h1 className="text-xl font-bold">atlantis // Diagrams</h1>
+              </Link>
             </div>
 
             <div className="flex-1 max-w-md flex justify-center">
@@ -614,9 +627,9 @@ export function DiagramGrid({
                 className="hidden"
               />
 
-              <Button onClick={handleCreate} className="gap-2">
-                <Plus size={18} />
-                <span className="hidden sm:inline">New Diagram</span>
+              <Button onClick={handleCreate} className="gap-2" disabled={isCreating}>
+                {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus size={18} />}
+                <span className="hidden sm:inline">{isCreating ? 'Creating...' : 'New Diagram'}</span>
               </Button>
 
               <DropdownMenu>

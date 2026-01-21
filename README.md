@@ -71,6 +71,7 @@ docker run -d -p 3000:3000 -v $(pwd)/data:/app/data --name atlantis strikead/atl
 - [AI Contribution Guide](docs/AI.md): Practices specific to agentic/AI contributors.
 - [Container Startup & Deployment](docs/CONTAINER_STARTUP.md): Detailed instructions for running Atlantis with Docker, Docker Compose, and configuring the environment.
 - [API Guide](docs/API_GUIDE.md): How to enable and use the REST API for programmatic access.
+- [Notes Feature](docs/NOTES.md): Guide for the notetaking feature with API documentation.
 
 ## Data & Backup
 
