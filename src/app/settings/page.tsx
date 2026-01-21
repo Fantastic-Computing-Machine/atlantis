@@ -19,7 +19,7 @@ import { useDiagramStore } from '@/lib/store';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
     AlertTriangle,
@@ -33,16 +33,6 @@ import {
     Upload,
     XCircle,
 } from 'lucide-react';
-
-// Generate a random 6-character alphanumeric code
-const generateConfirmationCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excludes confusing chars like 0/O, 1/I/L
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-};
 
 export default function SettingsPage() {
     const { setTheme, theme } = useTheme();
@@ -65,6 +55,7 @@ export default function SettingsPage() {
     const [hasExistingKey, setHasExistingKey] = useState(false);
     const [isRemoving, setIsRemoving] = useState(false);
     const [aiModel, setAiModelLocal] = useState<string | null>(null);
+    const [isKeyFromEnv, setIsKeyFromEnv] = useState(false);
 
     // Advanced settings local state
     const [localMaxCheckpoints, setLocalMaxCheckpoints] = useState(settings.maxCheckpoints ?? 15);
@@ -80,7 +71,35 @@ export default function SettingsPage() {
     const [isWipeDialogOpen, setIsWipeDialogOpen] = useState(false);
     const [wipeConfirmationInput, setWipeConfirmationInput] = useState('');
     const [isWiping, setIsWiping] = useState(false);
-    const expectedCode = useMemo(() => generateConfirmationCode(), [isWipeDialogOpen]);
+    const [serverWipeCode, setServerWipeCode] = useState<string | null>(null);
+    const [isLoadingWipeCode, setIsLoadingWipeCode] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    // Track mounted state for hydration-safe rendering
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // Fetch wipe code from server when dialog opens
+    useEffect(() => {
+        if (isWipeDialogOpen) {
+            setIsLoadingWipeCode(true);
+            setServerWipeCode(null);
+            fetch('/api/settings/wipe')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.code) {
+                        setServerWipeCode(data.code);
+                    }
+                })
+                .catch(() => {
+                    toast.error('Failed to generate confirmation code');
+                })
+                .finally(() => {
+                    setIsLoadingWipeCode(false);
+                });
+        }
+    }, [isWipeDialogOpen]);
 
     // Load AI key status on mount
     useEffect(() => {
@@ -99,6 +118,9 @@ export default function SettingsPage() {
                 if (typeof data.aiModel === 'string') {
                     setAiModelLocal(data.aiModel);
                     setAiModel(data.aiModel);
+                }
+                if (typeof data.fromEnv === 'boolean') {
+                    setIsKeyFromEnv(data.fromEnv);
                 }
             } catch {
                 // ignore
@@ -240,7 +262,7 @@ export default function SettingsPage() {
     };
 
     const handleWipeDatabase = async () => {
-        if (wipeConfirmationInput !== expectedCode) {
+        if (!serverWipeCode || wipeConfirmationInput !== serverWipeCode) {
             toast.error('Confirmation code does not match');
             return;
         }
@@ -256,7 +278,6 @@ export default function SettingsPage() {
                 },
                 body: JSON.stringify({
                     confirmationCode: wipeConfirmationInput,
-                    expectedCode: expectedCode,
                 }),
             });
 
@@ -319,7 +340,7 @@ export default function SettingsPage() {
                             </div>
                             <div className="flex gap-2">
                                 <Button
-                                    variant={theme === 'light' ? 'default' : 'outline'}
+                                    variant={mounted && theme === 'light' ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={() => { setTheme('light'); toast.success('Theme set to Light'); }}
                                 >
@@ -327,7 +348,7 @@ export default function SettingsPage() {
                                     Light
                                 </Button>
                                 <Button
-                                    variant={theme === 'dark' ? 'default' : 'outline'}
+                                    variant={mounted && theme === 'dark' ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={() => { setTheme('dark'); toast.success('Theme set to Dark'); }}
                                 >
@@ -335,7 +356,7 @@ export default function SettingsPage() {
                                     Dark
                                 </Button>
                                 <Button
-                                    variant={theme === 'system' ? 'default' : 'outline'}
+                                    variant={mounted && theme === 'system' ? 'default' : 'outline'}
                                     size="sm"
                                     onClick={() => { setTheme('system'); toast.success('Theme set to System'); }}
                                 >
@@ -413,17 +434,30 @@ export default function SettingsPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        {isKeyFromEnv && (
+                            <div className="rounded-md bg-amber-500/10 border border-amber-500/20 p-3 text-sm">
+                                <p className="text-amber-600 dark:text-amber-400 font-medium">
+                                    🔒 Configured via environment variable
+                                </p>
+                                <p className="text-muted-foreground text-xs mt-1">
+                                    The AI API key is set via the <code className="bg-muted px-1 rounded">AI_API_KEY</code> environment variable and cannot be modified through the UI.
+                                </p>
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <label className="text-sm font-medium">API Key</label>
                             <Input
                                 type="password"
                                 autoComplete="off"
-                                placeholder="sk-..."
+                                placeholder={isKeyFromEnv ? '••••••••••••••••' : 'sk-...'}
                                 value={apiKey}
                                 onChange={(e) => setApiKey(e.target.value)}
+                                disabled={isKeyFromEnv}
                             />
                             <p className="text-xs text-muted-foreground">
-                                Stored securely on your local database. The key is required for AI mode.
+                                {isKeyFromEnv
+                                    ? 'Remove AI_API_KEY from .env to manage the key here.'
+                                    : 'Stored securely on your local database. The key is required for AI mode.'}
                             </p>
                         </div>
 
@@ -434,16 +468,17 @@ export default function SettingsPage() {
                                 <XCircle className="h-4 w-4 text-red-500" />
                             )}
                             <span className="text-muted-foreground">
-                                Status: {settings.hasAiApiKey ? 'Configured' : 'Not set'}
+                                Status: {settings.hasAiApiKey ? (isKeyFromEnv ? 'Configured (Environment)' : 'Configured') : 'Not set'}
                             </span>
                         </div>
 
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Provider</label>
                             <select
-                                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50"
                                 value={provider}
                                 onChange={(e) => setProvider(e.target.value as 'openai' | 'gemini' | 'auto')}
+                                disabled={isKeyFromEnv}
                             >
                                 <option value="auto">Auto-detect</option>
                                 <option value="openai">OpenAI-compatible</option>
@@ -467,23 +502,25 @@ export default function SettingsPage() {
                             </div>
                         )}
 
-                        <div className="flex gap-2 pt-2">
-                            {hasExistingKey && (
+                        {!isKeyFromEnv && (
+                            <div className="flex gap-2 pt-2">
+                                {hasExistingKey && (
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleRemoveAiKey}
+                                        disabled={isRemoving || isSubmitting}
+                                    >
+                                        {isRemoving ? 'Removing...' : 'Remove Key'}
+                                    </Button>
+                                )}
                                 <Button
-                                    variant="outline"
-                                    onClick={handleRemoveAiKey}
-                                    disabled={isRemoving || isSubmitting}
+                                    onClick={handleSaveAiKey}
+                                    disabled={isSubmitting || apiKey.trim().length === 0}
                                 >
-                                    {isRemoving ? 'Removing...' : 'Remove Key'}
+                                    {isSubmitting ? 'Saving...' : 'Save Key'}
                                 </Button>
-                            )}
-                            <Button
-                                onClick={handleSaveAiKey}
-                                disabled={isSubmitting || apiKey.trim().length === 0}
-                            >
-                                {isSubmitting ? 'Saving...' : 'Save Key'}
-                            </Button>
-                        </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -660,7 +697,13 @@ export default function SettingsPage() {
                                 </p>
                                 <div className="space-y-2 pt-2">
                                     <p>
-                                        To confirm, type the following code: <strong className="font-mono text-base text-foreground select-all">{expectedCode}</strong>
+                                        To confirm, type the following code: {isLoadingWipeCode ? (
+                                            <span className="text-muted-foreground">Loading...</span>
+                                        ) : serverWipeCode ? (
+                                            <strong className="font-mono text-base text-foreground select-all">{serverWipeCode}</strong>
+                                        ) : (
+                                            <span className="text-destructive">Failed to generate code</span>
+                                        )}
                                     </p>
                                     <Input
                                         type="text"
@@ -673,6 +716,7 @@ export default function SettingsPage() {
                                         onDrop={(e) => e.preventDefault()}
                                         autoComplete="off"
                                         spellCheck={false}
+                                        disabled={isLoadingWipeCode || !serverWipeCode}
                                         className="font-mono text-center text-lg tracking-widest uppercase"
                                         style={{ userSelect: 'none' } as React.CSSProperties}
                                     />
@@ -684,7 +728,7 @@ export default function SettingsPage() {
                         <AlertDialogCancel disabled={isWiping}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleWipeDatabase}
-                            disabled={wipeConfirmationInput !== expectedCode || isWiping}
+                            disabled={!serverWipeCode || wipeConfirmationInput !== serverWipeCode || isWiping}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                             {isWiping ? 'Wiping...' : 'Wipe All Data'}

@@ -1,6 +1,7 @@
 import { ensureCsrfCookie, csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { createNote, getNotePage } from '@/lib/notes-data';
 import { logApiError } from '@/lib/logger';
+import { noteCreateSchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
 
 const DEFAULT_LIMIT = 24;
@@ -33,10 +34,19 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
+        const result = noteCreateSchema.safeParse(body);
+
+        if (!result.success) {
+            return NextResponse.json(
+                { error: 'Invalid input', details: result.error.flatten() },
+                { status: 400 }
+            );
+        }
+
         const newNote = await createNote({
-            title: body.title,
-            content: body.content,
-            language: body.language,
+            title: result.data.title,
+            content: result.data.content,
+            language: result.data.language,
         });
 
         // Return metadata only (without content for consistency)

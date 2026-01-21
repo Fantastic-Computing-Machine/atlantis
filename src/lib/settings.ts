@@ -28,8 +28,18 @@ type SettingClient = {
 const settingClient = (prisma as unknown as { setting: SettingClient }).setting;
 
 export async function getAiApiKey(): Promise<string | null> {
+  // Environment variable takes precedence
+  const envKey = process.env.AI_API_KEY?.trim();
+  if (envKey) {
+    return envKey;
+  }
+  // Fall back to database storage
   const setting = await settingClient.findUnique({ where: { key: AI_API_KEY_KEY } });
   return setting?.value ?? null;
+}
+
+export function isAiApiKeyFromEnv(): boolean {
+  return Boolean(process.env.AI_API_KEY?.trim());
 }
 
 export async function setAiApiKey(value: string | null): Promise<void> {
