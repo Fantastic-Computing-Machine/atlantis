@@ -3,8 +3,8 @@
 # ============================================
 # Base image with security updates
 # ============================================
-FROM node:20-alpine AS base
-RUN apk update && apk upgrade --no-cache
+FROM node:20-slim AS base
+RUN apt-get update -y && apt-get install -y openssl ca-certificates
 
 # ============================================
 # Stage 1: Install dependencies + Prisma client
@@ -12,8 +12,7 @@ RUN apk update && apk upgrade --no-cache
 FROM base AS deps
 WORKDIR /app
 
-# Install libc6-compat for Alpine compatibility
-RUN apk add --no-cache libc6-compat
+
 
 ARG PRISMA_PROVIDER=sqlite
 ARG DATABASE_URL=file:./data/atlantis.db
@@ -89,7 +88,7 @@ ENV PRISMA_FORCE_GENERATE=true
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+  adduser --system --uid 1001 nextjs
 
 # Copy only the necessary files from builder
 # 1. Public assets
@@ -126,7 +125,7 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD node -e "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # Run lightweight bootstrap (generate skipped, optional db push if enabled) then start server
 CMD ["sh", "-c", "node scripts/bootstrap.js && node server.js"]
