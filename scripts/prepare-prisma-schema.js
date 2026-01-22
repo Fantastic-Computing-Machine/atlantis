@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 function resolveProvider() {
-  const raw = (process.env.DB_CONNECTION || process.env.PRISMA_PROVIDER || '').toLowerCase();
+  const raw = (process.env.DATABASE_URL || process.env.DB_CONNECTION || process.env.PRISMA_PROVIDER || '').toLowerCase();
   if (raw.includes('postgres')) return 'postgresql';
   if (raw.includes('mysql')) return 'mysql';
   if (raw.includes('sqlite') || raw.startsWith('file:')) return 'sqlite';
@@ -23,3 +23,5 @@ function main() {
 }
 
 main();
+
+
