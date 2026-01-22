@@ -24,9 +24,11 @@ import { toast } from 'sonner';
 import {
   AlertTriangle,
   ArrowLeft,
+  BarChart3,
   CheckCircle2,
   Database,
   Download,
+  FileText,
   Loader2,
   Moon,
   Monitor,
@@ -35,6 +37,7 @@ import {
   Trash2,
   Upload,
   XCircle,
+  Workflow,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -87,6 +90,14 @@ export default function SettingsPage() {
     error?: string;
   }>({ status: 'loading' });
 
+  // Stats state
+  const [stats, setStats] = useState<{
+    totalNotes: number;
+    totalDiagrams: number;
+    activity: { date: string; notes: number; diagrams: number }[];
+    loading: boolean;
+  }>({ totalNotes: 0, totalDiagrams: 0, activity: [], loading: true });
+
   // Track mounted state for hydration-safe rendering
   useEffect(() => {
     setMounted(true);
@@ -112,6 +123,29 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadDbStatus();
+  }, []);
+
+  // Load stats on mount
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const res = await fetch('/api/settings/stats');
+        const data = await res.json();
+        if (res.ok) {
+          setStats({
+            totalNotes: data.totalNotes ?? 0,
+            totalDiagrams: data.totalDiagrams ?? 0,
+            activity: data.activity ?? [],
+            loading: false,
+          });
+        } else {
+          setStats((prev) => ({ ...prev, loading: false }));
+        }
+      } catch {
+        setStats((prev) => ({ ...prev, loading: false }));
+      }
+    };
+    loadStats();
   }, []);
 
   // Fetch wipe code from server when dialog opens
@@ -427,6 +461,170 @@ export default function SettingsPage() {
                 Re-check
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Statistics */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <BarChart3 className="text-primary h-5 w-5" />
+              <CardTitle>Statistics</CardTitle>
+            </div>
+            <CardDescription>Overview of your notes and diagrams.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {stats.loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="border-muted-foreground/30 bg-muted/30 rounded-lg border border-dashed p-4 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <FileText className="text-primary h-5 w-5" />
+                      <span className="text-muted-foreground text-sm font-medium">Notes</span>
+                    </div>
+                    <p className="mt-2 text-3xl font-bold">{stats.totalNotes}</p>
+                  </div>
+                  <div className="border-muted-foreground/30 bg-muted/30 rounded-lg border border-dashed p-4 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <Workflow className="text-primary h-5 w-5" />
+                      <span className="text-muted-foreground text-sm font-medium">Diagrams</span>
+                    </div>
+                    <p className="mt-2 text-3xl font-bold">{stats.totalDiagrams}</p>
+                  </div>
+                </div>
+
+                {/* Activity Graph */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Activity (Last 30 Days)</p>
+                  <div className="border-muted-foreground/30 bg-muted/30 rounded-lg border border-dashed p-4">
+                    {stats.activity.length > 0 ? (
+                      (() => {
+                        const maxNotes = Math.max(...stats.activity.map((d) => d.notes), 1);
+                        const maxDiagrams = Math.max(...stats.activity.map((d) => d.diagrams), 1);
+                        const maxValue = Math.max(maxNotes, maxDiagrams, 1);
+                        const width = 100;
+                        const height = 100;
+                        const padding = 4;
+                        const graphWidth = width - padding * 2;
+                        const graphHeight = height - padding * 2;
+                        const stepX = graphWidth / (stats.activity.length - 1 || 1);
+
+                        const notesPath = stats.activity
+                          .map((day, i) => {
+                            const x = padding + i * stepX;
+                            const y = padding + graphHeight - (day.notes / maxValue) * graphHeight;
+                            return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+                          })
+                          .join(' ');
+
+                        const diagramsPath = stats.activity
+                          .map((day, i) => {
+                            const x = padding + i * stepX;
+                            const y = padding + graphHeight - (day.diagrams / maxValue) * graphHeight;
+                            return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+                          })
+                          .join(' ');
+
+                        return (
+                          <div className="relative">
+                            <svg
+                              viewBox={`0 0 ${width} ${height}`}
+                              className="h-28 w-full"
+                              preserveAspectRatio="none"
+                            >
+                              {/* Grid lines */}
+                              {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+                                <line
+                                  key={ratio}
+                                  x1={padding}
+                                  y1={padding + graphHeight * (1 - ratio)}
+                                  x2={width - padding}
+                                  y2={padding + graphHeight * (1 - ratio)}
+                                  stroke="currentColor"
+                                  strokeOpacity={0.1}
+                                  strokeWidth={0.5}
+                                />
+                              ))}
+                              {/* Notes line (blue) */}
+                              <path
+                                d={notesPath}
+                                fill="none"
+                                stroke="#3b82f6"
+                                strokeWidth={2}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                vectorEffect="non-scaling-stroke"
+                              />
+                              {/* Diagrams line (emerald) */}
+                              <path
+                                d={diagramsPath}
+                                fill="none"
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                vectorEffect="non-scaling-stroke"
+                              />
+                              {/* Data points for notes */}
+                              {stats.activity.map((day, i) => {
+                                const x = padding + i * stepX;
+                                const y = padding + graphHeight - (day.notes / maxValue) * graphHeight;
+                                return (
+                                  <circle
+                                    key={`note-${day.date}`}
+                                    cx={x}
+                                    cy={y}
+                                    r={1.5}
+                                    fill="#3b82f6"
+                                    vectorEffect="non-scaling-stroke"
+                                  />
+                                );
+                              })}
+                              {/* Data points for diagrams */}
+                              {stats.activity.map((day, i) => {
+                                const x = padding + i * stepX;
+                                const y = padding + graphHeight - (day.diagrams / maxValue) * graphHeight;
+                                return (
+                                  <circle
+                                    key={`diagram-${day.date}`}
+                                    cx={x}
+                                    cy={y}
+                                    r={1.5}
+                                    fill="#10b981"
+                                    vectorEffect="non-scaling-stroke"
+                                  />
+                                );
+                              })}
+                            </svg>
+                            {/* Legend */}
+                            <div className="mt-2 flex items-center justify-center gap-4 text-xs">
+                              <div className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                                <span className="text-muted-foreground">Notes</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                                <span className="text-muted-foreground">Diagrams</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <p className="text-muted-foreground text-center text-sm">No activity data</p>
+                    )}
+                    <div className="text-muted-foreground mt-2 flex justify-between text-xs">
+                      <span>30 days ago</span>
+                      <span>Today</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 

@@ -1,17 +1,19 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useDiagramStore } from '@/lib/store';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { Settings2, Search } from 'lucide-react';
+import { useEffect } from 'react';
+import { Settings2, Search, Keyboard } from 'lucide-react';
 import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
 import { useShortcutPlatform } from '@/lib/use-platform';
+import { useKeyboardShortcuts } from '@/lib/use-keyboard-shortcuts';
 
 export function DashboardHeader() {
     const { settings, setHasAiApiKey, setAiProvider } = useDiagramStore();
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const { shortcutHint } = useShortcutPlatform();
+    const { shortcutHint, shortcutSymbol, isMac } = useShortcutPlatform();
+    const { setPaletteOpen } = useKeyboardShortcuts();
 
     // Load AI key status on mount
     useEffect(() => {
@@ -41,19 +43,32 @@ export function DashboardHeader() {
                 </div>
 
                 <div className="flex-1 max-w-md flex justify-center">
-                    <Button
-                        variant="outline"
-                        className="gap-2 w-full max-w-xs justify-start text-muted-foreground px-2 sm:px-4"
-                        onClick={() => setIsSearchOpen(true)}
-                    >
-                        <Search className="h-4 w-4" />
-                        <span className="hidden sm:inline">Search diagrams...</span>
-                        <span className="inline sm:hidden">Search...</span>
-                        <span className="ml-auto text-xs hidden lg:inline">{shortcutHint}</span>
-                    </Button>
+                    <GlobalSearchDialog />
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9"
+                                onClick={() => setPaletteOpen(true)}
+                                aria-label="Keyboard shortcuts"
+                            >
+                                <Keyboard className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p className="flex items-center gap-1.5">
+                                Shortcuts
+                                <kbd className="ml-1 inline-flex h-5 select-none items-center gap-0.5 rounded border border-border bg-background px-1.5 font-mono text-[10px] font-medium text-foreground">
+                                    {isMac ? '⌘' : 'Ctrl'}/
+                                </kbd>
+                            </p>
+                        </TooltipContent>
+                    </Tooltip>
+
                     <div className="hidden md:flex items-center gap-2">
                         <Button asChild variant="ghost"><Link href="/diagram">Diagrams</Link></Button>
                         <Button asChild variant="ghost"><Link href="/notes">Notes</Link></Button>
@@ -70,8 +85,7 @@ export function DashboardHeader() {
                     </Button>
                 </div>
             </div>
-
-            <GlobalSearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
         </header>
     );
 }
+

@@ -2,6 +2,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ConsoleWelcome } from '@/components/ConsoleWelcome';
+import { GlobalShortcutsWrapper } from '@/components/GlobalShortcutsWrapper';
 import type { Metadata } from 'next';
 import './globals.css';
 
@@ -31,10 +32,13 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <ConsoleWelcome />
-          <TooltipProvider>{children}</TooltipProvider>
+          <GlobalShortcutsWrapper>
+            <TooltipProvider>{children}</TooltipProvider>
+          </GlobalShortcutsWrapper>
           <Toaster />
         </ThemeProvider>
       </body>
     </html>
   );
 }
+
