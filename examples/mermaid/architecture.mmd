@@ -1,0 +1,44 @@
+flowchart LR
+  subgraph Client
+    UI[Web UI]
+  end
+
+  subgraph Edge
+    CDN[CDN]
+    WAF[WAF]
+  end
+
+  subgraph Backend
+    API[API Gateway]
+    Auth[Auth Service]
+    SvcA[Service A]
+    SvcB[Service B]
+    Queue[Event Bus]
+  end
+
+  subgraph Data
+    Cache[(Redis Cache)]
+    DB[(Primary DB)]
+    Warehouse[(Analytics Warehouse)]
+  end
+
+  UI --> CDN --> WAF --> API
+  API --> Auth
+  API --> SvcA
+  API --> SvcB
+  SvcA --> Queue
+  SvcB --> Queue
+  SvcA --> Cache
+  SvcB --> Cache
+  Cache --> DB
+  Queue --> Warehouse
+
+  classDef edge fill:#0f172a,stroke:#22d3ee,stroke-width:2px,color:#e2e8f0
+  classDef data fill:#0b1120,stroke:#f59e0b,stroke-width:2px,color:#f8fafc
+  classDef client fill:#0f172a,stroke:#a855f7,stroke-width:2px,color:#e2e8f0
+  classDef backend fill:#0f172a,stroke:#22c55e,stroke-width:2px,color:#e2e8f0
+
+  class CDN,WAF edge;
+  class Cache,DB,Warehouse data;
+  class UI client;
+  class API,Auth,SvcA,SvcB,Queue backend;
