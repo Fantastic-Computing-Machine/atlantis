@@ -13,9 +13,7 @@ env:
   DATABASE_URL: file:./data/atlantis.db
 
 jobs:
-
   build:
-    needs: []
     strategy:
       fail-fast: false
       matrix:
@@ -50,12 +48,12 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           flavor: |
+            latest=false
             suffix=-${{ matrix.arch }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=ref,event=branch
-            type=sha,format=long
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
 
       - name: Build and push ${{ matrix.arch }}
         uses: docker/build-push-action@v6
@@ -75,57 +73,43 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: Docker meta (canonical tags)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=ref,event=branch
-            type=sha,format=long
-
-      - name: Docker meta (sha only, reused for manifest sources)
-        id: meta_sha
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,format=long
-
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Docker meta (canonical tags)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
+
       - name: Create multi-arch manifest
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           IMAGE: ${{ env.IMAGE_NAME }}
-          SHA_TAG: ${{ steps.meta_sha.outputs.tags }}
         run: |
-          # TAGS is newline-separated; convert to -t arguments
-          tag_args=""
-          while IFS= read -r t; do
-            [ -z "$t" ] && continue
-            tag_args="$tag_args -t $t"
+          # For each canonical tag, create a manifest from the arch-suffixed images
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            # Extract just the tag portion (after the colon)
+            tag_name="${tag##*:}"
+            echo "Creating manifest for $tag from ${tag}-amd64 and ${tag}-arm64"
+            docker buildx imagetools create \
+              -t "$tag" \
+              "${tag}-amd64" \
+              "${tag}-arm64"
           done <<< "$TAGS"
-
-          # Use the per-arch SHA tags as sources for the manifest
-          docker buildx imagetools create \
-            $tag_args \
-            "${SHA_TAG}-amd64" \
-            "${SHA_TAG}-arm64"
 
       - name: Inspect manifest
         env:
           IMAGE: ${{ env.IMAGE_NAME }}
-          SHA_TAG: ${{ steps.meta_sha.outputs.tags }}
         run: |
-          ref=$(echo "$SHA_TAG" | head -n1)
-          docker buildx imagetools inspect "$IMAGE:$ref"
+          docker buildx imagetools inspect "$IMAGE:latest" || true
