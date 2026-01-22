@@ -55,6 +55,7 @@ export interface AppSettings {
   autoSaveDelay?: number;
   defaultExportFormat?: 'svg' | 'png' | 'pdf';
   exportScale?: 1 | 2 | 3;
+  snowMode?: boolean;
 }
 
 export interface DiagramStore {
@@ -76,4 +77,5 @@ export interface DiagramStore {
   setAutoSaveDelay: (value: number) => void;
   setDefaultExportFormat: (format: AppSettings['defaultExportFormat']) => void;
   setExportScale: (scale: AppSettings['exportScale']) => void;
+  setSnowMode: (enabled: boolean) => void;
 }

@@ -3,6 +3,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ConsoleWelcome } from '@/components/ConsoleWelcome';
 import { GlobalShortcutsWrapper } from '@/components/GlobalShortcutsWrapper';
+import { SnowEffectWrapper } from '@/components/SnowEffectWrapper';
 import type { Metadata } from 'next';
 import './globals.css';
 
@@ -35,10 +36,12 @@ export default function RootLayout({
           <GlobalShortcutsWrapper>
             <TooltipProvider>{children}</TooltipProvider>
           </GlobalShortcutsWrapper>
+          <SnowEffectWrapper />
           <Toaster />
         </ThemeProvider>
       </body>
     </html>
   );
 }
+
 

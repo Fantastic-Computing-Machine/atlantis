@@ -141,3 +141,23 @@
   stroke: color-mix(in oklch, var(--primary) 65%, black) !important;
   stroke-width: 2px !important;
 }
+
+/* Snow animation */
+@keyframes snow-fall {
+  0% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(100vh) translateX(20px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.animate-snow {
+  animation: snow-fall linear infinite;
+}
+

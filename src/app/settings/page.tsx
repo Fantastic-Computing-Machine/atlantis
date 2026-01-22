@@ -38,6 +38,7 @@ import {
   Upload,
   XCircle,
   Workflow,
+  Snowflake,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -53,6 +54,7 @@ export default function SettingsPage() {
     setAutoSaveDelay,
     setDefaultExportFormat,
     setExportScale,
+    setSnowMode,
   } = useDiagramStore();
 
   // AI Settings state
@@ -676,6 +678,22 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="flex items-center gap-2 font-medium">
+                  <Snowflake className="h-4 w-4 text-sky-400" />
+                  Snow Mode
+                </p>
+                <p className="text-muted-foreground text-sm">Let it snow! ❄️</p>
+              </div>
+              <Switch
+                checked={settings.snowMode ?? false}
+                onCheckedChange={(checked) => {
+                  setSnowMode(checked);
+                  toast.success(checked ? 'Let it snow! ❄️' : 'Snow stopped');
+                }}
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -1059,6 +1077,14 @@ export default function SettingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Footer */}
+      <footer className="container mx-auto max-w-2xl px-4 py-8 text-center">
+        <p className="text-muted-foreground text-sm">
+          Made with <span className="text-red-500">❤️</span> in NYC
+        </p>
+      </footer>
     </div>
   );
 }
+
