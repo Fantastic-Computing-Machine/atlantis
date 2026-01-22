@@ -4,15 +4,13 @@
 # Base image with security updates
 # ============================================
 FROM node:20-slim AS base
-RUN apt-get update -y && apt-get install -y openssl ca-certificates
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # ============================================
 # Stage 1: Install dependencies + Prisma client
 # ============================================
 FROM base AS deps
 WORKDIR /app
-
-
 
 ARG PRISMA_PROVIDER=sqlite
 ARG DATABASE_URL=file:./data/atlantis.db
@@ -29,12 +27,6 @@ RUN --mount=type=cache,target=/root/.npm \
   npm ci && \
   npm run prisma:prepare && \
   npx prisma generate
-
-# ============================================
-# Stage 1b: Prune dev dependencies for runtime
-# ============================================
-FROM deps AS prod-deps
-RUN npm prune --omit=dev && rm -rf /root/.npm
 
 # ============================================
 # Stage 2: Build the application
@@ -60,7 +52,7 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_OUTPUT=standalone
 
-# Prepare schema/client, seed empty DB, and build app (fewer layers)
+# Prepare schema/client, seed empty DB, and build app
 RUN npm run prisma:prepare && \
   npx prisma generate && \
   mkdir -p /app/data && \
@@ -73,18 +65,11 @@ RUN npm run prisma:prepare && \
 FROM base AS runner
 WORKDIR /app
 
-ARG PRISMA_PROVIDER=sqlite
-ARG DATABASE_URL=file:./data/atlantis.db
-ENV PRISMA_PROVIDER=${PRISMA_PROVIDER}
-ENV DATABASE_URL=${DATABASE_URL}
-
 # Set production environment
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-ENV PRISMA_AUTO_APPLY=true
-ENV PRISMA_FORCE_GENERATE=true
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs && \
@@ -94,27 +79,27 @@ RUN addgroup --system --gid 1001 nodejs && \
 # 1. Public assets
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# 2. Standalone server (includes minimal node_modules)
+# 2. Standalone server (includes minimal node_modules from Next.js)
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-
-# 2b. Pruned node_modules for Prisma CLI + adapters (ensures runtime DB setup works)
-COPY --from=prod-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # 3. Static files
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# 4. Prisma schema and engines for runtime client
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+# 4. Full node_modules from deps stage for runtime Prisma CLI
+# (Required because prisma generate has many transitive dependencies)
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
-# 5. Baseline SQLite database (empty schema)
+# 5. Prisma schema template, config, and scripts for runtime generation
+COPY --from=builder --chown=nextjs:nodejs /app/prisma/schema.template.prisma ./prisma/schema.template.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma/prisma.config.ts ./prisma/prisma.config.ts
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/prepare-prisma-schema.js ./scripts/prepare-prisma-schema.js
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
+RUN chmod +x ./scripts/docker-entrypoint.sh
+
+# 6. Baseline SQLite database (empty schema)
 COPY --from=builder --chown=nextjs:nodejs /app/data ./data
 
-# Create data directory for diagram persistence (SQLite default)
+# Create data directory for diagram persistence
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 
 # Switch to non-root user
@@ -127,5 +112,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-# Run lightweight bootstrap (generate skipped, optional db push if enabled) then start server
-CMD ["sh", "-c", "node scripts/bootstrap.js && node server.js"]
+# Start via entrypoint (generates Prisma client + syncs schema at runtime)
+ENTRYPOINT ["./scripts/docker-entrypoint.sh"]
+
