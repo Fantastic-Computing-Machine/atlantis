@@ -1,4 +1,6 @@
-# atlantis
+[![Build and Publish Docker Image](https://github.com/Fantastic-Computing-Machine/atlantis/actions/workflows/docker-publish.yml/badge.svg?branch=master)](https://github.com/Fantastic-Computing-Machine/atlantis/actions/workflows/docker-publish.yml)
+
+# 🔱 atlantis
 
 A premium, self-hosted Mermaid.js diagramming application built with Next.js, Tailwind CSS, and Shadcn UI.
 
