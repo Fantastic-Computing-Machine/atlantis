@@ -1,0 +1,22 @@
+flowchart TD
+  A[Idea proposed] --> B{Is scope clear?}
+  B -- no --> C[Refine requirements]
+  B -- yes --> D{Approved?}
+  D -- no --> E[Park for later]
+  D -- yes --> F[Build feature]
+  F --> G{Passes QA?}
+  G -- no --> H[Fix issues]
+  H --> F
+  G -- yes --> I[Roll out to 10%]
+  I --> J{Metrics healthy?}
+  J -- no --> K[Rollback]
+  J -- yes --> L[Roll out to 100%]
+  L --> M[Measure & document]
+
+  classDef decision fill:#0f172a,stroke:#22c55e,stroke-width:2px,color:#e2e8f0
+  classDef action fill:#0b1120,stroke:#f59e0b,stroke-width:2px,color:#f8fafc
+  classDef end fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#e2e8f0
+
+  class B,D,G,J decision;
+  class C,E,F,H,I,K,M action;
+  class L end;
