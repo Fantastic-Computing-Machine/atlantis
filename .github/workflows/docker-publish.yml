@@ -119,8 +119,8 @@ jobs:
           # Use the per-arch SHA tags as sources for the manifest
           docker buildx imagetools create \
             $tag_args \
-            "$IMAGE:${SHA_TAG}-amd64" \
-            "$IMAGE:${SHA_TAG}-arm64"
+            "${SHA_TAG}-amd64" \
+            "${SHA_TAG}-arm64"
 
       - name: Inspect manifest
         env:
