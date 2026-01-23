@@ -32,16 +32,24 @@ type SearchResult = {
 type GlobalSearchDialogProps = {
   initialDiagrams?: Diagram[];
   onSelect?: (item: SearchResult) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 export function GlobalSearchDialog({
   initialDiagrams,
   onSelect,
+  open: controlledOpen,
+  onOpenChange,
 }: GlobalSearchDialogProps = {}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const controllerRef = useRef<AbortController | null>(null);
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+
+  // Use controlled state if provided, otherwise use internal state
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
