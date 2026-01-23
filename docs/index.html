@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Atlantis - Self-hosted platform for Mermaid.js diagrams, notes, and knowledge management. Built with Next.js, Tailwind CSS, and Shadcn UI.">
+    <meta name="keywords" content="mermaid, diagrams, notes, knowledge management, self-hosted, docker, next.js">
+    <meta name="author" content="Fantastic Computing Machine">
+    <title>Atlantis - Self-Hosted Diagrams & Notes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- Animated Background -->
+    <div class="bg-animation">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="gradient-orb orb-3"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="#" class="nav-brand">
+                <span class="brand-icon">🔱</span>
+                <span class="brand-text">atlantis</span>
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#screenshots">Screenshots</a>
+                <a href="#quickstart">Quick Start</a>
+                <a href="https://github.com/Fantastic-Computing-Machine/atlantis" target="_blank" class="nav-github">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span class="badge-dot"></span>
+                Self-Hosted & Open Source
+            </div>
+            <h1 class="hero-title">
+                Create Beautiful<br>
+                <span class="gradient-text">Diagrams & Notes</span>
+            </h1>
+            <p class="hero-subtitle">
+                A self-hosted platform for Mermaid.js diagrams, notes, and knowledge management.
+                Built with Next.js, Tailwind CSS, and Shadcn UI.
+            </p>
+            <div class="hero-buttons">
+                <a href="#quickstart" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    Get Started
+                </a>
+                <a href="https://github.com/Fantastic-Computing-Machine/atlantis" target="_blank"
+                    class="btn btn-secondary">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                    View on GitHub
+                </a>
+            </div>
+            <div class="hero-stats">
+                <a href="https://hub.docker.com/r/strikead/atlantis" target="_blank" class="stat-item">
+                    <img src="https://img.shields.io/docker/pulls/strikead/atlantis?style=flat-square&logo=docker&logoColor=white&label=Docker%20Pulls&color=2496ED"
+                        alt="Docker Pulls">
+                </a>
+                <a href="https://github.com/Fantastic-Computing-Machine/atlantis/actions/workflows/docker-publish.yml"
+                    target="_blank" class="stat-item">
+                    <img src="https://img.shields.io/github/actions/workflow/status/Fantastic-Computing-Machine/atlantis/docker-publish.yml?style=flat-square&logo=github&label=Build"
+                        alt="Build Status">
+                </a>
+                <a href="https://github.com/Fantastic-Computing-Machine/atlantis" target="_blank" class="stat-item">
+                    <img src="https://img.shields.io/github/last-commit/Fantastic-Computing-Machine/atlantis?style=flat-square&logo=github&label=Last%20Commit"
+                        alt="Last Commit">
+                </a>
+            </div>
+        </div>
+        <div class="hero-image">
+            <div class="browser-mockup">
+                <div class="browser-header">
+                    <div class="browser-dots">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                    </div>
+                    <div class="browser-address">localhost:3000</div>
+                </div>
+                <div class="browser-content">
+                    <img src="screenshots/1. home.png" alt="Atlantis Dashboard Preview">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Packed with <span class="gradient-text">Features</span></h2>
+                <p class="section-subtitle">Everything you need to create, organize, and manage your diagrams and notes.
+                </p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                        </svg>
+                    </div>
+                    <h3>Modern Editor</h3>
+                    <p>Split-pane interface with live preview for real-time diagram editing.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                    </div>
+                    <h3>Full Mermaid Support</h3>
+                    <p>All Mermaid.js diagram types supported out of the box.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                            </path>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                        </svg>
+                    </div>
+                    <h3>Docker Ready</h3>
+                    <p>Deploy instantly with Docker. Supports PostgreSQL, MySQL, or SQLite.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                            </path>
+                        </svg>
+                    </div>
+                    <h3>Dark/Light Mode</h3>
+                    <p>Beautiful UI that automatically adapts to your system preference.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon
+                                points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+                            </polygon>
+                        </svg>
+                    </div>
+                    <h3>Favorites</h3>
+                    <p>Organize your diagrams by starring important ones for quick access.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                    </div>
+                    <h3>Backup & Restore</h3>
+                    <p>Export your data to JSON and restore whenever needed.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Screenshots Section -->
+    <section id="screenshots" class="screenshots">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">See it in <span class="gradient-text">Action</span></h2>
+                <p class="section-subtitle">Beautiful interface designed for productivity and ease of use.</p>
+            </div>
+            <div class="screenshots-gallery">
+                <div class="screenshot-item active" data-index="0">
+                    <div class="screenshot-wrapper">
+                        <img src="screenshots/1. home.png" alt="Home Dashboard">
+                    </div>
+                    <div class="screenshot-info">
+                        <h4>Home Dashboard</h4>
+                        <p>View all your diagrams and notes in one place</p>
+                    </div>
+                </div>
+                <div class="screenshot-item" data-index="1">
+                    <div class="screenshot-wrapper">
+                        <img src="screenshots/2. diagram.png" alt="Diagram Editor">
+                    </div>
+                    <div class="screenshot-info">
+                        <h4>Diagram Editor</h4>
+                        <p>Split-pane editor with live preview</p>
+                    </div>
+                </div>
+                <div class="screenshot-item" data-index="2">
+                    <div class="screenshot-wrapper">
+                        <img src="screenshots/3. notes.png" alt="Notes Interface">
+                    </div>
+                    <div class="screenshot-info">
+                        <h4>Notes Interface</h4>
+                        <p>Organize your thoughts and documentation</p>
+                    </div>
+                </div>
+                <div class="screenshot-item" data-index="3">
+                    <div class="screenshot-wrapper">
+                        <img src="screenshots/4.1 settings.png" alt="Settings">
+                    </div>
+                    <div class="screenshot-info">
+                        <h4>Settings</h4>
+                        <p>Customize your experience</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Start Section -->
+    <section id="quickstart" class="quickstart">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Get Started in <span class="gradient-text">Seconds</span></h2>
+                <p class="section-subtitle">Run Atlantis instantly with Docker or set up for local development.</p>
+            </div>
+            <div class="quickstart-tabs">
+                <button class="tab-btn active" data-tab="docker">Docker</button>
+                <button class="tab-btn" data-tab="local">Local Development</button>
+            </div>
+            <div class="quickstart-content">
+                <div class="tab-content active" id="docker">
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span>Terminal</span>
+                            <button class="copy-btn" data-clipboard="docker-code">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                Copy
+                            </button>
+                        </div>
+                        <pre><code id="docker-code">docker run -d -p 3000:3000 \
+  -v $(pwd)/data:/app/data \
+  --name atlantis \
+  strikead/atlantis:latest</code></pre>
+                    </div>
+                    <p class="quickstart-note">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                        Then open <a href="http://localhost:3000" target="_blank">http://localhost:3000</a> in your
+                        browser.
+                    </p>
+                </div>
+                <div class="tab-content" id="local">
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span>Terminal</span>
+                            <button class="copy-btn" data-clipboard="local-code">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                Copy
+                            </button>
+                        </div>
+                        <pre><code id="local-code"># Clone the repository
+git clone https://github.com/Fantastic-Computing-Machine/atlantis.git
+cd atlantis
+
+# Install dependencies
+npm install
+
+# Setup environment
+cp .env.example .env
+
+# Start development server
+npm run dev</code></pre>
+                    </div>
+                    <p class="quickstart-note">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                        Requires Node.js 18+ installed on your machine.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Documentation Section -->
+    <section class="docs">
+        <div class="container">
+            <div class="docs-grid">
+                <a href="https://github.com/Fantastic-Computing-Machine/atlantis/blob/master/CONTRIBUTING.md"
+                    target="_blank" class="doc-card">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <h4>Contributing Guide</h4>
+                    <p>Learn how to contribute to Atlantis</p>
+                </a>
+                <a href="https://github.com/Fantastic-Computing-Machine/atlantis/blob/master/docs/CONTAINER_STARTUP.md"
+                    target="_blank" class="doc-card">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                        </path>
+                    </svg>
+                    <h4>Docker Deployment</h4>
+                    <p>Container setup and configuration</p>
+                </a>
+                <a href="https://github.com/Fantastic-Computing-Machine/atlantis/blob/master/docs/API_GUIDE.md"
+                    target="_blank" class="doc-card">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg>
+                    <h4>API Guide</h4>
+                    <p>REST API documentation</p>
+                </a>
+                <a href="https://github.com/Fantastic-Computing-Machine/atlantis/blob/master/docs/NOTES.md"
+                    target="_blank" class="doc-card">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <h4>Notes Feature</h4>
+                    <p>Note-taking documentation</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="container">
+            <div class="cta-content">
+                <h2>Ready to get started?</h2>
+                <p>Join the community and start creating beautiful diagrams today.</p>
+                <div class="cta-buttons">
+                    <a href="https://hub.docker.com/r/strikead/atlantis" target="_blank" class="btn btn-primary">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path
+                                d="M13.983 11.078h2.119a.186.186 0 0 0 .186-.185V9.006a.186.186 0 0 0-.186-.186h-2.119a.185.185 0 0 0-.185.185v1.888c0 .102.083.185.185.185m-2.954-5.43h2.118a.186.186 0 0 0 .186-.186V3.574a.186.186 0 0 0-.186-.185h-2.118a.185.185 0 0 0-.185.185v1.888c0 .102.082.185.185.185m0 2.716h2.118a.187.187 0 0 0 .186-.186V6.29a.186.186 0 0 0-.186-.185h-2.118a.185.185 0 0 0-.185.185v1.887c0 .102.082.185.185.186m-2.93 0h2.12a.186.186 0 0 0 .184-.186V6.29a.185.185 0 0 0-.185-.185H8.1a.185.185 0 0 0-.185.185v1.887c0 .102.083.185.185.186m-2.964 0h2.119a.186.186 0 0 0 .185-.186V6.29a.185.185 0 0 0-.185-.185H5.136a.186.186 0 0 0-.186.185v1.887c0 .102.084.185.186.186m5.893 2.715h2.118a.186.186 0 0 0 .186-.185V9.006a.186.186 0 0 0-.186-.186h-2.118a.185.185 0 0 0-.185.185v1.888c0 .102.082.185.185.185m-2.93 0h2.12a.185.185 0 0 0 .184-.185V9.006a.185.185 0 0 0-.184-.186h-2.12a.185.185 0 0 0-.184.185v1.888c0 .102.083.185.185.185m-2.964 0h2.119a.185.185 0 0 0 .185-.185V9.006a.185.185 0 0 0-.184-.186h-2.12a.186.186 0 0 0-.186.186v1.887c0 .102.084.185.186.185m-2.92 0h2.12a.185.185 0 0 0 .184-.185V9.006a.185.185 0 0 0-.184-.186h-2.12a.185.185 0 0 0-.184.185v1.888c0 .102.082.185.185.185M23.763 9.89c-.065-.051-.672-.51-1.954-.51-.338.001-.676.03-1.01.087-.248-1.7-1.653-2.53-1.716-2.566l-.344-.199-.226.327c-.284.438-.49.922-.612 1.43-.23.97-.09 1.882.403 2.661-.595.332-1.55.413-1.744.42H.751a.751.751 0 0 0-.75.748 11.376 11.376 0 0 0 .692 4.062c.545 1.428 1.355 2.48 2.41 3.124 1.18.723 3.1 1.137 5.275 1.137.983.003 1.963-.086 2.93-.266a12.248 12.248 0 0 0 3.823-1.389c.98-.567 1.86-1.288 2.61-2.136 1.252-1.418 1.998-2.997 2.553-4.4h.221c1.372 0 2.215-.549 2.68-1.009.309-.293.55-.65.707-1.046l.098-.288Z" />
+                        </svg>
+                        Docker Hub
+                    </a>
+                    <a href="https://www.buymeacoffee.com/strikead" target="_blank"
+                        class="btn btn-secondary btn-coffee">
+                        ☕ Buy me a coffee
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="brand-icon">🔱</span>
+                    <span>atlantis</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/Fantastic-Computing-Machine/atlantis" target="_blank">GitHub</a>
+                    <a href="https://hub.docker.com/r/strikead/atlantis" target="_blank">Docker Hub</a>
+                    <a href="https://github.com/Fantastic-Computing-Machine/atlantis/blob/master/LICENSE"
+                        target="_blank">MIT License</a>
+                </div>
+                <p class="footer-copyright">
+                    Made with ❤️ by <a href="https://github.com/Fantastic-Computing-Machine" target="_blank">Fantastic
+                        Computing Machine</a>
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
