@@ -26,7 +26,7 @@ export default async function Page() {
 
   return (
     <div className="bg-background text-foreground flex min-h-screen flex-col font-sans">
-      <DashboardHeader />
+      <DashboardHeader enableApiAccess={process.env.ENABLE_API_ACCESS === 'true'} />
 
       <main className="container mx-auto flex-1 space-y-12 px-4 py-8">
         {isCompletelyEmpty ? (

@@ -52,7 +52,6 @@ interface DiagramGridProps {
   initialHasMore?: boolean;
   initialNextOffset?: number;
   initialTotal?: number;
-  enableApiAccess?: boolean;
 }
 
 export function DiagramGrid({
@@ -60,7 +59,6 @@ export function DiagramGrid({
   initialHasMore,
   initialNextOffset,
   initialTotal,
-  enableApiAccess,
 }: DiagramGridProps) {
   const [diagrams, setDiagrams] = useState<Diagram[]>(initialDiagrams);
   const [hasMore, setHasMore] = useState<boolean>(initialHasMore ?? false);

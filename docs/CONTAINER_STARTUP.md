@@ -21,6 +21,8 @@ docker run -d \
   strikead/atlantis:latest
 ```
 
+[![Docker Hub](https://img.shields.io/badge/View_on-Docker_Hub-blue?logo=docker&logoColor=white)](https://hub.docker.com/r/strikead/atlantis)
+
 ### Quick Run (No Persistence)
 
 Perfect for testing:
@@ -85,4 +87,3 @@ Available tags on [Docker Hub](https://hub.docker.com/r/strikead/atlantis/tags):
 - `latest`: The most recent stable release.
 - `vX.Y.Z`: Specific version releases.
 - `sha-xxxx`: Development builds from specific commits.
-

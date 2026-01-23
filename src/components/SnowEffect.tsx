@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 
 type SnowEffectProps = {
@@ -51,7 +51,7 @@ export function SnowEffect({ enabled }: SnowEffectProps) {
     const { resolvedTheme } = useTheme();
 
     useEffect(() => {
-        setMounted(true);
+        setTimeout(() => setMounted(true), 0);
     }, []);
 
     if (!mounted || !enabled) return null;

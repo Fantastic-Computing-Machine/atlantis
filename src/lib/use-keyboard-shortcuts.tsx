@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, useState, createContext, useContext, type ReactNode } from 'react';
+import { useEffect, useCallback, useState, createContext, useContext, type ReactNode, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useShortcutPlatform } from '@/lib/use-platform';
 
@@ -44,10 +44,10 @@ export function GlobalShortcutsProvider({ children }: GlobalShortcutsProviderPro
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        setMounted(true);
+        setTimeout(() => setMounted(true), 0);
     }, []);
 
-    const shortcuts: ShortcutDefinition[] = [
+    const shortcuts: ShortcutDefinition[] = useMemo(() => [
         {
             id: 'open-palette',
             key: '/',
@@ -139,7 +139,7 @@ export function GlobalShortcutsProvider({ children }: GlobalShortcutsProviderPro
                 localStorage.setItem('theme', next);
             },
         },
-    ];
+    ], [router]);
 
     const handleKeyDown = useCallback(
         (event: KeyboardEvent) => {

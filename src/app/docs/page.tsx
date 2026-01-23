@@ -3,7 +3,7 @@ import ApiDoc from '@/components/ApiDoc';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'API Documentation - Atlantis',
+  title: 'API Documentation -atlantis',
   description: 'Interactive API documentation for the Atlantis application.',
 };
 
@@ -17,7 +17,7 @@ export default function DocsPage() {
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">API Documentation</h1>
           <p className="text-muted-foreground mt-2">
-            Explore and test the Atlantis API endpoints.
+            Explore and test the atlantis API endpoints.
             Ensure <code>ENABLE_API_ACCESS=true</code> is set in your environment.
           </p>
         </div>

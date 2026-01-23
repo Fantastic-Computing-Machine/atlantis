@@ -13,17 +13,20 @@ Thank you for your interest in contributing to atlantis! This document provides 
 ### Local Development Setup
 
 1. **Fork and clone the repository**
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/atlantis.git
    cd atlantis
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Start the development server**
+
    ```bash
    npm run dev
    ```
@@ -31,11 +34,24 @@ Thank you for your interest in contributing to atlantis! This document provides 
 4. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+## Tech Stack
+
+- Framework: [Next.js 14+](https://nextjs.org/) (App Router)
+- Styling: [Tailwind CSS](https://tailwindcss.com/)
+- Components: [Shadcn UI](https://ui.shadcn.com/)
+- Icons: [Lucide React](https://lucide.dev/)
+- Editor: [CodeMirror](https://uiwjs.github.io/react-codemirror/)
+- Rendering: [Mermaid.js](https://mermaid.js.org/)
+- State: [Zustand](https://github.com/pmndrs/zustand)
+
 ## Development Workflow
 
 ### Branch Naming
 
 Use descriptive branch names:
+
 - `feature/add-export-png` - New features
 - `fix/diagram-centering` - Bug fixes
 - `docs/update-readme` - Documentation updates
@@ -43,7 +59,8 @@ Use descriptive branch names:
 
 ### Making Changes
 
-1. Create a new branch from `main`
+1. Create a new branch from `master`
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -51,16 +68,19 @@ Use descriptive branch names:
 2. Make your changes following the code style guidelines
 
 3. Run linting to check for issues
+
    ```bash
    npm run lint
    ```
 
 4. Build to verify everything compiles
+
    ```bash
    npm run build
    ```
 
 5. Commit your changes with a descriptive message
+
    ```bash
    git commit -m "feat: add PNG export functionality"
    ```
@@ -78,6 +98,7 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) specific
 - `chore:` - Maintenance tasks
 
 Examples:
+
 ```
 feat: add dark mode toggle to canvas
 fix: resolve diagram centering issue on load
@@ -163,6 +184,7 @@ src/
 ### PR Title Format
 
 Use the same format as commit messages:
+
 ```
 feat: add PNG export functionality
 fix: resolve hydration mismatch in header
@@ -204,6 +226,8 @@ docker compose logs -f
 # Stop
 docker compose down
 ```
+
+[![Docker Hub](https://img.shields.io/badge/View_on-Docker_Hub-blue?logo=docker&logoColor=white)](https://hub.docker.com/r/strikead/atlantis)
 
 ## Questions?
 

@@ -22,6 +22,7 @@ import type { ViewUpdate } from '@codemirror/view';
 import { Decoration, EditorView } from '@codemirror/view';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import CodeMirror from '@uiw/react-codemirror';
+import { githubDark, githubLight } from '@uiw/codemirror-theme-github';
 import { mermaid } from 'codemirror-lang-mermaid';
 import { Copy, Settings2, WrapText } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -233,7 +234,7 @@ export function Editor({
           <CodeMirror
             value={value}
             height="100%"
-            theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
+            theme={resolvedTheme === 'dark' ? githubDark : githubLight}
             onChange={handleChange}
             onCreateEditor={handleCreateEditor}
             onUpdate={handleUpdate}

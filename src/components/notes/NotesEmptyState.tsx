@@ -6,12 +6,14 @@ import { FileText, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
+import { useKeyboardShortcuts } from '@/lib/use-keyboard-shortcuts';
 
 type CreatedNote = { id: string };
 
 export function NotesEmptyState() {
   const router = useRouter();
   const [isCreating, setIsCreating] = useState(false);
+  const { setPaletteOpen } = useKeyboardShortcuts();
 
   const handleCreateNote = async () => {
     setIsCreating(true);
@@ -58,6 +60,13 @@ export function NotesEmptyState() {
             New note
           </Button>
         </div>
+        <button
+          type="button"
+          onClick={() => setPaletteOpen(true)}
+          className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-4 transition-colors"
+        >
+          Open shortcut palette
+        </button>
       </div>
     </div>
   );
