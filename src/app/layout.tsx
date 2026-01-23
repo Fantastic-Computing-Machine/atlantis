@@ -12,9 +12,29 @@ const inter = { className: 'font-sans' };
 
 export const metadata: Metadata = {
   title: 'atlantis',
-  description: 'Self-hosted Mermaid Diagram Editor',
+  description: 'Self-hosted diagrams and notes platform',
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔱</text></svg>",
+  },
+  openGraph: {
+    title: '🔱 atlantis',
+    description: 'Self-hosted platform for diagrams, notes, and knowledge management.',
+    siteName: 'atlantis',
+    type: 'website',
+    images: [
+      {
+        url: '/preview.png',
+        width: 1200,
+        height: 630,
+        alt: '🔱 atlantis - Self-hosted diagrams and notes platform',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '🔱 atlantis',
+    description: 'Self-hosted platform for diagrams, notes, and knowledge management.',
+    images: ['/preview.png'],
   },
 };
 

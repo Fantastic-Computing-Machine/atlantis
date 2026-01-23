@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "Atlantis API",
+    "title": "🔱 atlantis API",
     "version": "1.0.0",
-    "description": "API documentation for the Atlantis diagramming application."
+    "description": "API documentation for the Atlantis platform - diagrams, notes, and knowledge management."
   },
   "servers": [
     {

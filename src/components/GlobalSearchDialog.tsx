@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Star, Loader2, FileText, PenSquare } from 'lucide-react';
@@ -41,7 +41,8 @@ export function GlobalSearchDialog({
   onSelect,
   open: controlledOpen,
   onOpenChange,
-}: GlobalSearchDialogProps = {}) {
+  hideTrigger = false,
+}: GlobalSearchDialogProps & { hideTrigger?: boolean } = {}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const controllerRef = useRef<AbortController | null>(null);
@@ -84,7 +85,7 @@ export function GlobalSearchDialog({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [setOpen]);
 
   useEffect(() => {
     if (open) {
@@ -97,7 +98,7 @@ export function GlobalSearchDialog({
       controllerRef.current?.abort();
       controllerRef.current = null;
     }
-  }, [open]);
+  }, [open, setOpen]);
 
   // Fetch both diagrams and notes
   useEffect(() => {
@@ -242,18 +243,20 @@ export function GlobalSearchDialog({
 
   return (
     <>
-      <Button
-        variant="outline"
-        className="gap-2 w-full max-w-xs justify-start text-muted-foreground px-2 sm:px-4"
-        onClick={() => setOpen(true)}
-      >
-        <Search className="h-4 w-4" />
-        <span className="hidden sm:inline">Search...</span>
-        <span className="inline sm:hidden">Search</span>
-        <kbd className="ml-auto hidden lg:inline-flex h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-          {shortcutSymbol}K
-        </kbd>
-      </Button>
+      {!hideTrigger && (
+        <Button
+          variant="outline"
+          className="gap-2 w-full max-w-xs justify-start text-muted-foreground px-2 sm:px-4"
+          onClick={() => setOpen(true)}
+        >
+          <Search className="h-4 w-4" />
+          <span className="hidden sm:inline">Search...</span>
+          <span className="inline sm:hidden">Search</span>
+          <kbd className="ml-auto hidden lg:inline-flex h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+            {shortcutSymbol}K
+          </kbd>
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="p-0 gap-0 w-[94vw] max-w-[700px] sm:w-full overflow-hidden border bg-background/95 backdrop-blur-xl shadow-2xl rounded-xl sm:rounded-2xl">
           <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3">

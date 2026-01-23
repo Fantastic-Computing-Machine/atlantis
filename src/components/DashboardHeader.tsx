@@ -5,14 +5,22 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useDiagramStore } from '@/lib/store';
 import Link from 'next/link';
 import { useEffect } from 'react';
-import { Settings2, Search, Keyboard } from 'lucide-react';
+import { Settings2, Keyboard, BookOpen } from 'lucide-react';
 import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { useKeyboardShortcuts } from '@/lib/use-keyboard-shortcuts';
 
-export function DashboardHeader() {
+
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Menu } from 'lucide-react';
+
+interface DashboardHeaderProps {
+    enableApiAccess?: boolean;
+}
+
+export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
     const { settings, setHasAiApiKey, setAiProvider } = useDiagramStore();
-    const { shortcutHint, shortcutSymbol, isMac } = useShortcutPlatform();
+    const { isMac } = useShortcutPlatform();
     const { setPaletteOpen } = useKeyboardShortcuts();
 
     // Load AI key status on mount
@@ -69,9 +77,39 @@ export function DashboardHeader() {
                         </TooltipContent>
                     </Tooltip>
 
-                    <div className="hidden md:flex items-center gap-2">
+                    <div className="hidden lg:flex items-center gap-2">
                         <Button asChild variant="ghost"><Link href="/diagram">Diagrams</Link></Button>
                         <Button asChild variant="ghost"><Link href="/notes">Notes</Link></Button>
+                        {enableApiAccess && (
+                            <Button asChild variant="ghost">
+                                <Link href="/docs" className="flex items-center gap-2">
+                                    <BookOpen className="h-4 w-4" />
+                                </Link>
+                            </Button>
+                        )}
+                    </div>
+
+                    <div className="lg:hidden">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                    <Menu className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem asChild>
+                                    <Link href="/diagram">Diagrams</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/notes">Notes</Link>
+                                </DropdownMenuItem>
+                                {enableApiAccess && (
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/docs">Docs</Link>
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
 
                     <Button variant="outline" className="gap-2 h-9 px-2 sm:px-3" asChild>

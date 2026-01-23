@@ -7,16 +7,18 @@ import { ArrowRight, FileText, Keyboard, PenSquare, Sparkles, UploadCloud } from
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
+import { useKeyboardShortcuts } from '@/lib/use-keyboard-shortcuts';
 import { toast } from 'sonner';
 
 type CreatedEntity = { id: string };
 const examplesLink =
-  'https://github.com/Fantastic-Computing-Machine/atlantis/tree/main/examples/mermaid';
+  'https://github.com/Fantastic-Computing-Machine/atlantis/tree/master/examples/mermaid';
 
 export function DashboardEmptyState() {
   const router = useRouter();
   const [isDiagramLoading, setIsDiagramLoading] = useState(false);
   const [isNoteLoading, setIsNoteLoading] = useState(false);
+  const { setPaletteOpen } = useKeyboardShortcuts();
 
   const createDiagram = async () => {
     setIsDiagramLoading(true);
@@ -125,13 +127,13 @@ export function DashboardEmptyState() {
               icon={<UploadCloud className="h-4 w-4" />}
               title="Import Mermaid"
               body="Bring existing diagrams or JSON backups."
-              href={examplesLink}
+              href="/settings"
             />
             <QuickCard
               icon={<Keyboard className="h-4 w-4" />}
               title="Shortcut palette"
               body="Hit Ctrl+K to jump anywhere."
-              href="/settings"
+              onClick={() => setPaletteOpen(true)}
             />
           </div>
         </div>

@@ -18,6 +18,7 @@ import type { Extension } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import CodeMirror from '@uiw/react-codemirror';
+import { githubDark, githubLight } from '@uiw/codemirror-theme-github';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
 import { html } from '@codemirror/lang-html';
@@ -26,7 +27,7 @@ import { json } from '@codemirror/lang-json';
 import { markdown } from '@codemirror/lang-markdown';
 import { Copy, Settings2, WrapText, Search, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { NoteSearchReplace } from './NoteSearchReplace';
 import { NoteMarkdownPreview } from './NoteMarkdownPreview';
@@ -67,12 +68,12 @@ export function NoteEditor({
     const [wordWrap, setWordWrap] = useState(true);
     const [showSearch, setShowSearch] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
-    const editorViewRef = useRef<EditorView | null>(null);
+    const [editorView, setEditorView] = useState<EditorView | null>(null);
 
     const isMarkdown = language === 'markdown' || language === 'md';
 
     useEffect(() => {
-        setMounted(true);
+        setTimeout(() => setMounted(true), 0);
     }, []);
 
     const handleChange = useCallback((val: string) => {
@@ -85,7 +86,7 @@ export function NoteEditor({
     }, [value]);
 
     const handleCreateEditor = useCallback((view: EditorView) => {
-        editorViewRef.current = view;
+        setEditorView(view);
     }, []);
 
     const toggleSearch = useCallback(() => {
@@ -124,7 +125,7 @@ export function NoteEditor({
         return exts;
     }, [wordWrap, showIndentGuides, language]);
 
-    const editorTheme = mounted && resolvedTheme === 'dark' ? 'dark' : 'light';
+    const editorTheme = mounted && resolvedTheme === 'dark' ? githubDark : githubLight;
 
     return (
         <div className="h-full w-full overflow-hidden bg-background flex flex-col">
@@ -248,7 +249,7 @@ export function NoteEditor({
             {/* Search & Replace Panel */}
             {showSearch && (
                 <NoteSearchReplace
-                    editorView={editorViewRef.current}
+                    editorView={editorView}
                     onClose={() => setShowSearch(false)}
                 />
             )}

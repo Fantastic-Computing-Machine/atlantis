@@ -1,6 +1,6 @@
 # 🔱 atlantis
 
-A premium, self-hosted Mermaid.js diagramming application built with Next.js, Tailwind CSS, and Shadcn UI.
+Self-hosted platform for Mermaid.js diagrams, notes, and knowledge management. Built with Next.js, Tailwind CSS, and Shadcn UI.
 
 ![Atlantis Preview](/public/preview.png)
 
@@ -14,6 +14,8 @@ A premium, self-hosted Mermaid.js diagramming application built with Next.js, Ta
 [![Last Commit](https://img.shields.io/github/last-commit/Fantastic-Computing-Machine/atlantis)](https://github.com/Fantastic-Computing-Machine/atlantis/commits/master)
 [![Repo Views](https://visitor-badge.laobi.icu/badge?page_id=Fantastic-Computing-Machine.atlantis)](https://github.com/Fantastic-Computing-Machine/atlantis)
 
+[![Docker Hub](https://img.shields.io/badge/View_on-Docker_Hub-blue?logo=docker&logoColor=white)](https://hub.docker.com/r/strikead/atlantis)
+
 ## Features
 
 - Modern Editor: Split-pane interface with code editor and live preview.
@@ -22,17 +24,22 @@ A premium, self-hosted Mermaid.js diagramming application built with Next.js, Ta
 - Dark/Light Mode: Beautiful UI that adapts to your system preference.
 - Favorites: Organize your diagrams by marking important ones.
 - Backup & Restore: Export your data to JSON and restore it whenever needed.
+- Management: Create, edit, and delete diagrams easily.
 - Search: fast searching through your saved diagrams.
 
-## Tech Stack
+## Screenshots
 
-- Framework: [Next.js 14+](https://nextjs.org/) (App Router)
-- Styling: [Tailwind CSS](https://tailwindcss.com/)
-- Components: [Shadcn UI](https://ui.shadcn.com/)
-- Icons: [Lucide React](https://lucide.dev/)
-- Editor: [CodeMirror](https://uiwjs.github.io/react-codemirror/)
-- Rendering: [Mermaid.js](https://mermaid.js.org/)
-- State: [Zustand](https://github.com/pmndrs/zustand)
+![Home Screen](screenshots/1.%20home.png)
+*Home Dashboard*
+
+![Diagram Editor](screenshots/2.%20diagram.png)
+*Diagram Editor*
+
+**More Screenshots:**
+
+- [Notes Interface](screenshots/3.%20notes.png)
+- [Settings - General](screenshots/4.1%20settings.png)
+- [Settings - Advanced](screenshots/4.2%20settings.png)
 
 ## Quick Start (Docker)
 
@@ -77,6 +84,7 @@ docker run -d -p 3000:3000 -v $(pwd)/data:/app/data --name atlantis strikead/atl
 
 ## Documentation
 
+- [Contributing Guide](CONTRIBUTING.md): Tech stack, workflow, and guidelines for contributors.
 - [Agent Guide](AGENTS.md): Conventions and commands for contributors and AI agents.
 - [AI Contribution Guide](docs/AI.md): Practices specific to agentic/AI contributors.
 - [Container Startup & Deployment](docs/CONTAINER_STARTUP.md): Detailed instructions for running Atlantis with Docker, Docker Compose, and configuring the environment.

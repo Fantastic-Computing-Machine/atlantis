@@ -66,33 +66,9 @@ export function ShortcutPaletteDialog() {
     const { shortcuts, paletteOpen, setPaletteOpen, getDisplayKey } = useKeyboardShortcuts();
     const [query, setQuery] = useState('');
 
-    const filteredShortcuts = useMemo(() => {
-        const normalized = query.trim().toLowerCase();
-        if (!normalized) return shortcuts;
-        return shortcuts.filter(
-            (s) =>
-                s.description.toLowerCase().includes(normalized) ||
-                s.key.toLowerCase().includes(normalized)
-        );
-    }, [shortcuts, query]);
 
-    const groupedShortcuts = useMemo(() => {
-        const groups: Record<ShortcutCategory, typeof filteredShortcuts> = {
-            general: [],
-            navigation: [],
-            creation: [],
-        };
 
-        for (const shortcut of filteredShortcuts) {
-            groups[shortcut.category].push(shortcut);
-        }
 
-        return CATEGORY_ORDER.filter((cat) => groups[cat].length > 0).map((cat) => ({
-            category: cat,
-            label: CATEGORY_LABELS[cat],
-            shortcuts: groups[cat],
-        }));
-    }, [filteredShortcuts]);
 
     const handleOpenChange = (open: boolean) => {
         setPaletteOpen(open);
@@ -108,15 +84,16 @@ export function ShortcutPaletteDialog() {
     };
 
     // Add Ctrl+K to the display (handled by GlobalSearchDialog but we show it here for reference)
-    const searchShortcut: typeof shortcuts[number] = {
+    const searchShortcut: typeof shortcuts[number] = useMemo(() => ({
         id: 'search',
         key: 'k',
         modifiers: ['ctrl'],
         description: 'Search diagrams',
         category: 'general',
         action: () => { },
-    };
-    const allShortcutsForDisplay = [...shortcuts, searchShortcut];
+    }), []);
+
+    const allShortcutsForDisplay = useMemo(() => [...shortcuts, searchShortcut], [shortcuts, searchShortcut]);
 
     const displayGroups = useMemo(() => {
         const normalized = query.trim().toLowerCase();

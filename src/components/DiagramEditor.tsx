@@ -3,6 +3,16 @@
 import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
 import { Button } from '@/components/ui/button';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -28,7 +38,8 @@ import { useDiagramStore } from '@/lib/store';
 import { Checkpoint, Diagram } from '@/lib/types';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { copyToClipboard, formatDate, cn } from '@/lib/utils';
-import { History, Info, Moon, Save, Search, Share2, Star, Sun, Menu, Settings2 } from 'lucide-react';
+import { History, Info, Moon, Save, Search, Share2, Star, Sun, Menu, Settings2, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -224,10 +235,12 @@ const upsertNodeStyleLine = (content: string, nodeId: string, color: string | nu
 };
 
 export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
+  const router = useRouter();
   const [diagram, setDiagram] = useState<Diagram>(initialDiagram);
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedNode, setSelectedNode] = useState<NodeSelection | null>(null);
   const [selectionRange, setSelectionRange] = useState<TextRange | null>(null);
   const { shortcutHint } = useShortcutPlatform();
@@ -237,6 +250,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const { setTheme, theme } = useTheme();
   const settings = useDiagramStore((state) => state.settings);
   const updateDiagram = useDiagramStore((state) => state.updateDiagram);
+  const removeDiagram = useDiagramStore((state) => state.removeDiagram);
   const setHasAiApiKey = useDiagramStore((state) => state.setHasAiApiKey);
   const setAiProvider = useDiagramStore((state) => state.setAiProvider);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -443,6 +457,28 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     }
   };
 
+  const handleDelete = useCallback(async () => {
+    try {
+      const csrfToken = await ensureCsrfToken();
+      const res = await fetch(`/api/diagrams/${diagram.id}`, {
+        method: 'DELETE',
+        headers: {
+          [CSRF_HEADER_NAME]: csrfToken,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to delete');
+      }
+
+      removeDiagram(diagram.id);
+      toast.success('Diagram deleted');
+      router.push('/diagram');
+    } catch {
+      toast.error('Failed to delete diagram');
+    }
+  }, [diagram.id, router, removeDiagram]);
+
   const selectedNodeColor = selectedNodeId ? getNodeFillColor(diagram.content, selectedNodeId) : null;
 
   const loadCheckpoints = useCallback(async () => {
@@ -544,7 +580,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
             {/* Desktop layout */}
             <div className="hidden sm:flex items-center gap-2 min-w-0 text-lg font-medium flex-1 sm:flex-initial">
               <Link href="/" className="shrink-0 hover:opacity-80 transition-opacity flex items-center gap-1">
-                <span className="hidden sm:inline">🔱atlantis //</span>
+                <span className="hidden sm:inline">🔱 atlantis //</span>
               </Link>
 
               <span className="text-xl shrink-0 hidden sm:inline">{diagram.emoji || '📊'}</span>
@@ -631,6 +667,16 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
                   <Settings2 className="h-4 w-4" />
                 </Link>
               </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setShowDeleteDialog(true)}
+                aria-label="Delete diagram"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
 
             {/* Mobile Actions Menu */}
@@ -663,6 +709,11 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
                       <Settings2 className="mr-2 h-4 w-4" />
                       <span>Settings</span>
                     </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete Diagram</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -868,7 +919,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
         </div>
       )}
 
-      <GlobalSearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
+      <GlobalSearchDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} hideTrigger />
 
       <Dialog open={isInfoOpen} onOpenChange={setIsInfoOpen}>
         <DialogContent className="sm:max-w-[425px]">
@@ -925,6 +976,24 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this diagram?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The diagram &quot;{diagram.title}&quot; will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

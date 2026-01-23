@@ -64,7 +64,12 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     const [hasChanges, setHasChanges] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [mounted, setMounted] = useState(false);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Track changes
     useEffect(() => {
@@ -77,24 +82,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         setHasChanges(changed);
     }, [title, content, language, isPrivate, starred, note]);
 
-    // Auto-save debounced (only if autoSave is enabled)
-    useEffect(() => {
-        if (!hasChanges || !settings.autoSave) return;
 
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-        }
-
-        saveTimeoutRef.current = setTimeout(() => {
-            handleSave();
-        }, 2000);
-
-        return () => {
-            if (saveTimeoutRef.current) {
-                clearTimeout(saveTimeoutRef.current);
-            }
-        };
-    }, [content, hasChanges, settings.autoSave]);
 
     const handleSave = useCallback(async () => {
         if (isSaving) return;
@@ -137,6 +125,25 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         }
     }, [note.id, title, content, language, isPrivate, starred, isSaving, updateNote]);
 
+    // Auto-save debounced (only if autoSave is enabled)
+    useEffect(() => {
+        if (!hasChanges || !settings.autoSave) return;
+
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+
+        saveTimeoutRef.current = setTimeout(() => {
+            handleSave();
+        }, 2000);
+
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, [content, hasChanges, settings.autoSave, handleSave]);
+
     const handleDelete = useCallback(async () => {
         try {
             await ensureCsrfToken();
@@ -157,9 +164,38 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         }
     }, [note.id, router, removeNote]);
 
-    const toggleStarred = useCallback(() => {
-        setStarred((prev) => !prev);
-    }, []);
+    const toggleStarred = useCallback(async () => {
+        const newStarred = !starred;
+        setStarred(newStarred);
+
+        // Immediately persist starred state to server
+        try {
+            await ensureCsrfToken();
+            const res = await fetch(`/api/notes/${note.id}`, withCsrfHeader({
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ starred: newStarred }),
+            }));
+
+            if (!res.ok) {
+                // Revert on failure
+                setStarred(!newStarred);
+                throw new Error('Failed to update starred status');
+            }
+
+            const updatedNote = await res.json();
+            // Update the note reference to reflect the server state
+            setNote((prev) => ({ ...prev, starred: updatedNote.starred, updatedAt: updatedNote.updatedAt }));
+
+            // Update sidebar in real-time
+            updateNote(note.id, {
+                starred: updatedNote.starred,
+                updatedAt: updatedNote.updatedAt,
+            });
+        } catch {
+            toast.error('Failed to update starred status');
+        }
+    }, [starred, note.id, updateNote]);
 
     const togglePrivate = useCallback(() => {
         setIsPrivate((prev) => !prev);
@@ -309,7 +345,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
                                     className="h-8 w-8"
                                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                                 >
-                                    {theme === 'dark' ? (
+                                    {mounted && theme === 'dark' ? (
                                         <Sun className="h-4 w-4" />
                                     ) : (
                                         <Moon className="h-4 w-4" />
