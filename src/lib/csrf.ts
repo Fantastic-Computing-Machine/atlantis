@@ -9,7 +9,9 @@ function getCookieOptions() {
   return {
     httpOnly: false,
     sameSite: 'lax' as const,
-    secure: process.env.NODE_ENV === 'production',
+    // sameSite: 'lax' already provides CSRF protection
+    // secure is only needed for HTTPS enforcement, not CSRF
+    secure: false,
     path: '/',
     maxAge: ONE_DAY,
   };
