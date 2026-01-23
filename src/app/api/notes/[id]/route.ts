@@ -2,6 +2,7 @@ import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { getNoteById, updateNoteById, deleteNoteById } from '@/lib/notes-data';
 import { logApiError } from '@/lib/logger';
 import { noteUpdateSchema } from '@/lib/schemas';
+import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS } from '@/lib/cache';
 import { NextResponse } from 'next/server';
 
 const PRIVATE_CONTENT_MESSAGE = 'Content policy in effect.';
@@ -12,6 +13,16 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
+        const cache = getCache();
+        const cacheKey = CacheKeys.note(id);
+
+        // Try cache first
+        const cached = await cache.get<{ private?: boolean }>(cacheKey);
+        if (cached) {
+            // Return cached (already handles private)
+            return NextResponse.json(cached);
+        }
+
         const note = await getNoteById(id);
 
         if (!note) {
@@ -20,7 +31,7 @@ export async function GET(
 
         // If private, hide content
         if (note.private) {
-            return NextResponse.json({
+            const privateNote = {
                 id: note.id,
                 title: note.title,
                 content: PRIVATE_CONTENT_MESSAGE,
@@ -29,9 +40,14 @@ export async function GET(
                 private: note.private,
                 createdAt: note.createdAt,
                 updatedAt: note.updatedAt,
-            });
+            };
+            // Cache the private version
+            await cache.set(cacheKey, privateNote, DEFAULT_TTL_MS);
+            return NextResponse.json(privateNote);
         }
 
+        // Cache the full note
+        await cache.set(cacheKey, note, DEFAULT_TTL_MS);
         return NextResponse.json(note);
     } catch (error) {
         logApiError('GET /api/notes/[id]', error);
@@ -71,6 +87,11 @@ export async function PATCH(
             return NextResponse.json({ error: 'Note not found' }, { status: 404 });
         }
 
+        // Invalidate cache
+        const cache = getCache();
+        await cache.delete(CacheKeys.note(id));
+        await cache.deletePrefix(CachePrefixes.notesList);
+
         return NextResponse.json(updatedNote);
     } catch (error) {
         logApiError('PATCH /api/notes/[id]', error);
@@ -93,6 +114,11 @@ export async function DELETE(
         if (!deleted) {
             return NextResponse.json({ error: 'Note not found' }, { status: 404 });
         }
+
+        // Invalidate cache
+        const cache = getCache();
+        await cache.delete(CacheKeys.note(id));
+        await cache.deletePrefix(CachePrefixes.notesList);
 
         return NextResponse.json({ success: true });
     } catch (error) {

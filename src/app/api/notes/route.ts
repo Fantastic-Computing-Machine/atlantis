@@ -2,6 +2,7 @@ import { ensureCsrfCookie, csrfFailureResponse, validateCsrfToken } from '@/lib/
 import { createNote, getNotePage } from '@/lib/notes-data';
 import { logApiError } from '@/lib/logger';
 import { noteCreateSchema } from '@/lib/schemas';
+import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS } from '@/lib/cache';
 import { NextResponse } from 'next/server';
 
 const DEFAULT_LIMIT = 24;
@@ -18,6 +19,20 @@ export async function GET(request: Request) {
 
         const limitNumber = limit ? Number.parseInt(limit, 10) : DEFAULT_LIMIT;
         const offsetNumber = offset ? Number.parseInt(offset, 10) : 0;
+
+        // Try cache first (only for non-search, non-starred requests)
+        if (!query && !starredOnly) {
+            const cache = getCache();
+            const cacheKey = CacheKeys.noteList(sort, offsetNumber, limitNumber);
+            const cached = await cache.get(cacheKey);
+            if (cached) {
+                return NextResponse.json(cached);
+            }
+
+            const page = await getNotePage({ limit: limitNumber, offset: offsetNumber, query, sort, starredOnly });
+            await cache.set(cacheKey, page, DEFAULT_TTL_MS);
+            return NextResponse.json(page);
+        }
 
         const page = await getNotePage({ limit: limitNumber, offset: offsetNumber, query, sort, starredOnly });
         return NextResponse.json(page);
@@ -48,6 +63,10 @@ export async function POST(request: Request) {
             content: result.data.content,
             language: result.data.language,
         });
+
+        // Invalidate list cache on create
+        const cache = getCache();
+        await cache.deletePrefix(CachePrefixes.notesList);
 
         // Return metadata only (without content for consistency)
         return NextResponse.json({

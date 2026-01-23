@@ -39,6 +39,7 @@ import {
   XCircle,
   Workflow,
   Snowflake,
+  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -127,6 +128,31 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadDbStatus();
+  }, []);
+
+  // Cache Status
+  const [cacheStatus, setCacheStatus] = useState<{
+    enabled: boolean;
+    backend: 'redis' | 'memory' | null;
+    connected: boolean;
+  }>({
+    enabled: false,
+    backend: null,
+    connected: false,
+  });
+
+  const loadCacheStatus = async () => {
+    try {
+      const res = await fetch('/api/settings/cache-status');
+      const data = await res.json();
+      setCacheStatus(data);
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => {
+    loadCacheStatus();
   }, []);
 
   // Load stats on mount
@@ -460,6 +486,58 @@ export default function SettingsPage() {
                 size="sm"
                 onClick={loadDbStatus}
                 disabled={dbStatus.status === 'loading'}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Re-check
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Cache Status */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Zap className="text-primary h-5 w-5" />
+              <CardTitle>Cache</CardTitle>
+            </div>
+            <CardDescription>Performance acceleration status.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Backend</p>
+                <p className="text-muted-foreground text-sm capitalize">
+                  {cacheStatus.backend || 'Loading...'}
+                </p>
+              </div>
+              <span
+                className={cn(
+                  'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold',
+                  cacheStatus.connected
+                    ? 'border-emerald-200 bg-emerald-500/10 text-emerald-600 dark:border-emerald-800 dark:text-emerald-300'
+                    : 'border-yellow-200 bg-yellow-500/10 text-yellow-600 dark:border-yellow-800 dark:text-yellow-300'
+                )}
+              >
+                {cacheStatus.connected ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4" />
+                )}
+                {cacheStatus.connected ? 'Active' : 'Fallback'}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 text-sm">
+              <div className="border-muted-foreground/30 bg-muted/30 rounded-md border border-dashed px-3 py-2">
+                <p className="text-muted-foreground text-xs">Enabled</p>
+                <p className="font-medium">{cacheStatus.enabled ? 'Yes' : 'No'}</p>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadCacheStatus}
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Re-check
