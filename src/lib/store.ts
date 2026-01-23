@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS = {
   autoSaveDelay: 2000,
   defaultExportFormat: 'svg' as const,
   exportScale: 2 as const,
+  snowMode: false,
 };
 
 export const useDiagramStore = create<DiagramStore>()(
@@ -81,6 +82,10 @@ export const useDiagramStore = create<DiagramStore>()(
       setExportScale: (scale) =>
         set((state) => ({
           settings: { ...state.settings, exportScale: scale },
+        })),
+      setSnowMode: (enabled) =>
+        set((state) => ({
+          settings: { ...state.settings, snowMode: enabled },
         })),
     }),
     {

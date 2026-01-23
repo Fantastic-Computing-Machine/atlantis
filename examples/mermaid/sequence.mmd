@@ -1,0 +1,22 @@
+sequenceDiagram
+  participant User
+  participant UI as Web UI
+  participant API as API Gateway
+  participant Auth as Auth Service
+  participant Svc as Feature Service
+  participant DB as Primary DB
+  participant Cache as Redis Cache
+
+  User->>UI: Submit action
+  UI->>API: POST /feature (payload)
+  API->>Auth: Validate token
+  Auth-->>API: Token OK
+  API->>Cache: Check recent result
+  Cache-->>API: Miss
+  API->>Svc: Process request
+  Svc->>DB: Read/write
+  DB-->>Svc: Result
+  Svc-->>API: Response
+  API->>Cache: Write short TTL
+  API-->>UI: 200 OK (data)
+  UI-->>User: Render update

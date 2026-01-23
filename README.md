@@ -1,10 +1,18 @@
-[![Build and Publish Docker Image](https://github.com/Fantastic-Computing-Machine/atlantis/actions/workflows/docker-publish.yml/badge.svg?branch=master)](https://github.com/Fantastic-Computing-Machine/atlantis/actions/workflows/docker-publish.yml)
-
 # 🔱 atlantis
 
 A premium, self-hosted Mermaid.js diagramming application built with Next.js, Tailwind CSS, and Shadcn UI.
 
 ![Atlantis Preview](/public/preview.png)
+
+---
+
+[![Build and Publish Docker Image](https://github.com/Fantastic-Computing-Machine/atlantis/actions/workflows/docker-publish.yml/badge.svg?branch=master)](https://github.com/Fantastic-Computing-Machine/atlantis/actions/workflows/docker-publish.yml)
+[![Docker Pulls](https://img.shields.io/docker/pulls/strikead/atlantis)](https://hub.docker.com/r/strikead/atlantis)
+[![Docker Image Size](https://img.shields.io/docker/image-size/strikead/atlantis/latest)](https://hub.docker.com/r/strikead/atlantis)
+
+[![GitHub Issues](https://img.shields.io/github/issues/Fantastic-Computing-Machine/atlantis)](https://github.com/Fantastic-Computing-Machine/atlantis/issues)
+[![Last Commit](https://img.shields.io/github/last-commit/Fantastic-Computing-Machine/atlantis)](https://github.com/Fantastic-Computing-Machine/atlantis/commits/master)
+[![Repo Views](https://visitor-badge.laobi.icu/badge?page_id=Fantastic-Computing-Machine.atlantis)](https://github.com/Fantastic-Computing-Machine/atlantis)
 
 ## Features
 
