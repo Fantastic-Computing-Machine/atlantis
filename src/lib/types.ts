@@ -56,6 +56,8 @@ export interface AppSettings {
   defaultExportFormat?: 'svg' | 'png' | 'pdf';
   exportScale?: 1 | 2 | 3;
   snowMode?: boolean;
+  liveSync?: boolean;
+  liveSyncInterval?: number;
 }
 
 export interface DiagramStore {
@@ -78,4 +80,6 @@ export interface DiagramStore {
   setDefaultExportFormat: (format: AppSettings['defaultExportFormat']) => void;
   setExportScale: (scale: AppSettings['exportScale']) => void;
   setSnowMode: (enabled: boolean) => void;
+  setLiveSync: (enabled: boolean) => void;
+  setLiveSyncInterval: (ms: number) => void;
 }

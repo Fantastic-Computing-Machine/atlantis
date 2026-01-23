@@ -55,6 +55,8 @@ export default function SettingsPage() {
     setDefaultExportFormat,
     setExportScale,
     setSnowMode,
+    setLiveSync,
+    setLiveSyncInterval,
   } = useDiagramStore();
 
   // AI Settings state
@@ -750,6 +752,43 @@ export default function SettingsPage() {
                 <option value={2000}>2 seconds</option>
                 <option value={5000}>5 seconds</option>
                 <option value={10000}>10 seconds</option>
+              </select>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Live Sync</p>
+                <p className="text-muted-foreground text-sm">
+                  Automatically sync changes from other users.
+                </p>
+              </div>
+              <Switch
+                checked={settings.liveSync ?? true}
+                onCheckedChange={(checked) => {
+                  setLiveSync(checked);
+                  toast.success(checked ? 'Live sync enabled' : 'Live sync disabled');
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">Sync Interval</p>
+                <p className="text-muted-foreground text-sm">
+                  How often to check for updates from others.
+                </p>
+              </div>
+              <select
+                className="border-input bg-background h-9 w-32 rounded-md border px-3 text-sm"
+                value={settings.liveSyncInterval ?? 5000}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setLiveSyncInterval(val);
+                  toast.success('Sync interval updated');
+                }}
+              >
+                <option value={3000}>3 seconds</option>
+                <option value={5000}>5 seconds</option>
+                <option value={10000}>10 seconds</option>
+                <option value={30000}>30 seconds</option>
               </select>
             </div>
           </CardContent>

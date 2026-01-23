@@ -36,6 +36,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
 import { Diagram, SortOption } from '@/lib/types';
+import { useListSync } from '@/lib/useListSync';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
 
@@ -76,6 +77,21 @@ export function DiagramGrid({
   const router = useRouter();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Live sync: poll for diagram property changes and new items
+  useListSync<Diagram>({
+    listUrl: `/api/diagrams?limit=24&offset=0&sort=${sortMode}`,
+    currentItems: diagrams,
+    enabled: Boolean(settings.liveSync),
+    intervalMs: (settings.liveSyncInterval ?? 5000) * 2, // Poll lists less frequently
+    onUpdate: (serverItems, newTotal) => {
+      setDiagrams(serverItems);
+      setTotal(newTotal);
+    },
+    onListChanged: () => {
+      toast.info('Diagram list updated');
+    },
+  });
 
   useEffect(() => {
     setDiagrams(initialDiagrams);

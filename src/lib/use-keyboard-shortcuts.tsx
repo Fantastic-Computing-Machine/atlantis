@@ -50,8 +50,8 @@ export function GlobalShortcutsProvider({ children }: GlobalShortcutsProviderPro
     const shortcuts: ShortcutDefinition[] = useMemo(() => [
         {
             id: 'open-palette',
-            key: '/',
-            modifiers: ['ctrl'],
+            key: 'p',
+            modifiers: ['ctrl', 'shift'],
             description: 'Open shortcut palette',
             category: 'general',
             action: () => setPaletteOpen(true),
@@ -147,6 +147,9 @@ export function GlobalShortcutsProvider({ children }: GlobalShortcutsProviderPro
             const target = event.target as HTMLElement;
             const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
+            // Detect if user is inside a CodeMirror editor
+            const isInCodeMirror = target.closest('.cm-editor') !== null;
+
             const isCtrl = event.metaKey || event.ctrlKey;
             const isShift = event.shiftKey;
             const isAlt = event.altKey;
@@ -162,7 +165,12 @@ export function GlobalShortcutsProvider({ children }: GlobalShortcutsProviderPro
                 const keyMatch = event.key.toLowerCase() === shortcut.key.toLowerCase();
 
                 if (keyMatch && ctrlMatch && shiftMatch && altMatch) {
-                    // Allow palette shortcut even in inputs
+                    // Skip shortcuts inside CodeMirror that conflict with editor keybindings
+                    // Editor shortcuts like Ctrl+/, Ctrl+D, etc. should not be intercepted
+                    if (isInCodeMirror && shortcut.id !== 'open-palette') {
+                        return; // Let CodeMirror handle it
+                    }
+                    // Allow palette shortcut even in inputs (but CodeMirror check above still applies)
                     if (shortcut.id === 'open-palette' || !isInput) {
                         event.preventDefault();
                         shortcut.action();

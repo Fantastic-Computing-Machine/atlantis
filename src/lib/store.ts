@@ -12,6 +12,8 @@ const DEFAULT_SETTINGS = {
   defaultExportFormat: 'svg' as const,
   exportScale: 2 as const,
   snowMode: false,
+  liveSync: true,
+  liveSyncInterval: 5000,
 };
 
 export const useDiagramStore = create<DiagramStore>()(
@@ -86,6 +88,14 @@ export const useDiagramStore = create<DiagramStore>()(
       setSnowMode: (enabled) =>
         set((state) => ({
           settings: { ...state.settings, snowMode: enabled },
+        })),
+      setLiveSync: (enabled) =>
+        set((state) => ({
+          settings: { ...state.settings, liveSync: enabled },
+        })),
+      setLiveSyncInterval: (ms) =>
+        set((state) => ({
+          settings: { ...state.settings, liveSyncInterval: ms },
         })),
     }),
     {

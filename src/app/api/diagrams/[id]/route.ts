@@ -1,9 +1,27 @@
 import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
-import { deleteDiagramById, updateDiagramById } from '@/lib/data';
+import { deleteDiagramById, getDiagramById, updateDiagramById } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { diagramSchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
 
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const diagram = await getDiagramById(id);
+
+    if (!diagram) {
+      return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(diagram);
+  } catch (error) {
+    logApiError('GET /api/diagrams/[id]', error);
+    return NextResponse.json({ error: 'Failed to load diagram' }, { status: 500 });
+  }
+}
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

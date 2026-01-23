@@ -8,8 +8,22 @@ export const dynamic = 'force-dynamic';
 export async function generateMetadata({ params }: PageProps) {
     const { id } = await params;
     const diagram = await getDiagramById(id);
+    if (!diagram) {
+        return {
+            title: 'Diagram Not Found // Atlantis',
+        };
+    }
     return {
-        title: diagram ? `${diagram.title} // Diagrams` : 'Diagram Not Found // Atlantis',
+        title: 'atlantis // diagram',
+        description: diagram.title,
+        openGraph: {
+            title: 'atlantis // diagram',
+            description: diagram.title,
+        },
+        twitter: {
+            title: 'atlantis // diagram',
+            description: diagram.title,
+        },
     };
 }
 

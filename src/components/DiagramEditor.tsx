@@ -36,6 +36,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
 import { Checkpoint, Diagram } from '@/lib/types';
+import { useLiveSync } from '@/lib/useLiveSync';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { copyToClipboard, formatDate, cn } from '@/lib/utils';
 import { History, Info, Moon, Save, Search, Share2, Star, Sun, Menu, Settings2, Trash2 } from 'lucide-react';
@@ -261,6 +262,30 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [activePane, setActivePane] = useState<'editor' | 'preview'>('preview');
 
+  // Track if user has unsaved local changes (for live sync conflict detection)
+  const hasLocalChanges = diagram.content !== lastSavedContentRef.current ||
+    diagram.title !== lastSavedTitleRef.current ||
+    diagram.description !== lastSavedDescriptionRef.current;
+
+  // Live sync: poll for external changes from other users
+  const { refresh: syncFromServer } = useLiveSync<Diagram>({
+    resourceUrl: `/api/diagrams/${diagram.id}`,
+    currentUpdatedAt: diagram.updatedAt,
+    hasLocalChanges,
+    enabled: Boolean(settings.liveSync) && mounted,
+    intervalMs: settings.liveSyncInterval ?? 5000,
+    onUpdate: (remoteDiagram) => {
+      setDiagram(remoteDiagram);
+      lastSavedContentRef.current = remoteDiagram.content;
+      lastSavedTitleRef.current = remoteDiagram.title;
+      lastSavedDescriptionRef.current = remoteDiagram.description;
+      updateDiagram(diagram.id, remoteDiagram);
+    },
+    onExternalChange: () => {
+      toast.info('Document updated by another user');
+    },
+  });
+
   // Prevent hydration mismatch by only rendering client-dependent UI after mount
   useEffect(() => {
     setMounted(true);
@@ -376,10 +401,12 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
       if (showToast) {
         toast.success('Changes saved');
       }
+      // Sync from server after save to pull any concurrent changes
+      syncFromServer();
     } catch {
       toast.error('Failed to save changes');
     }
-  }, [diagram, updateDiagram]);
+  }, [diagram, updateDiagram, syncFromServer]);
 
   // Ctrl+S to save
   useEffect(() => {
