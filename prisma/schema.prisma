@@ -7,7 +7,7 @@ generator client {
 // Supported providers: postgresql, mysql, sqlite
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Diagram {

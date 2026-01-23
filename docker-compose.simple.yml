@@ -1,3 +1,7 @@
+# Simple Docker Compose (without Redis)
+# Use this if you don't need caching or want a simpler setup
+# The application will use in-memory caching instead
+
 services:
   atlantis:
     image: strikead/atlantis:latest
@@ -15,13 +19,9 @@ services:
       - NODE_ENV=production
       # Set to 'true' to enable the external API
       - ENABLE_API_ACCESS=${ENABLE_API_ACCESS:-false}
-      # Redis connection for caching (optional - uses in-memory if not set)
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
       # Database connection (optional - uses SQLite if not set)
       - DATABASE_URL=${DATABASE_URL:-}
-    depends_on:
-      redis:
-        condition: service_healthy
+      # No REDIS_URL - uses in-memory caching
     healthcheck:
       test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/" ]
       interval: 30s
@@ -29,23 +29,6 @@ services:
       retries: 3
       start_period: 10s
 
-  redis:
-    image: redis:7-alpine
-    container_name: atlantis-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
 volumes:
   atlantis_data:
-    driver: local
-  redis_data:
     driver: local

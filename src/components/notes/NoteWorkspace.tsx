@@ -27,6 +27,7 @@ import type { Note } from '@/lib/types';
 import { ensureCsrfToken, withCsrfHeader } from '@/lib/csrf-client';
 import { cn } from '@/lib/utils';
 import { useDiagramStore } from '@/lib/store';
+import { useLiveSync } from '@/lib/useLiveSync';
 import { useNotes } from '@/components/notes/NotesContext';
 import { ArrowLeft, Star, Trash2, ChevronDown, Save, Download, Plus, Moon, Sun, MoreVertical } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -70,6 +71,34 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Live sync: poll for external changes from other users
+    const { refresh: syncFromServer } = useLiveSync<Note>({
+        resourceUrl: `/api/notes/${note.id}`,
+        currentUpdatedAt: note.updatedAt,
+        hasLocalChanges: hasChanges,
+        enabled: Boolean(settings.liveSync) && mounted && !note.private,
+        intervalMs: settings.liveSyncInterval ?? 5000,
+        onUpdate: (remoteNote) => {
+            setNote(remoteNote);
+            setTitle(remoteNote.title);
+            setContent(remoteNote.content);
+            setLanguage(remoteNote.language);
+            setIsPrivate(remoteNote.private);
+            setStarred(remoteNote.starred);
+            setHasChanges(false);
+            updateNote(note.id, {
+                title: remoteNote.title,
+                language: remoteNote.language,
+                starred: remoteNote.starred,
+                private: remoteNote.private,
+                updatedAt: remoteNote.updatedAt,
+            });
+        },
+        onExternalChange: () => {
+            toast.info('Note updated by another user');
+        },
+    });
 
     // Track changes
     useEffect(() => {
@@ -118,12 +147,14 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
                 private: updatedNote.private,
                 updatedAt: updatedNote.updatedAt,
             });
+            // Sync from server after save to pull any concurrent changes
+            syncFromServer();
         } catch {
             toast.error('Failed to save note');
         } finally {
             setIsSaving(false);
         }
-    }, [note.id, title, content, language, isPrivate, starred, isSaving, updateNote]);
+    }, [note.id, title, content, language, isPrivate, starred, isSaving, updateNote, syncFromServer]);
 
     // Auto-save debounced (only if autoSave is enabled)
     useEffect(() => {
@@ -143,6 +174,18 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
             }
         };
     }, [content, hasChanges, settings.autoSave, handleSave]);
+
+    // Ctrl+S to save
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                handleSave();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleSave]);
 
     const handleDelete = useCallback(async () => {
         try {
