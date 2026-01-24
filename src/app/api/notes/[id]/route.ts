@@ -2,17 +2,43 @@ import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { getNoteById, updateNoteById, deleteNoteById } from '@/lib/notes-data';
 import { logApiError } from '@/lib/logger';
 import { noteUpdateSchema } from '@/lib/schemas';
-import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS } from '@/lib/cache';
+import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS, withCacheHeader, type CacheStatus } from '@/lib/cache';
 import { NextResponse } from 'next/server';
 
 const PRIVATE_CONTENT_MESSAGE = 'Content policy in effect.';
 
 export async function GET(
-    _request: Request,
+    request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
+        const url = new URL(request.url);
+        const fresh = url.searchParams.get('fresh') === 'true';
+
+        // Bypass cache if fresh=true (live sync polling)
+        if (fresh) {
+            const note = await getNoteById(id);
+            if (!note) {
+                return NextResponse.json({ error: 'Note not found' }, { status: 404 });
+            }
+            // If private, hide content
+            if (note.private) {
+                const privateNote = {
+                    id: note.id,
+                    title: note.title,
+                    content: PRIVATE_CONTENT_MESSAGE,
+                    language: note.language,
+                    starred: note.starred,
+                    private: note.private,
+                    createdAt: note.createdAt,
+                    updatedAt: note.updatedAt,
+                };
+                return withCacheHeader(NextResponse.json(privateNote), 'BYPASS');
+            }
+            return withCacheHeader(NextResponse.json(note), 'BYPASS');
+        }
+
         const cache = getCache();
         const cacheKey = CacheKeys.note(id);
 
@@ -20,7 +46,7 @@ export async function GET(
         const cached = await cache.get<{ private?: boolean }>(cacheKey);
         if (cached) {
             // Return cached (already handles private)
-            return NextResponse.json(cached);
+            return withCacheHeader(NextResponse.json(cached), 'HIT');
         }
 
         const note = await getNoteById(id);
@@ -43,12 +69,12 @@ export async function GET(
             };
             // Cache the private version
             await cache.set(cacheKey, privateNote, DEFAULT_TTL_MS);
-            return NextResponse.json(privateNote);
+            return withCacheHeader(NextResponse.json(privateNote), 'MISS');
         }
 
         // Cache the full note
         await cache.set(cacheKey, note, DEFAULT_TTL_MS);
-        return NextResponse.json(note);
+        return withCacheHeader(NextResponse.json(note), 'MISS');
     } catch (error) {
         logApiError('GET /api/notes/[id]', error);
         return NextResponse.json({ error: 'Failed to load note' }, { status: 500 });

@@ -55,7 +55,10 @@ export function useLiveSync<T extends { updatedAt: string }>({
         isSyncingRef.current = true;
 
         try {
-            const res = await fetch(resourceUrl);
+            // Append fresh=true to bypass server-side cache during polling
+            const separator = resourceUrl.includes('?') ? '&' : '?';
+            const freshUrl = `${resourceUrl}${separator}fresh=true`;
+            const res = await fetch(freshUrl);
             if (!res.ok) return;
 
             const data = (await res.json()) as T;

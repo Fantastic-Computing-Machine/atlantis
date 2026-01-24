@@ -57,7 +57,10 @@ export function useListSync<T extends ListItem>({
         isSyncingRef.current = true;
 
         try {
-            const res = await fetch(listUrl);
+            // Append fresh=true to bypass server-side cache during polling
+            const separator = listUrl.includes('?') ? '&' : '?';
+            const freshUrl = `${listUrl}${separator}fresh=true`;
+            const res = await fetch(freshUrl);
             if (!res.ok) return;
 
             const data = await res.json();

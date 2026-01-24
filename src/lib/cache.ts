@@ -16,6 +16,8 @@ interface CacheProvider {
     deletePrefix(prefix: string): Promise<void>;
     isConnected(): boolean;
     getBackend(): 'redis' | 'memory';
+    /** Ping to verify connectivity - returns latency in ms or -1 if failed */
+    ping(): Promise<number>;
 }
 
 // ============================================================================
@@ -78,6 +80,11 @@ class InMemoryCache implements CacheProvider {
 
     getBackend(): 'memory' {
         return 'memory';
+    }
+
+    async ping(): Promise<number> {
+        // In-memory is always instant
+        return 0;
     }
 
     destroy(): void {
@@ -190,6 +197,18 @@ class RedisCache implements CacheProvider {
         return 'redis';
     }
 
+    async ping(): Promise<number> {
+        if (!(await this.ensureConnected()) || !this.client) return -1;
+        try {
+            const start = Date.now();
+            await this.client.ping();
+            return Date.now() - start;
+        } catch (error) {
+            console.error('[Cache] Redis ping error:', error);
+            return -1;
+        }
+    }
+
     async destroy(): Promise<void> {
         if (this.client) {
             await this.client.quit();
@@ -246,6 +265,26 @@ export function getCacheStatus(): { enabled: boolean; backend: 'redis' | 'memory
         backend: cache.getBackend(),
         connected: cache.isConnected(),
     };
+}
+
+/**
+ * Ping the cache to verify connectivity
+ * @returns latency in ms, or -1 if failed
+ */
+export async function pingCache(): Promise<number> {
+    const cache = getCache();
+    return cache.ping();
+}
+
+/** Cache status for response headers */
+export type CacheStatus = 'HIT' | 'MISS' | 'BYPASS';
+
+/**
+ * Helper to add cache status header to response
+ */
+export function withCacheHeader(response: Response, status: CacheStatus): Response {
+    response.headers.set('X-Cache-Status', status);
+    return response;
 }
 
 // ============================================================================
