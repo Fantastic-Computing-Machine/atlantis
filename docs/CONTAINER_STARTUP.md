@@ -45,7 +45,20 @@ services:
       - "3000:3000"
     volumes:
       - ./data:/app/data
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
     restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
 ```
 
 ### Building Your Own Image
@@ -77,7 +90,10 @@ PORT=8080 ATLANTIS_DATA_DIR=./my-data docker compose up -d
 | `PORT` | `3000` | The port the application will listen on. |
 | `PRISMA_PROVIDER` | `sqlite` | Database provider (`sqlite`, `postgresql`, `mysql`). |
 | `DATABASE_URL` / `DB_CONNECTION` | `file:./data/atlantis.db` | Connection string; defaults to local SQLite file. |
+| `REDIS_URL` | None | Connection string for Redis cache (e.g. `redis://redis:6379`). |
+| `AI_API_KEY` | None | API Key for AI features (OpenAI/Gemini). |
 | `PRISMA_AUTO_APPLY` | `true` (non-prod), `false` (prod) | Auto-runs `prisma db push` on server start to ensure schema exists. |
+| `PRISMA_SKIP_AUTOPUSH` | `false` | Set to `true` to skip all db push/seed operations. |
 | `ENABLE_API_ACCESS` | `false` | Set to `true` to enable the REST API and /docs. |
 
 ## Versioning
