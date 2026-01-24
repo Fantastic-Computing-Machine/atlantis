@@ -3,7 +3,7 @@ import { prisma } from './prisma';
 import { Checkpoint, Diagram, DiagramPage } from './types';
 import { generateShortId, getRandomEmoji } from './utils';
 
-import { buildSearchVector } from '../../scripts/searchVector';
+import { buildSearchVector, stripStopWords } from './search';
 
 const DEFAULT_PAGE_SIZE = 24;
 const MAX_PAGE_SIZE = 100;
@@ -103,7 +103,7 @@ export async function getDiagramPage({
 
   const where: Prisma.DiagramWhereInput = {};
   if (query?.trim()) {
-    where.searchVector = { contains: query.trim().toLowerCase() };
+    where.searchVector = { contains: stripStopWords(query.trim()) };
   }
   if (favoritesOnly) {
     where.isFavorite = true;

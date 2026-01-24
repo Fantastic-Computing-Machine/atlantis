@@ -15,7 +15,43 @@ interface CacheProvider {
     delete(key: string): Promise<void>;
     deletePrefix(prefix: string): Promise<void>;
     isConnected(): boolean;
-    getBackend(): 'redis' | 'memory';
+    getBackend(): 'redis' | 'memory' | 'noop';
+    /** Ping to verify connectivity - returns latency in ms or -1 if failed */
+    ping(): Promise<number>;
+}
+
+// ============================================================================
+// NoOp Cache Implementation (Disabled Caching)
+// ============================================================================
+
+class NoOpCache implements CacheProvider {
+    async get<T>(key: string): Promise<T | null> {
+        return null;
+    }
+
+    async set<T>(key: string, value: T, ttlMs: number): Promise<void> {
+        // No-op
+    }
+
+    async delete(key: string): Promise<void> {
+        // No-op
+    }
+
+    async deletePrefix(prefix: string): Promise<void> {
+        // No-op
+    }
+
+    isConnected(): boolean {
+        return true;
+    }
+
+    getBackend(): 'noop' {
+        return 'noop';
+    }
+
+    async ping(): Promise<number> {
+        return 0;
+    }
 }
 
 // ============================================================================
@@ -78,6 +114,11 @@ class InMemoryCache implements CacheProvider {
 
     getBackend(): 'memory' {
         return 'memory';
+    }
+
+    async ping(): Promise<number> {
+        // In-memory is always instant
+        return 0;
     }
 
     destroy(): void {
@@ -190,6 +231,18 @@ class RedisCache implements CacheProvider {
         return 'redis';
     }
 
+    async ping(): Promise<number> {
+        if (!(await this.ensureConnected()) || !this.client) return -1;
+        try {
+            const start = Date.now();
+            await this.client.ping();
+            return Date.now() - start;
+        } catch (error) {
+            console.error('[Cache] Redis ping error:', error);
+            return -1;
+        }
+    }
+
     async destroy(): Promise<void> {
         if (this.client) {
             await this.client.quit();
@@ -215,6 +268,11 @@ function createCache(): CacheProvider {
         return new RedisCache(redisUrl);
     }
 
+    if (process.env.NODE_ENV === 'production') {
+        console.log('[Cache] Production mode without Redis - Caching DISABLED for safety');
+        return new NoOpCache();
+    }
+
     console.log('[Cache] Initializing in-memory cache');
     return new InMemoryCache();
 }
@@ -233,19 +291,39 @@ export function getCache(): CacheProvider {
  * Check if caching is enabled (Redis URL is configured)
  */
 export function isCacheEnabled(): boolean {
-    return Boolean(process.env.REDIS_URL) || true; // In-memory is always available
+    return Boolean(process.env.REDIS_URL) || process.env.NODE_ENV !== 'production';
 }
 
 /**
  * Get cache status for settings page
  */
-export function getCacheStatus(): { enabled: boolean; backend: 'redis' | 'memory'; connected: boolean } {
+export function getCacheStatus(): { enabled: boolean; backend: 'redis' | 'memory' | 'noop'; connected: boolean } {
     const cache = getCache();
     return {
         enabled: true,
         backend: cache.getBackend(),
         connected: cache.isConnected(),
     };
+}
+
+/**
+ * Ping the cache to verify connectivity
+ * @returns latency in ms, or -1 if failed
+ */
+export async function pingCache(): Promise<number> {
+    const cache = getCache();
+    return cache.ping();
+}
+
+/** Cache status for response headers */
+export type CacheStatus = 'HIT' | 'MISS' | 'BYPASS';
+
+/**
+ * Helper to add cache status header to response
+ */
+export function withCacheHeader(response: Response, status: CacheStatus): Response {
+    response.headers.set('X-Cache-Status', status);
+    return response;
 }
 
 // ============================================================================

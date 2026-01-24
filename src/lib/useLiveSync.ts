@@ -44,6 +44,14 @@ export function useLiveSync<T extends { updatedAt: string }>({
 }: UseLiveSyncOptions<T>): UseLiveSyncResult {
     const isSyncingRef = useRef(false);
     const currentUpdatedAtRef = useRef(currentUpdatedAt);
+    const isMountedRef = useRef(false);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
 
     // Keep ref in sync with prop
     useEffect(() => {
@@ -51,14 +59,19 @@ export function useLiveSync<T extends { updatedAt: string }>({
     }, [currentUpdatedAt]);
 
     const refresh = useCallback(async () => {
-        if (isSyncingRef.current) return;
+        if (isSyncingRef.current || !isMountedRef.current) return;
         isSyncingRef.current = true;
 
         try {
-            const res = await fetch(resourceUrl);
+            // Append fresh=true to bypass server-side cache during polling
+            const separator = resourceUrl.includes('?') ? '&' : '?';
+            const freshUrl = `${resourceUrl}${separator}fresh=true`;
+            const res = await fetch(freshUrl);
             if (!res.ok) return;
 
             const data = (await res.json()) as T;
+
+            if (!isMountedRef.current) return;
 
             // Check if server has newer version
             if (data.updatedAt !== currentUpdatedAtRef.current) {
@@ -68,7 +81,9 @@ export function useLiveSync<T extends { updatedAt: string }>({
         } catch {
             // Silently ignore sync errors to avoid spamming the user
         } finally {
-            isSyncingRef.current = false;
+            if (isMountedRef.current) {
+                isSyncingRef.current = false;
+            }
         }
     }, [resourceUrl, onUpdate, onExternalChange]);
 

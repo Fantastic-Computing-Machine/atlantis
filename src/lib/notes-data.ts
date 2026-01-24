@@ -46,8 +46,10 @@ function toNoteListItem(row: NoteRow): Omit<Note, 'content'> {
     };
 }
 
+import { buildSearchVector } from './search';
+
 function buildNoteSearchVector(title: string, content: string): string {
-    return `${title} ${content}`.toLowerCase();
+    return buildSearchVector(title, undefined, content);
 }
 
 function validateNoteLengths(title?: string) {
@@ -85,7 +87,11 @@ export async function getNotePage({
     const where: Prisma.NoteWhereInput = {};
 
     if (query?.trim()) {
-        where.searchVector = { contains: query.trim().toLowerCase() };
+        const cleanQuery = query.trim().toLowerCase();
+        // If we stripped stop words from the vector, we should generally search for key terms.
+        // However, precise phrase match becomes impossible.
+        // For now, let's simple-search.
+        where.searchVector = { contains: cleanQuery };
     }
     if (starredOnly) {
         where.starred = true;

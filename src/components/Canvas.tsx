@@ -35,14 +35,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { toast } from 'sonner';
 
-const TransformWrapper = dynamic(
-  () => import('react-zoom-pan-pinch').then((mod) => mod.TransformWrapper),
-  { ssr: false }
-);
-const TransformComponent = dynamic(
-  () => import('react-zoom-pan-pinch').then((mod) => mod.TransformComponent),
-  { ssr: false }
-);
+import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch';
 
 interface CanvasProps {
   code: string;

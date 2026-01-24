@@ -2,7 +2,7 @@ import { ensureCsrfCookie, csrfFailureResponse, validateCsrfToken } from '@/lib/
 import { createDiagram, getDiagramPage } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { diagramSchema } from '@/lib/schemas';
-import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS } from '@/lib/cache';
+import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS, withCacheHeader, type CacheStatus } from '@/lib/cache';
 import { NextResponse } from 'next/server';
 
 const DEFAULT_LIMIT = 24;
@@ -15,26 +15,29 @@ export async function GET(request: Request) {
     const offset = url.searchParams.get('offset');
     const query = url.searchParams.get('query') || undefined;
     const sort = (url.searchParams.get('sort') as import('@/lib/types').SortOption) || 'recent';
+    const fresh = url.searchParams.get('fresh') === 'true';
 
     const limitNumber = limit ? Number.parseInt(limit, 10) : DEFAULT_LIMIT;
     const offsetNumber = offset ? Number.parseInt(offset, 10) : 0;
 
-    // Try cache first (only for non-search requests)
-    if (!query) {
-      const cache = getCache();
-      const cacheKey = CacheKeys.diagramList(sort, offsetNumber, limitNumber);
-      const cached = await cache.get(cacheKey);
-      if (cached) {
-        return NextResponse.json(cached);
-      }
-
+    // Bypass cache if fresh=true or if searching
+    if (fresh || query) {
       const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query, sort });
-      await cache.set(cacheKey, page, DEFAULT_TTL_MS);
-      return NextResponse.json(page);
+      const status: CacheStatus = fresh ? 'BYPASS' : 'MISS';
+      return withCacheHeader(NextResponse.json(page), status);
+    }
+
+    // Try cache first (only for non-search requests)
+    const cache = getCache();
+    const cacheKey = CacheKeys.diagramList(sort, offsetNumber, limitNumber);
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      return withCacheHeader(NextResponse.json(cached), 'HIT');
     }
 
     const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query, sort });
-    return NextResponse.json(page);
+    await cache.set(cacheKey, page, DEFAULT_TTL_MS);
+    return withCacheHeader(NextResponse.json(page), 'MISS');
   } catch (error) {
     logApiError('GET /api/diagrams', error);
     return NextResponse.json({ error: 'Failed to load diagrams' }, { status: 500 });
