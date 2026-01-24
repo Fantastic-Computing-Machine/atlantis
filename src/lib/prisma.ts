@@ -17,6 +17,12 @@ function ensureDataDir(url: string) {
   mkdirSync(dir, { recursive: true });
 }
 
+export function resolveProvider(): string {
+  if (process.env.DATABASE_URL?.startsWith('postgres')) return 'postgresql';
+  if (process.env.DB_CONNECTION === 'postgresql') return 'postgresql';
+  return 'sqlite';
+}
+
 function createAdapter(url: string) {
   if (url.startsWith('file:')) {
     ensureDataDir(url);
@@ -33,6 +39,14 @@ export const prisma =
   new PrismaClient({
     adapter: createAdapter(resolveDatabaseUrl()),
   });
+
+// Initialize search indexes if running in a server context (not during build)
+if (process.env.NODE_ENV !== 'test' && typeof window === 'undefined') {
+  // We lazily init this to avoid blocking startup, but import dynamically to avoid cycles if any
+  import('./setup-gin-index').then(({ setupGinIndexes }) => {
+    setupGinIndexes(resolveProvider());
+  }).catch(err => console.error('Failed to init search indexes:', err));
+}
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;

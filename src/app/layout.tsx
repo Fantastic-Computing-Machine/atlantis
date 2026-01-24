@@ -13,6 +13,7 @@ const inter = { className: 'font-sans' };
 export const metadata: Metadata = {
   title: 'atlantis',
   description: 'Self-hosted diagrams and notes platform',
+  metadataBase: new URL(process.env.APP_URL || 'http://localhost:3000'),
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔱</text></svg>",
   },

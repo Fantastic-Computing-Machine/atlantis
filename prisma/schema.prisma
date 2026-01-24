@@ -23,7 +23,7 @@ model Diagram {
   contents     Content[]
 
   @@index([updatedAt], map: "diagram_updatedAt_idx")
-  @@index([searchVector], map: "diagram_searchVector_idx")
+  
 }
 
 model Content {
@@ -56,7 +56,7 @@ model Note {
   updatedAt    DateTime
 
   @@index([updatedAt], map: "note_updatedAt_idx")
-  @@index([searchVector], map: "note_searchVector_idx")
+  
   @@index([starred], map: "note_starred_idx")
 }
 

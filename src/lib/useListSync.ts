@@ -46,6 +46,14 @@ export function useListSync<T extends ListItem>({
 }: UseListSyncOptions<T>): UseListSyncResult {
     const isSyncingRef = useRef(false);
     const currentItemsRef = useRef(currentItems);
+    const isMountedRef = useRef(false);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
 
     // Keep ref in sync with prop
     useEffect(() => {
@@ -53,7 +61,7 @@ export function useListSync<T extends ListItem>({
     }, [currentItems]);
 
     const refresh = useCallback(async () => {
-        if (isSyncingRef.current) return;
+        if (isSyncingRef.current || !isMountedRef.current) return;
         isSyncingRef.current = true;
 
         try {
@@ -62,6 +70,8 @@ export function useListSync<T extends ListItem>({
             const freshUrl = `${listUrl}${separator}fresh=true`;
             const res = await fetch(freshUrl);
             if (!res.ok) return;
+
+            if (!isMountedRef.current) return;
 
             const data = await res.json();
             const serverItems = (Array.isArray(data.items) ? data.items : []) as T[];
@@ -88,14 +98,16 @@ export function useListSync<T extends ListItem>({
                 }
             }
 
-            if (hasChanges) {
+            if (hasChanges && isMountedRef.current) {
                 onListChanged?.();
                 onUpdate(serverItems, serverTotal);
             }
         } catch {
             // Silently ignore sync errors
         } finally {
-            isSyncingRef.current = false;
+            if (isMountedRef.current) {
+                isSyncingRef.current = false;
+            }
         }
     }, [listUrl, onUpdate, onListChanged]);
 
