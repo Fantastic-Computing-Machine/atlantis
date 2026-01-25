@@ -10,6 +10,7 @@ const MAX_PAGE_SIZE = 100;
 const MAX_CHECKPOINTS = 15;
 const TITLE_MAX = 100;
 const DESCRIPTION_MAX = 400;
+const MAX_TAGS_PER_ITEM = 3;
 
 type TransactionClient = typeof prisma;
 const diagramWithLatestSelect = {
@@ -91,12 +92,14 @@ export async function getDiagramPage({
   query,
   sort = 'recent',
   favoritesOnly = false,
+  tagSlug,
 }: {
   limit?: number;
   offset?: number;
   query?: string;
   sort?: import('./types').SortOption;
   favoritesOnly?: boolean;
+  tagSlug?: string;
 }): Promise<DiagramPage> {
   const normalizedLimit = normalizeLimit(limit);
   const normalizedOffset = normalizeOffset(offset);
@@ -107,6 +110,9 @@ export async function getDiagramPage({
   }
   if (favoritesOnly) {
     where.isFavorite = true;
+  }
+  if (tagSlug) {
+    where.tags = { some: { slug: tagSlug } };
   }
 
   let orderBy: Prisma.DiagramOrderByWithRelationInput = { updatedAt: 'desc' };
@@ -124,6 +130,56 @@ export async function getDiagramPage({
     default:
       orderBy = { updatedAt: 'desc' };
       break;
+  }
+
+
+
+  const diagramWithLatestSelect = {
+    id: true,
+    title: true,
+    description: true,
+    emoji: true,
+    createdAt: true,
+    updatedAt: true,
+    isFavorite: true,
+    totalVersions: true,
+    searchVector: true,
+    tags: true,
+    contents: {
+      orderBy: { updatedAt: 'desc' as const },
+      take: 1,
+      select: { id: true, content: true, updatedAt: true },
+    },
+  } satisfies Prisma.DiagramSelect;
+  type DiagramWithLatest = Prisma.DiagramGetPayload<{
+    select: typeof diagramWithLatestSelect;
+  }>;
+
+
+  function normalizeLimit(limit?: number | null) {
+    if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
+    return Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE);
+  }
+
+  function normalizeOffset(offset?: number | null) {
+    if (!Number.isFinite(offset)) return 0;
+    return Math.max(Math.trunc(offset as number), 0);
+  }
+
+  function toDiagram(diagram: DiagramWithLatest): Diagram {
+    const latest = diagram.contents[0];
+    return {
+      id: diagram.id,
+      title: diagram.title,
+      description: diagram.description,
+      content: latest?.content ?? '',
+      emoji: diagram.emoji,
+      createdAt: diagram.createdAt.toISOString(),
+      updatedAt: diagram.updatedAt.toISOString(),
+      isFavorite: diagram.isFavorite,
+      totalVersions: diagram.totalVersions,
+      tags: diagram.tags,
+    };
   }
 
   const [diagrams, total] = await Promise.all([
@@ -167,14 +223,21 @@ export async function createDiagram({
   description,
   content,
   emoji,
+  tags,
 }: {
   title?: string;
   description?: string;
   content?: string;
   emoji?: string;
+  tags?: string[];
 }): Promise<Diagram> {
   const now = new Date();
   validateLengths(title, description);
+
+  // Validate tag limit
+  if (tags && tags.length > MAX_TAGS_PER_ITEM) {
+    throw new Error(`Cannot add more than ${MAX_TAGS_PER_ITEM} tags`);
+  }
 
   const diagramId = await ensureUniqueId(async (id) => {
     const existing = await prisma.diagram.findUnique({ where: { id }, select: { id: true } });
@@ -209,6 +272,7 @@ export async function createDiagram({
             updatedAt: now,
           },
         },
+        tags: tags ? { connect: tags.map(id => ({ id })) } : undefined,
       },
       select: diagramWithLatestSelect,
     });
@@ -221,12 +285,16 @@ export async function createDiagram({
 
 export async function updateDiagramById(
   id: string,
-  updates: Partial<Pick<Diagram, 'title' | 'description' | 'content' | 'emoji' | 'isFavorite'>>
+  updates: Partial<Pick<Diagram, 'title' | 'description' | 'content' | 'emoji' | 'isFavorite'>> & { tags?: string[] }
 ): Promise<Diagram | null> {
   const existing = await prisma.diagram.findUnique({ where: { id } });
   if (!existing) return null;
 
   validateLengths(updates.title, updates.description);
+
+  if (updates.tags && updates.tags.length > MAX_TAGS_PER_ITEM) {
+    throw new Error(`Cannot add more than ${MAX_TAGS_PER_ITEM} tags`);
+  }
 
   const now = new Date();
   const hasContentUpdate = typeof updates.content === 'string';
@@ -286,6 +354,9 @@ export async function updateDiagramById(
           typeof updates.isFavorite === 'boolean' ? updates.isFavorite : existing.isFavorite,
         updatedAt: now,
         searchVector: buildSearchVector(nextTitle, nextDescription, nextContent),
+        tags: updates.tags ? {
+          set: updates.tags.map(id => ({ id })),
+        } : undefined,
       },
     });
 

@@ -33,9 +33,10 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { Textarea } from '@/components/ui/textarea';
+import { TagPicker } from '@/components/tag-picker';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
-import { Checkpoint, Diagram } from '@/lib/types';
+import { Checkpoint, Diagram, Tag } from '@/lib/types';
 import { useLiveSync } from '@/lib/useLiveSync';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { copyToClipboard, formatDate, cn } from '@/lib/utils';
@@ -238,6 +239,7 @@ const upsertNodeStyleLine = (content: string, nodeId: string, color: string | nu
 export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const router = useRouter();
   const [diagram, setDiagram] = useState<Diagram>(initialDiagram);
+  const [tags, setTags] = useState<Tag[]>(initialDiagram.tags || []);
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
@@ -276,6 +278,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     intervalMs: settings.liveSyncInterval ?? 5000,
     onUpdate: (remoteDiagram) => {
       setDiagram(remoteDiagram);
+      setTags(remoteDiagram.tags || []);
       lastSavedContentRef.current = remoteDiagram.content;
       lastSavedTitleRef.current = remoteDiagram.title;
       lastSavedDescriptionRef.current = remoteDiagram.description;
@@ -384,10 +387,11 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
           'Content-Type': 'application/json',
           [CSRF_HEADER_NAME]: csrfToken,
         },
-        body: JSON.stringify(diagram),
+        body: JSON.stringify({ ...diagram, tags: tags.map(t => t.id) }),
       });
       if (!res.ok) throw new Error('Failed to save');
       const updated = await res.json();
+      setTags(updated.tags || []);
       setDiagram((prev) => ({ ...prev, updatedAt: updated.updatedAt }));
       updateDiagram(diagram.id, {
         title: diagram.title,
@@ -620,6 +624,9 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
                 className="bg-transparent border-none focus:outline-none focus:ring-0 px-0 w-full min-w-[60px] max-w-[75vw] truncate font-semibold sm:font-normal"
                 placeholder="Untitled Diagram"
               />
+              <div className="hidden lg:block ml-2">
+                <TagPicker selectedTags={tags} onTagsChange={setTags} maxTags={3} />
+              </div>
             </div>
           </div>
 

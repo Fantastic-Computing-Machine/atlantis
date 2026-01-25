@@ -1,7 +1,7 @@
-
 'use client';
 
 import { NoteEditor } from '@/components/notes/NoteEditor';
+import { TagPicker } from '@/components/tag-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -23,7 +23,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { Note } from '@/lib/types';
+import type { Note, Tag } from '@/lib/types';
 import { ensureCsrfToken, withCsrfHeader } from '@/lib/csrf-client';
 import { cn } from '@/lib/utils';
 import { useDiagramStore } from '@/lib/store';
@@ -60,6 +60,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     const [title, setTitle] = useState(initialNote.title);
     const [content, setContent] = useState(initialNote.content);
     const [language, setLanguage] = useState(initialNote.language);
+    const [tags, setTags] = useState<Tag[]>(initialNote.tags || []);
     const [isPrivate, setIsPrivate] = useState(initialNote.private);
     const [starred, setStarred] = useState(initialNote.starred);
     const [hasChanges, setHasChanges] = useState(false);
@@ -84,6 +85,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
             setTitle(remoteNote.title);
             setContent(remoteNote.content);
             setLanguage(remoteNote.language);
+            setTags(remoteNote.tags || []);
             setIsPrivate(remoteNote.private);
             setStarred(remoteNote.starred);
             setHasChanges(false);
@@ -106,10 +108,11 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
             title !== note.title ||
             content !== note.content ||
             language !== note.language ||
+            JSON.stringify(tags) !== JSON.stringify(note.tags || []) || // Simple array comparison
             isPrivate !== note.private ||
             starred !== note.starred;
         setHasChanges(changed);
-    }, [title, content, language, isPrivate, starred, note]);
+    }, [title, content, language, tags, isPrivate, starred, note]);
 
 
 
@@ -128,6 +131,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
                     language,
                     private: isPrivate,
                     starred,
+                    tags: tags.map(t => t.id),
                 }),
             }));
 
@@ -137,6 +141,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
 
             const updatedNote = await res.json();
             setNote(updatedNote);
+            setTags(updatedNote.tags || []);
             setHasChanges(false);
 
             // Update sidebar in real-time
@@ -306,6 +311,14 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
                         className="h-8 min-w-[100px] flex-1 text-sm font-medium border-transparent hover:border-input focus:border-input px-2 truncate"
                         placeholder="Note title..."
                     />
+
+                    <div className="hidden sm:block">
+                        <TagPicker
+                            selectedTags={tags}
+                            onTagsChange={setTags}
+                            maxTags={3}
+                        />
+                    </div>
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>

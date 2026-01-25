@@ -40,6 +40,7 @@ import {
   Workflow,
   Snowflake,
   Zap,
+  Tag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -99,9 +100,10 @@ export default function SettingsPage() {
   const [stats, setStats] = useState<{
     totalNotes: number;
     totalDiagrams: number;
+    totalTags: number;
     activity: { date: string; notes: number; diagrams: number }[];
     loading: boolean;
-  }>({ totalNotes: 0, totalDiagrams: 0, activity: [], loading: true });
+  }>({ totalNotes: 0, totalDiagrams: 0, totalTags: 0, activity: [], loading: true });
 
   // Track mounted state for hydration-safe rendering
   useEffect(() => {
@@ -165,6 +167,7 @@ export default function SettingsPage() {
           setStats({
             totalNotes: data.totalNotes ?? 0,
             totalDiagrams: data.totalDiagrams ?? 0,
+            totalTags: data.totalTags ?? 0,
             activity: data.activity ?? [],
             loading: false,
           });
@@ -710,6 +713,36 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+
+
+        {/* Tags Settings */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Tag className="text-primary h-5 w-5" />
+              <CardTitle>Tags</CardTitle>
+            </div>
+            <CardDescription>
+              {stats.loading ? (
+                'Loading...'
+              ) : (
+                `Organize your content with tags. (${stats.totalTags} / 25 created)`
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="font-medium">Manage Tags</p>
+              <p className="text-muted-foreground text-sm">
+                Create, edit, and delete tags for your notes and diagrams.
+              </p>
+            </div>
+            <Button variant="outline" asChild>
+              <Link href="/settings/tags">Manage Tags</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* Theme Settings */}
         <Card>
           <CardHeader>
@@ -1128,10 +1161,10 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
-      </main>
+      </main >
 
       {/* Wipe Confirmation Dialog */}
-      <AlertDialog open={isWipeDialogOpen} onOpenChange={handleWipeDialogClose}>
+      < AlertDialog open={isWipeDialogOpen} onOpenChange={handleWipeDialogClose} >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-destructive flex items-center gap-2">
@@ -1193,15 +1226,15 @@ export default function SettingsPage() {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+      </AlertDialog >
 
       {/* Footer */}
-      <footer className="container mx-auto max-w-2xl px-4 py-8 text-center">
+      < footer className="container mx-auto max-w-2xl px-4 py-8 text-center" >
         <p className="text-muted-foreground text-sm">
           Made with <span className="text-red-500">❤️</span> by Terrestrian 🌏
         </p>
-      </footer>
-    </div>
+      </footer >
+    </div >
   );
 }
 
