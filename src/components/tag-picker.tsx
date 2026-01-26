@@ -9,7 +9,7 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Check, Hash, Plus, X } from 'lucide-react';
+import { Check, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Tag } from '@/lib/types';
 

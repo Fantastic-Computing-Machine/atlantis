@@ -160,7 +160,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         } finally {
             setIsSaving(false);
         }
-    }, [note.id, title, content, language, isPrivate, starred, isSaving, updateNote, syncFromServer]);
+    }, [note.id, title, content, language, isPrivate, starred, isSaving, updateNote, syncFromServer, tags]);
 
     // Auto-save debounced (only if autoSave is enabled)
     useEffect(() => {

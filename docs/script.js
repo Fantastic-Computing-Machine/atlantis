@@ -67,7 +67,7 @@ window.addEventListener('scroll', () => {
         navbar.style.background = 'hsla(222, 47%, 7%, 0.8)';
     }
 
-    lastScroll = currentScroll;
+
 });
 
 // Intersection Observer for fade-in animations

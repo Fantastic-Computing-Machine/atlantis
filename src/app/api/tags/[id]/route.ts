@@ -12,7 +12,7 @@ export async function DELETE(
             where: { id },
         });
         return NextResponse.json({ success: true });
-    } catch (error) {
+    } catch (_error) {
         return NextResponse.json({ error: 'Failed to delete tag' }, { status: 500 });
     }
 }
@@ -29,7 +29,7 @@ export async function PATCH(
         // If name is updated, we might need to update slug too? 
         // User didn't explicitly ask for update, but "manage tags (create delete update read)" was requested.
 
-        const updateData: any = { color };
+        const updateData: { color: string; name?: string; slug?: string } = { color };
 
         if (name) {
             updateData.name = name;
@@ -46,7 +46,7 @@ export async function PATCH(
         });
 
         return NextResponse.json(tag);
-    } catch (error) {
+    } catch (_error) {
         // Check for unique constraint violation on slug
         return NextResponse.json({ error: 'Failed to update tag' }, { status: 500 });
     }

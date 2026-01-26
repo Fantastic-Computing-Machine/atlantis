@@ -36,7 +36,7 @@ export default async function TagsPage() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {tags.map((tag: any) => (
+                        {tags.map((tag) => (
                             <Link key={tag.id} href={`/tags/${tag.slug}`} className="block group">
                                 <Card className="h-full transition-all hover:shadow-md hover:border-primary/50">
                                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

@@ -415,7 +415,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     } catch {
       toast.error('Failed to save changes');
     }
-  }, [diagram, updateDiagram, syncFromServer]);
+  }, [diagram, updateDiagram, syncFromServer, tags]);
 
   // Ctrl+S to save
   useEffect(() => {

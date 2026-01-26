@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 
 export default function TagsSettingsPage() {
-    const [tags, setTags] = React.useState<Tag[]>([]);
+    const [tags, setTags] = React.useState<(Tag & { _count?: { notes: number; diagrams: number } })[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [newTagName, setNewTagName] = React.useState('');
     const [newTagColor, setNewTagColor] = React.useState('#3b82f6');
@@ -55,8 +55,8 @@ export default function TagsSettingsPage() {
             toast.success('Tag created');
             setNewTagName('');
             fetchTags();
-        } catch (error: any) {
-            toast.error(error.message);
+        } catch (error) {
+            toast.error((error as Error).message);
         } finally {
             setCreating(false);
         }
@@ -169,9 +169,9 @@ export default function TagsSettingsPage() {
                                             </div>
                                         </Link>
                                         <div className="flex items-center gap-4">
-                                            {(tag as any)._count && (
+                                            {tag._count && (
                                                 <div className="text-xs text-muted-foreground">
-                                                    {(tag as any)._count.notes + (tag as any)._count.diagrams} uses
+                                                    {tag._count.notes + tag._count.diagrams} uses
                                                 </div>
                                             )}
                                             <Button variant="ghost" size="icon" onClick={() => handleDeleteTag(tag.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">

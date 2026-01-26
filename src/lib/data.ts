@@ -35,15 +35,7 @@ type DiagramWithLatest = Prisma.DiagramGetPayload<{
 }>;
 
 
-function normalizeLimit(limit?: number | null) {
-  if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
-  return Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE);
-}
 
-function normalizeOffset(offset?: number | null) {
-  if (!Number.isFinite(offset)) return 0;
-  return Math.max(Math.trunc(offset as number), 0);
-}
 
 function toDiagram(diagram: DiagramWithLatest): Diagram {
   const latest = diagram.contents[0];

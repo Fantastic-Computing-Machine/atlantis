@@ -29,15 +29,15 @@ class NoOpCache implements CacheProvider {
         return null;
     }
 
-    async set<T>(key: string, value: T, ttlMs: number): Promise<void> {
+    async set<T>(_key: string, _value: T, _ttlMs: number): Promise<void> {
         // No-op
     }
 
-    async delete(key: string): Promise<void> {
+    async delete(_key: string): Promise<void> {
         // No-op
     }
 
-    async deletePrefix(prefix: string): Promise<void> {
+    async deletePrefix(_prefix: string): Promise<void> {
         // No-op
     }
 
