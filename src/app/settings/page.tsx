@@ -419,9 +419,11 @@ export default function SettingsPage() {
             </Link>
           </Button>
           <div className="flex items-center gap-2">
-            <span className="text-2xl" role="img" aria-label="atlantis logo">
-              🔱
-            </span>
+            <Link href="/" className="hover:opacity-80 transition-opacity">
+              <span className="text-2xl" role="img" aria-label="atlantis logo">
+                🔱
+              </span>
+            </Link>
             <h1 className="text-xl font-bold">Settings</h1>
           </div>
         </div>
@@ -726,7 +728,7 @@ export default function SettingsPage() {
               {stats.loading ? (
                 'Loading...'
               ) : (
-                `Organize your content with tags. (${stats.totalTags} / 25 created)`
+                `Organize your content with tags. (${stats.totalTags} of 25 created)`
               )}
             </CardDescription>
           </CardHeader>

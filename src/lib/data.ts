@@ -23,6 +23,7 @@ const diagramWithLatestSelect = {
   isFavorite: true,
   totalVersions: true,
   searchVector: true,
+  tags: true,
   contents: {
     orderBy: { updatedAt: 'desc' as const },
     take: 1,
@@ -56,6 +57,7 @@ function toDiagram(diagram: DiagramWithLatest): Diagram {
     updatedAt: diagram.updatedAt.toISOString(),
     isFavorite: diagram.isFavorite,
     totalVersions: diagram.totalVersions,
+    tags: diagram.tags,
   };
 }
 

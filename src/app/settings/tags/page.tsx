@@ -99,9 +99,11 @@ export default function TagsSettingsPage() {
                         </Link>
                     </Button>
                     <div className="flex items-center gap-2">
-                        <span className="text-2xl" role="img" aria-label="atlantis logo">
-                            🔱
-                        </span>
+                        <Link href="/" className="hover:opacity-80 transition-opacity">
+                            <span className="text-2xl" role="img" aria-label="atlantis logo">
+                                🔱
+                            </span>
+                        </Link>
                         <h1 className="text-xl font-bold">Tag Settings</h1>
                     </div>
                 </div>
@@ -158,14 +160,14 @@ export default function TagsSettingsPage() {
 
                             <div className="grid gap-2">
                                 {tags.map((tag) => (
-                                    <div key={tag.id} className="flex items-center justify-between p-3 rounded-md border bg-card hover:bg-muted/20 transition-colors">
-                                        <div className="flex items-center gap-3">
+                                    <div key={tag.id} className="flex items-center justify-between p-3 rounded-md border bg-card hover:bg-muted/20 transition-colors group">
+                                        <Link href={`/tags/${tag.slug}`} className="flex items-center gap-3 flex-1 hover:opacity-80 transition-opacity">
                                             <div className="h-4 w-4 rounded-full border shadow-sm" style={{ backgroundColor: tag.color }} />
                                             <div className="flex flex-col">
-                                                <span className="font-medium text-sm">{tag.name}</span>
+                                                <span className="font-medium text-sm group-hover:underline">{tag.name}</span>
                                                 <span className="text-[10px] text-muted-foreground font-mono">#{tag.slug}</span>
                                             </div>
-                                        </div>
+                                        </Link>
                                         <div className="flex items-center gap-4">
                                             {(tag as any)._count && (
                                                 <div className="text-xs text-muted-foreground">

@@ -45,10 +45,10 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
     return (
         <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm shrink-0">
             <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
+                <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                     <span className="text-2xl" role="img" aria-label="atlantis logo">🔱</span>
                     <h1 className="text-xl font-bold hidden sm:block">atlantis</h1>
-                </div>
+                </Link>
 
                 <div className="flex-1 max-w-md flex justify-center">
                     <GlobalSearchDialog />
@@ -80,6 +80,7 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
                     <div className="hidden lg:flex items-center gap-2">
                         <Button asChild variant="ghost"><Link href="/diagram">Diagrams</Link></Button>
                         <Button asChild variant="ghost"><Link href="/notes">Notes</Link></Button>
+                        <Button asChild variant="ghost"><Link href="/tags">Tags</Link></Button>
                         {enableApiAccess && (
                             <Button asChild variant="ghost">
                                 <Link href="/docs" className="flex items-center gap-2">
@@ -102,6 +103,9 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
                                     <Link href="/notes">Notes</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/tags">Tags</Link>
                                 </DropdownMenuItem>
                                 {enableApiAccess && (
                                     <DropdownMenuItem asChild>

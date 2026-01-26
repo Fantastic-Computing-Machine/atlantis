@@ -17,12 +17,14 @@ interface TagPickerProps {
     selectedTags: Tag[];
     onTagsChange: (tags: Tag[]) => void;
     maxTags?: number;
+    align?: 'start' | 'end' | 'center';
 }
 
 export function TagPicker({
     selectedTags,
     onTagsChange,
     maxTags = 3,
+    align = 'start',
 }: TagPickerProps) {
     const [open, setOpen] = React.useState(false);
     const [query, setQuery] = React.useState('');
@@ -58,21 +60,24 @@ export function TagPicker({
     );
 
     return (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-nowrap items-center gap-1.5 overflow-hidden">
             {selectedTags.map((tag) => (
                 <Badge
                     key={tag.id}
                     variant="secondary"
-                    className="gap-1 pr-1"
+                    className="gap-1 pr-0.5 h-6 rounded-md px-2 font-normal shrink-0"
                     style={{ backgroundColor: tag.color + '20', color: tag.color, borderColor: tag.color + '40' }}
                 >
-                    <span className="text-xs">#</span>
-                    {tag.name}
+                    <span className="text-[10px] opacity-70">#</span>
+                    <a href={`/tags/${tag.slug}`} className="truncate max-w-[80px] sm:max-w-[120px] hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {tag.name}
+                    </a>
                     <div
                         role="button"
                         className="rounded-full hover:bg-black/10 dark:hover:bg-white/10 p-0.5 ml-1 cursor-pointer"
                         onClick={(e) => {
                             e.preventDefault();
+                            e.stopPropagation();
                             onTagsChange(selectedTags.filter((t) => t.id !== tag.id))
                         }}
                     >
@@ -84,16 +89,18 @@ export function TagPicker({
             <DropdownMenu open={open} onOpenChange={setOpen}>
                 <DropdownMenuTrigger asChild>
                     <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
-                        className="h-6 rounded-full text-xs text-muted-foreground hover:text-foreground"
+                        className="h-6 gap-1 rounded-md border-dashed border-muted-foreground/30 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0"
                         disabled={selectedTags.length >= maxTags}
                     >
-                        <Plus className="mr-1 h-3 w-3" />
-                        Add Tag {selectedTags.length >= maxTags ? '(Max)' : ''}
+                        <Plus className="h-3 w-3" />
+                        <span className={cn(selectedTags.length > 0 && "hidden lg:inline")}>
+                            {selectedTags.length === 0 ? 'Add Tag' : 'Add'}
+                        </span>
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="p-0 w-52" align="start">
+                <DropdownMenuContent className="p-0 w-52" align={align} sideOffset={8}>
                     <div className="p-2 border-b">
                         <input
                             className="flex h-8 w-full rounded-md bg-transparent px-3 py-1 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
