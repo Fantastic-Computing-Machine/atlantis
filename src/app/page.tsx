@@ -9,6 +9,7 @@ import { Diagram, Note } from '@/lib/types';
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { Greeting } from '@/components/Greeting';
 import { DashboardEmptyState } from '@/components/DashboardEmptyState';
+import { TagBadge } from '@/components/TagBadge';
 
 export const dynamic = 'force-dynamic';
 
@@ -153,42 +154,50 @@ function DashboardCard({
   const badgeLabel = type === 'diagram' ? 'Diagram' : 'Note';
 
   return (
-    <Link href={href} className="group block">
-      <Card className="hover:border-primary/50 relative h-full overflow-hidden transition-shadow hover:shadow-md">
-        <CardHeader className="p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="shrink-0 text-2xl">{icon}</span>
-              <div className="min-w-0 overflow-hidden">
-                <CardTitle className="truncate text-base">{item.title}</CardTitle>
-                <CardDescription className="truncate text-xs">
-                  {formatDate(item.updatedAt)}
-                </CardDescription>
-              </div>
+    <Card className="group relative h-full overflow-hidden transition-shadow hover:shadow-md hover:border-primary/50 flex flex-col">
+      <Link href={href} className="absolute inset-0 z-0 focus:outline-none">
+        <span className="sr-only">View {item.title}</span>
+      </Link>
+      <CardHeader className="p-4 relative z-10 pointer-events-none">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 text-2xl">{icon}</span>
+            <div className="min-w-0 overflow-hidden">
+              <CardTitle className="truncate text-base">{item.title}</CardTitle>
+              <CardDescription className="truncate text-xs">
+                {formatDate(item.updatedAt)}
+              </CardDescription>
             </div>
           </div>
-        </CardHeader>
-        {!small && (
-          <CardContent className="p-4 pt-0">
-            <p className="text-muted-foreground line-clamp-2 text-xs">
-              {type === 'diagram' ? description || 'No description' : `Language: ${description}`}
-            </p>
-          </CardContent>
-        )}
-        <div className="absolute top-2 right-2">
-          <span
-            className={cn(
-              'rounded-full border px-2 py-0.5 text-[10px] font-medium',
-              type === 'diagram'
-                ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300'
-            )}
-          >
-            {badgeLabel}
-          </span>
         </div>
-      </Card>
-    </Link>
+      </CardHeader>
+      {!small && (
+        <CardContent className="p-4 pt-0 space-y-3 flex-1 relative z-10 pointer-events-none">
+          <p className="text-muted-foreground line-clamp-2 text-xs">
+            {type === 'diagram' ? description || 'No description' : `Language: ${description}`}
+          </p>
+          {item.tags && item.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 pointer-events-auto">
+              {item.tags.map(tag => (
+                <TagBadge key={tag.id} tag={tag} />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      )}
+      <div className="absolute top-2 right-2 z-10 pointer-events-none">
+        <span
+          className={cn(
+            'rounded-full border px-2 py-0.5 text-[10px] font-medium',
+            type === 'diagram'
+              ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300'
+          )}
+        >
+          {badgeLabel}
+        </span>
+      </div>
+    </Card>
   );
 }
 

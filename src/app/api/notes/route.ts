@@ -67,6 +67,7 @@ export async function POST(request: Request) {
             title: result.data.title,
             content: result.data.content,
             language: result.data.language,
+            tags: result.data.tags,
         });
 
         // Invalidate list cache on create

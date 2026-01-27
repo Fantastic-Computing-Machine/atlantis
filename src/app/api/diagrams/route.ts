@@ -69,6 +69,7 @@ export async function POST(request: Request) {
       content,
       emoji,
       description,
+      tags: result.data.tags,
     });
 
     // Invalidate list cache on create

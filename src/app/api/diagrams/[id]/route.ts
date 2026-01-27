@@ -67,7 +67,10 @@ export async function PUT(
       );
     }
 
-    const updatedDiagram = await updateDiagramById(id, result.data);
+    const updatedDiagram = await updateDiagramById(id, {
+      ...result.data,
+      tags: result.data.tags,
+    });
 
     if (!updatedDiagram) {
       return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });

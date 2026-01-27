@@ -107,6 +107,7 @@ export async function PATCH(
             language: result.data.language,
             starred: result.data.starred,
             private: result.data.private,
+            tags: result.data.tags,
         });
 
         if (!updatedNote) {

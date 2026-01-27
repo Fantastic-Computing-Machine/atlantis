@@ -10,6 +10,20 @@ datasource db {
   provider = "sqlite"
 }
 
+
+model Tag {
+  id             String    @id @default(cuid())
+  name           String    @unique
+  slug           String    @unique
+  color          String    @default("#000000")
+  createdAt      DateTime  @default(now())
+  
+  notes          Note[]
+  diagrams       Diagram[]
+  
+  @@index([slug])
+}
+
 model Diagram {
   id           String    @id
   title        String
@@ -21,6 +35,7 @@ model Diagram {
   totalVersions Int      @default(1)
   searchVector String    @default("")
   contents     Content[]
+  tags         Tag[]
 
   @@index([updatedAt], map: "diagram_updatedAt_idx")
   @@index([searchVector], map: "diagram_searchVector_idx")
@@ -54,6 +69,7 @@ model Note {
   searchVector String   @default("")
   createdAt    DateTime @default(now())
   updatedAt    DateTime
+  tags         Tag[]
 
   @@index([updatedAt], map: "note_updatedAt_idx")
   @@index([searchVector], map: "note_searchVector_idx")
