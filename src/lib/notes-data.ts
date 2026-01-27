@@ -19,7 +19,9 @@ function normalizeOffset(offset?: number | null) {
     return Math.max(Math.trunc(offset as number), 0);
 }
 
-function toNote(row: NoteRow): Note {
+const MAX_TAGS_PER_ITEM = 3;
+
+function toNote(row: NoteRow & { tags?: { id: string; name: string; slug: string; color: string }[] }): Note {
     return {
         id: row.id,
         title: row.title,
@@ -30,10 +32,11 @@ function toNote(row: NoteRow): Note {
         private: row.private,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
+        tags: row.tags,
     };
 }
 
-function toNoteListItem(row: NoteRow): Omit<Note, 'content'> {
+function toNoteListItem(row: NoteRow & { tags?: { id: string; name: string; slug: string; color: string }[] }): Omit<Note, 'content'> {
     return {
         id: row.id,
         title: row.title,
@@ -43,6 +46,7 @@ function toNoteListItem(row: NoteRow): Omit<Note, 'content'> {
         private: row.private,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
+        tags: row.tags,
     };
 }
 
@@ -74,12 +78,14 @@ export async function getNotePage({
     query,
     sort = 'recent',
     starredOnly = false,
+    tagSlug,
 }: {
     limit?: number;
     offset?: number;
     query?: string;
     sort?: NoteSortOption;
     starredOnly?: boolean;
+    tagSlug?: string;
 }): Promise<NotePage> {
     const normalizedLimit = normalizeLimit(limit);
     const normalizedOffset = normalizeOffset(offset);
@@ -88,13 +94,13 @@ export async function getNotePage({
 
     if (query?.trim()) {
         const cleanQuery = query.trim().toLowerCase();
-        // If we stripped stop words from the vector, we should generally search for key terms.
-        // However, precise phrase match becomes impossible.
-        // For now, let's simple-search.
         where.searchVector = { contains: cleanQuery };
     }
     if (starredOnly) {
         where.starred = true;
+    }
+    if (tagSlug) {
+        where.tags = { some: { slug: tagSlug } };
     }
 
     let orderBy: Prisma.NoteOrderByWithRelationInput = { updatedAt: 'desc' };
@@ -117,6 +123,7 @@ export async function getNotePage({
             orderBy,
             skip: normalizedOffset,
             take: normalizedLimit,
+            include: { tags: true },
         }),
         prisma.note.count({ where }),
     ]);
@@ -129,7 +136,10 @@ export async function getNotePage({
 }
 
 export async function getNoteById(id: string): Promise<Note | null> {
-    const note = await prisma.note.findUnique({ where: { id } });
+    const note = await prisma.note.findUnique({
+        where: { id },
+        include: { tags: true },
+    });
     if (!note) return null;
     return toNote(note);
 }
@@ -138,10 +148,12 @@ export async function createNote({
     title,
     content,
     language,
+    tags,
 }: {
     title?: string;
     content?: string;
     language?: string;
+    tags?: string[];
 }): Promise<Note> {
     const now = new Date();
     validateNoteLengths(title);
@@ -150,6 +162,11 @@ export async function createNote({
     const nextTitle = title || 'Untitled Note';
     const nextContent = content || '';
     const nextLanguage = language || 'txt';
+
+    // Validate tag limit
+    if (tags && tags.length > MAX_TAGS_PER_ITEM) {
+        throw new Error(`Cannot add more than ${MAX_TAGS_PER_ITEM} tags`);
+    }
 
     const note = await prisma.note.create({
         data: {
@@ -163,7 +180,9 @@ export async function createNote({
             searchVector: buildNoteSearchVector(nextTitle, nextContent),
             createdAt: now,
             updatedAt: now,
+            tags: tags ? { connect: tags.map(id => ({ id })) } : undefined,
         },
+        include: { tags: true },
     });
 
     return toNote(note);
@@ -171,12 +190,19 @@ export async function createNote({
 
 export async function updateNoteById(
     id: string,
-    updates: Partial<Pick<Note, 'title' | 'content' | 'language' | 'starred' | 'private'>>
+    updates: Partial<Pick<Note, 'title' | 'content' | 'language' | 'starred' | 'private'>> & { tags?: string[] }
 ): Promise<Note | null> {
-    const existing = await prisma.note.findUnique({ where: { id } });
+    const existing = await prisma.note.findUnique({
+        where: { id },
+        include: { tags: { select: { id: true } } },
+    });
     if (!existing) return null;
 
     validateNoteLengths(updates.title);
+
+    if (updates.tags && updates.tags.length > MAX_TAGS_PER_ITEM) {
+        throw new Error(`Cannot add more than ${MAX_TAGS_PER_ITEM} tags`);
+    }
 
     const now = new Date();
     const nextTitle = updates.title ?? existing.title;
@@ -192,7 +218,11 @@ export async function updateNoteById(
             private: typeof updates.private === 'boolean' ? updates.private : existing.private,
             searchVector: buildNoteSearchVector(nextTitle, nextContent),
             updatedAt: now,
+            tags: updates.tags ? {
+                set: updates.tags.map(id => ({ id })),
+            } : undefined,
         },
+        include: { tags: true },
     });
 
     return toNote(note);

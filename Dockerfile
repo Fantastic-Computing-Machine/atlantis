@@ -3,8 +3,10 @@
 # ============================================
 # Base image with security updates
 # ============================================
-FROM node:20-slim AS base
-RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+FROM node:20-alpine AS base
+# Install OpenSSL (required for Prisma) and CA certificates
+# libc6-compat is sometimes needed for compatibility with certain libraries
+RUN apk add --no-cache openssl ca-certificates libc6-compat
 
 # ============================================
 # Stage 1: Install dependencies + Prisma client

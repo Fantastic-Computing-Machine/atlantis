@@ -6,6 +6,7 @@ export const diagramSchema = z.object({
   content: z.string().optional(),
   emoji: z.string().max(10).optional(),
   isFavorite: z.boolean().optional(),
+  tags: z.array(z.string()).max(3).optional(),
 });
 
 export const checkpointSchema = z.object({
@@ -21,6 +22,7 @@ export const noteCreateSchema = z.object({
   title: z.string().max(200).optional(),
   content: z.string().optional(),
   language: z.string().max(20).optional(),
+  tags: z.array(z.string()).max(3).optional(),
 });
 
 export const noteUpdateSchema = z.object({
@@ -29,6 +31,7 @@ export const noteUpdateSchema = z.object({
   language: z.string().max(20).optional(),
   starred: z.boolean().optional(),
   private: z.boolean().optional(),
+  tags: z.array(z.string()).max(3).optional(),
 });
 
 // Backup restore validation

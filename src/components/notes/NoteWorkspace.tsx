@@ -1,7 +1,8 @@
-
 'use client';
 
 import { NoteEditor } from '@/components/notes/NoteEditor';
+import { TagPicker } from '@/components/tag-picker';
+import { ResponsiveTagPicker } from '@/components/responsive-tag-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -23,13 +24,13 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { Note } from '@/lib/types';
+import type { Note, Tag } from '@/lib/types';
 import { ensureCsrfToken, withCsrfHeader } from '@/lib/csrf-client';
 import { cn } from '@/lib/utils';
 import { useDiagramStore } from '@/lib/store';
 import { useLiveSync } from '@/lib/useLiveSync';
 import { useNotes } from '@/components/notes/NotesContext';
-import { ArrowLeft, Star, Trash2, ChevronDown, Save, Download, Plus, Moon, Sun, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Star, Trash2, ChevronDown, Save, Download, Plus, Moon, Sun, MoreHorizontal } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -60,6 +61,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     const [title, setTitle] = useState(initialNote.title);
     const [content, setContent] = useState(initialNote.content);
     const [language, setLanguage] = useState(initialNote.language);
+    const [tags, setTags] = useState<Tag[]>(initialNote.tags || []);
     const [isPrivate, setIsPrivate] = useState(initialNote.private);
     const [starred, setStarred] = useState(initialNote.starred);
     const [hasChanges, setHasChanges] = useState(false);
@@ -84,6 +86,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
             setTitle(remoteNote.title);
             setContent(remoteNote.content);
             setLanguage(remoteNote.language);
+            setTags(remoteNote.tags || []);
             setIsPrivate(remoteNote.private);
             setStarred(remoteNote.starred);
             setHasChanges(false);
@@ -106,10 +109,11 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
             title !== note.title ||
             content !== note.content ||
             language !== note.language ||
+            JSON.stringify(tags) !== JSON.stringify(note.tags || []) || // Simple array comparison
             isPrivate !== note.private ||
             starred !== note.starred;
         setHasChanges(changed);
-    }, [title, content, language, isPrivate, starred, note]);
+    }, [title, content, language, tags, isPrivate, starred, note]);
 
 
 
@@ -128,6 +132,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
                     language,
                     private: isPrivate,
                     starred,
+                    tags: tags.map(t => t.id),
                 }),
             }));
 
@@ -137,6 +142,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
 
             const updatedNote = await res.json();
             setNote(updatedNote);
+            setTags(updatedNote.tags || []);
             setHasChanges(false);
 
             // Update sidebar in real-time
@@ -154,7 +160,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         } finally {
             setIsSaving(false);
         }
-    }, [note.id, title, content, language, isPrivate, starred, isSaving, updateNote, syncFromServer]);
+    }, [note.id, title, content, language, isPrivate, starred, isSaving, updateNote, syncFromServer, tags]);
 
     // Auto-save debounced (only if autoSave is enabled)
     useEffect(() => {
@@ -291,30 +297,51 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     return (
         <div className="h-full flex flex-col">
             {/* Header */}
-            <div className="h-14 border-b flex items-center justify-between px-4 bg-background shrink-0 gap-2">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <Link href="/notes" className="shrink-0">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
+            <div className="h-14 border-b flex items-center px-4 bg-background/50 backdrop-blur-sm z-10 shrink-0 justify-between gap-4">
+
+                {/* Left: Branding & Title */}
+                <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1">
+                    <Link href="/notes" className="shrink-0 hover:opacity-80 transition-opacity flex items-center gap-1">
+                        <span className="text-2xl sm:hidden">📝</span>
+                        <span className="hidden sm:inline font-semibold text-lg">📝 notes //</span>
                     </Link>
 
-                    <Input
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        onBlur={handleSave}
-                        className="h-8 min-w-[100px] flex-1 text-sm font-medium border-transparent hover:border-input focus:border-input px-2 truncate"
-                        placeholder="Note title..."
-                    />
+                    <div className="h-6 w-px bg-border shrink-0 hidden sm:block" />
 
+                    <div className="flex items-center gap-2 min-w-0 flex-1 max-w-xl">
+                        <input
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            onBlur={handleSave}
+                            className="bg-transparent border-none focus:outline-none focus:ring-0 px-0 min-w-[60px] flex-1 truncate font-medium text-sm sm:text-base placeholder:text-muted-foreground/50 text-foreground"
+                            placeholder="Note title..."
+                        />
+                        <div className="shrink-0">
+                            <ResponsiveTagPicker
+                                selectedTags={tags}
+                                onTagsChange={setTags}
+                                maxTags={3}
+                                align="start"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right: Actions */}
+                <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-muted-foreground mr-2 hidden lg:inline">
+                        {hasChanges ? 'Unsaved' : 'Saved'}
+                    </span>
+
+                    {/* Language Selector */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-8 text-xs shrink-0 hidden md:flex">
+                            <Button variant="ghost" size="sm" className="hidden sm:flex gap-1 text-muted-foreground hover:text-foreground h-8">
                                 {SUPPORTED_LANGUAGES.find((l) => l.value === language)?.label || language}
-                                <ChevronDown className="h-3 w-3 ml-1" />
+                                <ChevronDown className="h-3 w-3 opacity-50" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent>
+                        <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Language</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             {SUPPORTED_LANGUAGES.map((lang) => (
@@ -328,140 +355,51 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
                             ))}
                         </DropdownMenuContent>
                     </DropdownMenu>
-                </div>
 
-                <div className="flex items-center gap-1 shrink-0">
-                    {hasChanges && (
-                        <span className="text-xs text-muted-foreground mr-1 hidden sm:inline">Unsaved changes</span>
-                    )}
+                    {/* More Actions */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" title="More options">
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={toggleStarred}>
+                                <Star className={cn("mr-2 h-4 w-4", starred && "fill-amber-400 text-amber-400")} />
+                                <span>{starred ? 'Unstar' : 'Star'}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleDownload}>
+                                <Download className="mr-2 h-4 w-4" />
+                                <span>Download</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+                                {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                                <span>Switch Theme</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                <span>Delete Note</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
 
-                    {/* Desktop Actions */}
-                    <div className="hidden md:flex items-center gap-1">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={handleDownload}
-                            title="Download file"
-                        >
-                            <Download className="h-4 w-4" />
-                        </Button>
+                    <div className="w-px h-6 bg-border mx-1" />
 
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={toggleStarred}
-                        >
-                            <Star
-                                className={`h-4 w-4 ${starred ? 'text-yellow-500 fill-yellow-500' : ''}`}
-                            />
-                        </Button>
+                    <Button
+                        onClick={handleSave}
+                        disabled={!hasChanges || isSaving}
+                        size="sm"
+                        className="gap-2"
+                    >
+                        <Save className="h-4 w-4" />
+                        <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save'}</span>
+                    </Button>
 
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8"
-                            onClick={handleSave}
-                            disabled={!hasChanges || isSaving}
-                        >
-                            <Save className="h-3.5 w-3.5 mr-1" />
-                            {isSaving ? 'Saving...' : 'Save'}
-                        </Button>
-
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setShowDeleteDialog(true)}
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-
-                        <div className="w-px h-6 bg-border mx-1" />
-
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                                >
-                                    {mounted && theme === 'dark' ? (
-                                        <Sun className="h-4 w-4" />
-                                    ) : (
-                                        <Moon className="h-4 w-4" />
-                                    )}
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-                            </TooltipContent>
-                        </Tooltip>
-
-                        <Button size="sm" onClick={handleCreateNote} className="h-8">
-                            <Plus className="h-4 w-4 mr-1" />
-                            New
-                        </Button>
-                    </div>
-
-                    {/* Mobile Actions Menu */}
-                    <div className="md:hidden flex items-center gap-1">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={handleSave}
-                            disabled={!hasChanges || isSaving}
-                        >
-                            <Save className={hasChanges ? "h-4 w-4 text-primary" : "h-4 w-4"} />
-                        </Button>
-
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreVertical className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={toggleStarred}>
-                                    <Star className={cn("h-4 w-4 mr-2", starred && "text-yellow-500 fill-yellow-500")} />
-                                    {starred ? 'Unstar' : 'Star'}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={handleDownload}>
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Download
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                                    {theme === 'dark' ? <Sun className="h-4 w-4 mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
-                                    Toggle Theme
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuLabel>Language</DropdownMenuLabel>
-                                {SUPPORTED_LANGUAGES.map((lang) => (
-                                    <DropdownMenuItem
-                                        key={lang.value}
-                                        onClick={() => setLanguage(lang.value)}
-                                        className={language === lang.value ? 'bg-muted' : ''}
-                                    >
-                                        {lang.label}
-                                    </DropdownMenuItem>
-                                ))}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive">
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete Note
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-
-                        <Button size="icon" variant="ghost" onClick={handleCreateNote} className="h-8 w-8">
-                            <Plus className="h-5 w-5" />
-                        </Button>
-                    </div>
+                    <Button size="sm" variant="ghost" onClick={handleCreateNote}>
+                        <Plus className="h-4 w-4" />
+                        <span className="sr-only sm:not-sr-only sm:ml-1">New</span>
+                    </Button>
                 </div>
             </div>
 
