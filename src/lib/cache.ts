@@ -326,6 +326,17 @@ export function withCacheHeader(response: Response, status: CacheStatus): Respon
     return response;
 }
 
+/**
+ * Helper to add no-cache headers to prevent browser/proxy caching.
+ * Use this for live sync polling responses to ensure fresh data.
+ */
+export function withNoCacheHeaders(response: Response): Response {
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    return response;
+}
+
 // ============================================================================
 // Cache Key Helpers
 // ============================================================================

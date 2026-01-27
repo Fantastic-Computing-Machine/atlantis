@@ -2,7 +2,7 @@ import { ensureCsrfCookie, csrfFailureResponse, validateCsrfToken } from '@/lib/
 import { createDiagram, getDiagramPage } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { diagramSchema } from '@/lib/schemas';
-import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS, withCacheHeader, type CacheStatus } from '@/lib/cache';
+import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS, withCacheHeader, withNoCacheHeaders, type CacheStatus } from '@/lib/cache';
 import { NextResponse } from 'next/server';
 
 const DEFAULT_LIMIT = 24;
@@ -24,7 +24,9 @@ export async function GET(request: Request) {
     if (fresh || query) {
       const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query, sort });
       const status: CacheStatus = fresh ? 'BYPASS' : 'MISS';
-      return withCacheHeader(NextResponse.json(page), status);
+      const response = withCacheHeader(NextResponse.json(page), status);
+      // Add no-cache headers for fresh requests to prevent browser/proxy caching
+      return fresh ? withNoCacheHeaders(response) : response;
     }
 
     // Try cache first (only for non-search requests)
