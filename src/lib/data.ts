@@ -479,6 +479,145 @@ export async function createCheckpoint(
   return { checkpoint: result.checkpoint, diagram: toDiagram(result.diagram) };
 }
 
+/**
+ * Delete a specific checkpoint from a diagram.
+ * Cannot delete the latest (current) checkpoint.
+ */
+export async function deleteCheckpoint(
+  diagramId: string,
+  checkpointId: string
+): Promise<boolean> {
+  return withTx(async (tx: TransactionClient) => {
+    // Check if checkpoint exists and belongs to this diagram
+    const checkpoint = await tx.content.findFirst({
+      where: { id: checkpointId, diagramId },
+    });
+
+    if (!checkpoint) return false;
+
+    // Get the latest checkpoint to prevent deleting current
+    const latest = await tx.content.findFirst({
+      where: { diagramId },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (latest?.id === checkpointId) {
+      throw new Error('Cannot delete the current checkpoint');
+    }
+
+    // Delete the checkpoint
+    await tx.content.delete({ where: { id: checkpointId } });
+
+    // Update totalVersions
+    const count = await tx.content.count({ where: { diagramId } });
+    await tx.diagram.update({
+      where: { id: diagramId },
+      data: { totalVersions: count },
+    });
+
+    return true;
+  });
+}
+
+/**
+ * Restore a checkpoint as the current version.
+ * Creates a new checkpoint with the restored content.
+ */
+export async function restoreCheckpoint(
+  diagramId: string,
+  checkpointId: string
+): Promise<{ checkpoint: Checkpoint; diagram: Diagram } | null> {
+  const now = new Date();
+
+  return withTx(async (tx: TransactionClient) => {
+    // Get the checkpoint to restore
+    const checkpoint = await tx.content.findFirst({
+      where: { id: checkpointId, diagramId },
+    });
+
+    if (!checkpoint) return null;
+
+    // Get current diagram
+    const diagram = await tx.diagram.findUnique({
+      where: { id: diagramId },
+      select: {
+        title: true,
+        description: true,
+        emoji: true,
+        isFavorite: true,
+        totalVersions: true,
+      },
+    });
+
+    if (!diagram) return null;
+
+    // Create new checkpoint with the restored content
+    const newCheckpointId = await ensureUniqueId(async (candidate) => {
+      const found = await tx.content.findUnique({
+        where: { id: candidate },
+        select: { id: true },
+      });
+      return Boolean(found);
+    });
+
+    await tx.content.create({
+      data: {
+        id: newCheckpointId,
+        diagramId,
+        content: checkpoint.content,
+        updatedAt: now,
+      },
+    });
+
+    // Update diagram timestamp and search vector
+    await tx.diagram.update({
+      where: { id: diagramId },
+      data: {
+        updatedAt: now,
+        searchVector: buildSearchVector(diagram.title, diagram.description, checkpoint.content),
+      },
+    });
+
+    // Prune old checkpoints if over limit
+    const extraContents = await tx.content.findMany({
+      where: { diagramId },
+      orderBy: { updatedAt: 'desc' },
+      skip: MAX_CHECKPOINTS,
+      select: { id: true },
+    });
+
+    if (extraContents.length > 0) {
+      await tx.content.deleteMany({
+        where: { id: { in: extraContents.map((c: { id: string }) => c.id) } },
+      });
+    }
+
+    const prunedCount = extraContents.length;
+
+    await tx.diagram.update({
+      where: { id: diagramId },
+      data: { totalVersions: diagram.totalVersions + 1 - prunedCount },
+    });
+
+    // Get updated diagram
+    const latest = await tx.diagram.findUnique({
+      where: { id: diagramId },
+      select: diagramWithLatestSelect,
+    });
+
+    if (!latest) return null;
+
+    return {
+      checkpoint: {
+        id: newCheckpointId,
+        content: checkpoint.content,
+        updatedAt: now.toISOString(),
+      },
+      diagram: toDiagram(latest as DiagramWithLatest),
+    };
+  });
+}
+
 export async function deleteDiagramById(id: string): Promise<boolean> {
   try {
     await prisma.diagram.delete({ where: { id } });

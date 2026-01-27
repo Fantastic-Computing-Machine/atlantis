@@ -1,5 +1,5 @@
 import { csrfFailureResponse, ensureCsrfCookie, validateCsrfToken } from '@/lib/csrf';
-import { createCheckpoint, getDiagramById, listCheckpoints } from '@/lib/data';
+import { createCheckpoint, deleteCheckpoint, getDiagramById, listCheckpoints, restoreCheckpoint } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 
@@ -57,5 +57,74 @@ export async function POST(
   } catch (error) {
     logApiError('POST /api/diagrams/[id]/checkpoint', error);
     return NextResponse.json({ error: 'Failed to create checkpoint' }, { status: 500 });
+  }
+}
+
+/**
+ * Restore a checkpoint as the current version
+ */
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!(await validateCsrfToken(request))) {
+    return csrfFailureResponse();
+  }
+
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const checkpointId = body?.checkpointId;
+
+    if (typeof checkpointId !== 'string' || !checkpointId.length) {
+      return NextResponse.json({ error: 'checkpointId is required' }, { status: 400 });
+    }
+
+    const result = await restoreCheckpoint(id, checkpointId);
+
+    if (!result) {
+      return NextResponse.json({ error: 'Checkpoint not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(result);
+  } catch (error) {
+    logApiError('PATCH /api/diagrams/[id]/checkpoint', error);
+    return NextResponse.json({ error: 'Failed to restore checkpoint' }, { status: 500 });
+  }
+}
+
+/**
+ * Delete a checkpoint
+ */
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!(await validateCsrfToken(request))) {
+    return csrfFailureResponse();
+  }
+
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const checkpointId = body?.checkpointId;
+
+    if (typeof checkpointId !== 'string' || !checkpointId.length) {
+      return NextResponse.json({ error: 'checkpointId is required' }, { status: 400 });
+    }
+
+    const deleted = await deleteCheckpoint(id, checkpointId);
+
+    if (!deleted) {
+      return NextResponse.json({ error: 'Checkpoint not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Cannot delete the current checkpoint') {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    logApiError('DELETE /api/diagrams/[id]/checkpoint', error);
+    return NextResponse.json({ error: 'Failed to delete checkpoint' }, { status: 500 });
   }
 }

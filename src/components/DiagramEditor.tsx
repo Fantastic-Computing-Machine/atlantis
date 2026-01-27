@@ -41,7 +41,7 @@ import { Checkpoint, Diagram, Tag } from '@/lib/types';
 import { useLiveSync } from '@/lib/useLiveSync';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { copyToClipboard, formatDate, cn } from '@/lib/utils';
-import { History, Info, Moon, Save, Search, Share2, Star, Sun, Menu, Settings2, Trash2, MoreHorizontal } from 'lucide-react';
+import { History, Info, Moon, Save, Search, Share2, Star, Sun, Menu, Settings2, Trash2, MoreHorizontal, RotateCcw, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
@@ -252,6 +252,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [isLoadingCheckpoints, setIsLoadingCheckpoints] = useState(false);
   const [isSavingCheckpoint, setIsSavingCheckpoint] = useState(false);
+  const [viewingCheckpointId, setViewingCheckpointId] = useState<string | null>(null);
   const { setTheme, theme } = useTheme();
   const settings = useDiagramStore((state) => state.settings);
   const updateDiagram = useDiagramStore((state) => state.updateDiagram);
@@ -326,6 +327,8 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   }, [diagram.content, selectedNodeId]);
 
   const handleEditorChange = (value: string) => {
+    // Ignore changes when viewing a past checkpoint (read-only mode)
+    if (viewingCheckpointId !== null) return;
     setDiagram((prev) => ({ ...prev, content: value }));
   };
 
@@ -422,16 +425,22 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
+        // Don't save when viewing a past checkpoint
+        if (viewingCheckpointId !== null) {
+          toast.info('Cannot save while viewing a past checkpoint');
+          return;
+        }
         saveChanges();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saveChanges]);
+  }, [saveChanges, viewingCheckpointId]);
 
   // Auto-save with debounce
   useEffect(() => {
-    if (!settings.autoSave) return;
+    // Don't auto-save when viewing a past checkpoint
+    if (!settings.autoSave || viewingCheckpointId !== null) return;
 
     const hasContentChanged = diagram.content !== lastSavedContentRef.current;
     const hasTitleChanged = diagram.title !== lastSavedTitleRef.current;
@@ -455,11 +464,12 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [diagram.content, diagram.title, diagram.description, tags, settings.autoSave, saveChanges]);
+  }, [diagram.content, diagram.title, diagram.description, tags, settings.autoSave, saveChanges, viewingCheckpointId]);
 
   // Save on blur for title (if auto-save is off)
   const handleTitleBlur = () => {
-    if (!settings.autoSave) {
+    // Don't save when viewing a past checkpoint
+    if (!settings.autoSave && viewingCheckpointId === null) {
       saveChanges();
     }
   };
@@ -569,13 +579,99 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     }
   }, [diagram, updateDiagram]);
 
-  const handleSelectCheckpoint = (checkpointId: string) => {
+  const handleViewCheckpoint = useCallback((checkpointId: string) => {
     const checkpoint = checkpoints.find((cp) => cp.id === checkpointId);
     if (!checkpoint) return;
+
+    // If viewing the current (first) checkpoint, clear viewing mode
+    if (checkpoints[0]?.id === checkpointId) {
+      setViewingCheckpointId(null);
+      return;
+    }
+
+    setViewingCheckpointId(checkpointId);
     setDiagram((prev) => ({ ...prev, content: checkpoint.content }));
-    updateDiagram(diagram.id, { content: checkpoint.content });
-    toast.success('Checkpoint loaded');
-  };
+    toast.info('Viewing past checkpoint (read-only)');
+  }, [checkpoints]);
+
+  const handleMakeCurrent = useCallback(async (checkpointId: string) => {
+    try {
+      const csrfToken = await ensureCsrfToken();
+      const res = await fetch(`/api/diagrams/${diagram.id}/checkpoint`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          [CSRF_HEADER_NAME]: csrfToken,
+        },
+        body: JSON.stringify({ checkpointId }),
+      });
+      if (!res.ok) throw new Error('Failed to restore checkpoint');
+      const data = await res.json();
+
+      // Update diagram with restored content
+      setDiagram(data.diagram);
+      lastSavedContentRef.current = data.diagram.content;
+      lastSavedTitleRef.current = data.diagram.title;
+      lastSavedDescriptionRef.current = data.diagram.description;
+      updateDiagram(diagram.id, data.diagram);
+
+      // Add new checkpoint to list
+      setCheckpoints((prev) => {
+        const next = [data.checkpoint as Checkpoint, ...prev.filter((cp) => cp.id !== data.checkpoint.id)];
+        return next.slice(0, MAX_CHECKPOINTS);
+      });
+
+      // Clear viewing mode
+      setViewingCheckpointId(null);
+      toast.success('Checkpoint restored as current');
+    } catch {
+      toast.error('Failed to restore checkpoint');
+    }
+  }, [diagram.id, updateDiagram]);
+
+  const handleDeleteCheckpoint = useCallback(async (checkpointId: string) => {
+    try {
+      const csrfToken = await ensureCsrfToken();
+      const res = await fetch(`/api/diagrams/${diagram.id}/checkpoint`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          [CSRF_HEADER_NAME]: csrfToken,
+        },
+        body: JSON.stringify({ checkpointId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete checkpoint');
+      }
+
+      // Remove from list
+      setCheckpoints((prev) => prev.filter((cp) => cp.id !== checkpointId));
+
+      // If we were viewing the deleted checkpoint, go back to current
+      if (viewingCheckpointId === checkpointId) {
+        setViewingCheckpointId(null);
+        // Reload current content
+        loadCheckpoints();
+      }
+
+      toast.success('Checkpoint deleted');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete checkpoint');
+    }
+  }, [diagram.id, viewingCheckpointId, loadCheckpoints]);
+
+  // When returning to current (clearing viewingCheckpointId), reload current content
+  useEffect(() => {
+    if (viewingCheckpointId === null && checkpoints.length > 0) {
+      const currentCheckpoint = checkpoints[0];
+      if (currentCheckpoint && diagram.content !== currentCheckpoint.content) {
+        setDiagram((prev) => ({ ...prev, content: currentCheckpoint.content }));
+      }
+    }
+  }, [viewingCheckpointId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isViewingPastCheckpoint = viewingCheckpointId !== null;
 
   // Show loading state until client hydration is complete
   if (!mounted) {
@@ -640,10 +736,14 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
             {/* Checkpoints */}
             <CheckpointHistory
               checkpoints={checkpoints}
+              currentCheckpointId={checkpoints[0]?.id}
+              viewingCheckpointId={viewingCheckpointId}
               isLoading={isLoadingCheckpoints}
               isSaving={isSavingCheckpoint}
               onCreateCheckpoint={handleSaveCheckpoint}
-              onRestoreCheckpoint={handleSelectCheckpoint}
+              onViewCheckpoint={handleViewCheckpoint}
+              onMakeCurrent={handleMakeCurrent}
+              onDeleteCheckpoint={handleDeleteCheckpoint}
             />
 
             {/* Desktop only actions moved to overflow menu on mobile if needed, but fitting key ones here */}
@@ -703,7 +803,25 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
           </Link>
         </div>
 
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 flex flex-col">
+          {/* Read-only banner when viewing past checkpoint */}
+          {isViewingPastCheckpoint && (
+            <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                <AlertCircle className="h-4 w-4" />
+                <span>Viewing past checkpoint (read-only)</span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                onClick={() => viewingCheckpointId && handleMakeCurrent(viewingCheckpointId)}
+              >
+                <RotateCcw className="h-3 w-3" />
+                Make Current
+              </Button>
+            </div>
+          )}
           <div className="sm:hidden border-b bg-muted/30 px-3 py-2 flex items-center gap-2">
             <button
               type="button"
