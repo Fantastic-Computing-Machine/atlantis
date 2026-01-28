@@ -104,6 +104,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/data ./data
 # Create data directory for diagram persistence
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 
+# Install TeX Live for LaTeX support
+RUN apk add --no-cache texlive-full fontconfig emf2svg
+
+
 # Switch to non-root user
 USER nextjs
 
