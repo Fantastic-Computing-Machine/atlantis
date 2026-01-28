@@ -105,7 +105,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/data ./data
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 
 # Install TeX Live for LaTeX support
-RUN apk add --no-cache texlive-full fontconfig emf2svg
+RUN apk add --no-cache texlive-full fontconfig
 
 
 # Switch to non-root user
@@ -120,4 +120,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Start via entrypoint (generates Prisma client + syncs schema at runtime)
 ENTRYPOINT ["./scripts/docker-entrypoint.sh"]
-
