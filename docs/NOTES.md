@@ -20,6 +20,7 @@ Atlantis includes a built-in notetaking feature with a code-editor-like experien
   - HTML
   - CSS
   - JSON
+  - Todo List (Interactive)
 
 - **Search & Replace**: Notepad++ style search panel with:
   - Find Next/Previous
@@ -36,6 +37,14 @@ Atlantis includes a built-in notetaking feature with a code-editor-like experien
   - Auto-save with manual save option
 
 - **Privacy**: Mark notes as private to hide content from API access.
+
+## Todo List
+
+When the language is set to "Todo List", the note transforms into an interactive task manager:
+
+- **Interactive UI**: Check/uncheck items, drag and drop to reorder, and add/delete tasks easily.
+- **Markdown Backed**: The list is stored as a standard Markdown task list (e.g., `- [ ] Task`), so it remains portable and readable as plain text.
+- **Multiline Support**: Tasks can contain multiple lines of text.
 
 ## API Endpoints
 

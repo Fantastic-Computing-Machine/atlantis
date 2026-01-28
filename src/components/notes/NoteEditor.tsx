@@ -31,6 +31,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { NoteSearchReplace } from './NoteSearchReplace';
 import { NoteMarkdownPreview } from './NoteMarkdownPreview';
+import { TodoList } from './TodoList';
 
 interface NoteEditorProps {
     value: string;
@@ -257,26 +258,30 @@ export function NoteEditor({
             {/* Code Editor + Optional Preview */}
             <div className="flex-1 min-h-0 overflow-hidden flex">
                 <div className={`${isMarkdown && showPreview ? 'w-1/2' : 'w-full'} h-full`}>
-                    <CodeMirror
-                        value={value}
-                        height="100%"
-                        theme={editorTheme}
-                        onChange={handleChange}
-                        onCreateEditor={handleCreateEditor}
-                        extensions={extensions}
-                        className="h-full text-sm [&_.cm-editor]:h-full [&_.cm-scroller]:!overflow-auto"
-                        basicSetup={{
-                            lineNumbers: showLineNumbers,
-                            foldGutter: true,
-                            highlightActiveLine: true,
-                            highlightActiveLineGutter: true,
-                            indentOnInput: true,
-                            bracketMatching: true,
-                            closeBrackets: true,
-                            autocompletion: false,
-                            highlightSelectionMatches: true,
-                        }}
-                    />
+                    {language === 'todo' ? (
+                        <TodoList value={value} onChange={handleChange} />
+                    ) : (
+                        <CodeMirror
+                            value={value}
+                            height="100%"
+                            theme={editorTheme}
+                            onChange={handleChange}
+                            onCreateEditor={handleCreateEditor}
+                            extensions={extensions}
+                            className="h-full text-sm [&_.cm-editor]:h-full [&_.cm-scroller]:!overflow-auto"
+                            basicSetup={{
+                                lineNumbers: showLineNumbers,
+                                foldGutter: true,
+                                highlightActiveLine: true,
+                                highlightActiveLineGutter: true,
+                                indentOnInput: true,
+                                bracketMatching: true,
+                                closeBrackets: true,
+                                autocompletion: false,
+                                highlightSelectionMatches: true,
+                            }}
+                        />
+                    )}
                 </div>
                 {isMarkdown && showPreview && (
                     <div className="w-1/2 h-full border-l overflow-auto">

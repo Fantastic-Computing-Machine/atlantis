@@ -1,10 +1,10 @@
 'use client';
 
 import { NoteEditor } from '@/components/notes/NoteEditor';
-import { TagPicker } from '@/components/tag-picker';
+
 import { ResponsiveTagPicker } from '@/components/responsive-tag-picker';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,14 +23,14 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
 import type { Note, Tag } from '@/lib/types';
 import { ensureCsrfToken, withCsrfHeader } from '@/lib/csrf-client';
 import { cn } from '@/lib/utils';
 import { useDiagramStore } from '@/lib/store';
 import { useLiveSync } from '@/lib/useLiveSync';
 import { useNotes } from '@/components/notes/NotesContext';
-import { ArrowLeft, Star, Trash2, ChevronDown, Save, Download, Plus, Moon, Sun, MoreHorizontal } from 'lucide-react';
+import { Star, Trash2, ChevronDown, Save, Download, Plus, Moon, Sun, MoreHorizontal } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -50,6 +50,7 @@ const SUPPORTED_LANGUAGES = [
     { value: 'html', label: 'HTML' },
     { value: 'css', label: 'CSS' },
     { value: 'json', label: 'JSON' },
+    { value: 'todo', label: 'Todo List' },
 ];
 
 export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
