@@ -19,6 +19,7 @@ Self-hosted platform for Mermaid.js diagrams, notes, and knowledge management. B
 ## Features
 
 - Modern Editor: Split-pane interface with code editor and live preview.
+- Interactive Todo Lists: Manage tasks with drag-and-drop support, backed by standard Markdown.
 - Full Mermaid Support: Supports all diagram types supported by Mermaid.js.
 - Local Persistence: Diagrams are stored in SQLite by default (data/atlantis.db), with optional Postgres/MySQL via envs.
 - Dark/Light Mode: Beautiful UI that adapts to your system preference.

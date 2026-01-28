@@ -17,11 +17,11 @@
     },
     {
       "name": "Notes",
-      "description": "Manage your code notes and snippets"
+      "description": "See and manage your notes"
     }
   ],
   "paths": {
-    "/api/access": {
+    "/api/access/diagrams": {
       "get": {
         "tags": [
           "Diagrams"
@@ -100,7 +100,7 @@
         }
       }
     },
-    "/api/access/{id}": {
+    "/api/access/diagrams/{id}": {
       "get": {
         "tags": [
           "Diagrams"
@@ -138,61 +138,31 @@
         }
       }
     },
-    "/api/notes": {
+    "/api/access/notes": {
       "get": {
         "tags": [
           "Notes"
         ],
         "summary": "List all notes",
-        "description": "Retrieve a list of notes with optional filtering and sorting. Content is omitted from the list for performance.",
+        "description": "Retrieve a list of notes. Content is omitted from the list for performance. Requires `ENABLE_API_ACCESS=true`.",
         "parameters": [
           {
             "name": "limit",
             "in": "query",
             "schema": {
               "type": "integer",
-              "default": 24
+              "default": 10
             },
             "description": "Number of notes to return"
           },
           {
-            "name": "offset",
+            "name": "page",
             "in": "query",
             "schema": {
               "type": "integer",
-              "default": 0
+              "default": 1
             },
-            "description": "Pagination offset"
-          },
-          {
-            "name": "query",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Search query"
-          },
-          {
-            "name": "sort",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "recent",
-                "old",
-                "alphabetical"
-              ],
-              "default": "recent"
-            },
-            "description": "Sort option"
-          },
-          {
-            "name": "starred",
-            "in": "query",
-            "schema": {
-              "type": "boolean"
-            },
-            "description": "Filter by starred status"
+            "description": "Page number to retrieve"
           }
         ],
         "responses": {
@@ -205,6 +175,9 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "API Access Disabled"
           }
         }
       },
@@ -213,7 +186,7 @@
           "Notes"
         ],
         "summary": "Create a new note",
-        "description": "Create a new note.",
+        "description": "Create a new note. Requires `ENABLE_API_ACCESS=true`.",
         "requestBody": {
           "required": true,
           "content": {
@@ -225,7 +198,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Note created successfully",
             "content": {
               "application/json": {
@@ -234,17 +207,23 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "403": {
+            "description": "API Access Disabled"
           }
         }
       }
     },
-    "/api/notes/{id}": {
+    "/api/access/notes/{id}": {
       "get": {
         "tags": [
           "Notes"
         ],
         "summary": "Get a note",
-        "description": "Retrieve a specific note by ID.",
+        "description": "Retrieve a specific note by ID. Requires `ENABLE_API_ACCESS=true`.",
         "parameters": [
           {
             "name": "id",
@@ -269,69 +248,9 @@
           },
           "404": {
             "description": "Note not found"
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "Notes"
-        ],
-        "summary": "Update a note",
-        "description": "Update a note's content or metadata.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Note ID"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateNoteRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Note updated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Note"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Notes"
-        ],
-        "summary": "Delete a note",
-        "description": "Delete a note by ID.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Note ID"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Note deleted successfully"
+          },
+          "403": {
+            "description": "API Access Disabled"
           }
         }
       }
@@ -443,10 +362,6 @@
             "type": "string",
             "example": "markdown"
           },
-          "emoji": {
-            "type": "string",
-            "example": "📝"
-          },
           "starred": {
             "type": "boolean",
             "example": true
@@ -471,46 +386,43 @@
           "title": {
             "type": "string",
             "example": "Untitled Note"
-          }
-        }
-      },
-      "UpdateNoteRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string"
           },
           "content": {
-            "type": "string"
+            "type": "string",
+            "example": "Note content..."
           },
           "language": {
-            "type": "string"
-          },
-          "starred": {
-            "type": "boolean"
-          },
-          "private": {
-            "type": "boolean"
+            "type": "string",
+            "example": "markdown",
+            "description": "Language or file type (e.g., markdown, todo, javascript)"
           }
         }
       },
       "NoteList": {
         "type": "object",
         "properties": {
-          "items": {
+          "data": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Note"
             }
           },
-          "total": {
-            "type": "integer"
-          },
-          "hasMore": {
-            "type": "boolean"
-          },
-          "nextOffset": {
-            "type": "integer"
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              },
+              "totalPages": {
+                "type": "integer"
+              }
+            }
           }
         }
       }

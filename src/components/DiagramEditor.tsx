@@ -33,17 +33,20 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { Textarea } from '@/components/ui/textarea';
+import { TagPicker } from '@/components/tag-picker';
+import { ResponsiveTagPicker } from '@/components/responsive-tag-picker';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
-import { Checkpoint, Diagram } from '@/lib/types';
+import { Checkpoint, Diagram, Tag } from '@/lib/types';
 import { useLiveSync } from '@/lib/useLiveSync';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { copyToClipboard, formatDate, cn } from '@/lib/utils';
-import { History, Info, Moon, Save, Search, Share2, Star, Sun, Menu, Settings2, Trash2 } from 'lucide-react';
+import { History, Info, Moon, Save, Search, Share2, Star, Sun, Menu, Settings2, Trash2, MoreHorizontal, RotateCcw, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { CheckpointHistory } from '@/components/CheckpointHistory';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -238,6 +241,7 @@ const upsertNodeStyleLine = (content: string, nodeId: string, color: string | nu
 export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const router = useRouter();
   const [diagram, setDiagram] = useState<Diagram>(initialDiagram);
+  const [tags, setTags] = useState<Tag[]>(initialDiagram.tags || []);
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
@@ -248,6 +252,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [isLoadingCheckpoints, setIsLoadingCheckpoints] = useState(false);
   const [isSavingCheckpoint, setIsSavingCheckpoint] = useState(false);
+  const [viewingCheckpointId, setViewingCheckpointId] = useState<string | null>(null);
   const { setTheme, theme } = useTheme();
   const settings = useDiagramStore((state) => state.settings);
   const updateDiagram = useDiagramStore((state) => state.updateDiagram);
@@ -258,6 +263,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const lastSavedContentRef = useRef(initialDiagram.content);
   const lastSavedTitleRef = useRef(initialDiagram.title);
   const lastSavedDescriptionRef = useRef(initialDiagram.description);
+  const lastSavedTagsRef = useRef(initialDiagram.tags || []);
   const selectedNodeId = selectedNode?.id ?? null;
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [activePane, setActivePane] = useState<'editor' | 'preview'>('preview');
@@ -276,9 +282,11 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     intervalMs: settings.liveSyncInterval ?? 5000,
     onUpdate: (remoteDiagram) => {
       setDiagram(remoteDiagram);
+      setTags(remoteDiagram.tags || []);
       lastSavedContentRef.current = remoteDiagram.content;
       lastSavedTitleRef.current = remoteDiagram.title;
       lastSavedDescriptionRef.current = remoteDiagram.description;
+      lastSavedTagsRef.current = remoteDiagram.tags || [];
       updateDiagram(diagram.id, remoteDiagram);
     },
     onExternalChange: () => {
@@ -319,6 +327,8 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   }, [diagram.content, selectedNodeId]);
 
   const handleEditorChange = (value: string) => {
+    // Ignore changes when viewing a past checkpoint (read-only mode)
+    if (viewingCheckpointId !== null) return;
     setDiagram((prev) => ({ ...prev, content: value }));
   };
 
@@ -384,10 +394,11 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
           'Content-Type': 'application/json',
           [CSRF_HEADER_NAME]: csrfToken,
         },
-        body: JSON.stringify(diagram),
+        body: JSON.stringify({ ...diagram, tags: tags.map(t => t.id) }),
       });
       if (!res.ok) throw new Error('Failed to save');
       const updated = await res.json();
+      setTags(updated.tags || []);
       setDiagram((prev) => ({ ...prev, updatedAt: updated.updatedAt }));
       updateDiagram(diagram.id, {
         title: diagram.title,
@@ -398,6 +409,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
       lastSavedContentRef.current = diagram.content;
       lastSavedTitleRef.current = diagram.title;
       lastSavedDescriptionRef.current = diagram.description;
+      lastSavedTagsRef.current = updated.tags || [];
       if (showToast) {
         toast.success('Changes saved');
       }
@@ -406,29 +418,36 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     } catch {
       toast.error('Failed to save changes');
     }
-  }, [diagram, updateDiagram, syncFromServer]);
+  }, [diagram, updateDiagram, syncFromServer, tags]);
 
   // Ctrl+S to save
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
+        // Don't save when viewing a past checkpoint
+        if (viewingCheckpointId !== null) {
+          toast.info('Cannot save while viewing a past checkpoint');
+          return;
+        }
         saveChanges();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saveChanges]);
+  }, [saveChanges, viewingCheckpointId]);
 
   // Auto-save with debounce
   useEffect(() => {
-    if (!settings.autoSave) return;
+    // Don't auto-save when viewing a past checkpoint
+    if (!settings.autoSave || viewingCheckpointId !== null) return;
 
     const hasContentChanged = diagram.content !== lastSavedContentRef.current;
     const hasTitleChanged = diagram.title !== lastSavedTitleRef.current;
     const hasDescriptionChanged = diagram.description !== lastSavedDescriptionRef.current;
+    const hasTagsChanged = JSON.stringify(tags) !== JSON.stringify(lastSavedTagsRef.current);
 
-    if (!hasContentChanged && !hasTitleChanged && !hasDescriptionChanged) return;
+    if (!hasContentChanged && !hasTitleChanged && !hasDescriptionChanged && !hasTagsChanged) return;
 
     // Clear existing timer
     if (autoSaveTimerRef.current) {
@@ -445,11 +464,12 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [diagram.content, diagram.title, diagram.description, settings.autoSave, saveChanges]);
+  }, [diagram.content, diagram.title, diagram.description, tags, settings.autoSave, saveChanges, viewingCheckpointId]);
 
   // Save on blur for title (if auto-save is off)
   const handleTitleBlur = () => {
-    if (!settings.autoSave) {
+    // Don't save when viewing a past checkpoint
+    if (!settings.autoSave && viewingCheckpointId === null) {
       saveChanges();
     }
   };
@@ -559,13 +579,99 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     }
   }, [diagram, updateDiagram]);
 
-  const handleSelectCheckpoint = (checkpointId: string) => {
+  const handleViewCheckpoint = useCallback((checkpointId: string) => {
     const checkpoint = checkpoints.find((cp) => cp.id === checkpointId);
     if (!checkpoint) return;
+
+    // If viewing the current (first) checkpoint, clear viewing mode
+    if (checkpoints[0]?.id === checkpointId) {
+      setViewingCheckpointId(null);
+      return;
+    }
+
+    setViewingCheckpointId(checkpointId);
     setDiagram((prev) => ({ ...prev, content: checkpoint.content }));
-    updateDiagram(diagram.id, { content: checkpoint.content });
-    toast.success('Checkpoint loaded');
-  };
+    toast.info('Viewing past checkpoint (read-only)');
+  }, [checkpoints]);
+
+  const handleMakeCurrent = useCallback(async (checkpointId: string) => {
+    try {
+      const csrfToken = await ensureCsrfToken();
+      const res = await fetch(`/api/diagrams/${diagram.id}/checkpoint`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          [CSRF_HEADER_NAME]: csrfToken,
+        },
+        body: JSON.stringify({ checkpointId }),
+      });
+      if (!res.ok) throw new Error('Failed to restore checkpoint');
+      const data = await res.json();
+
+      // Update diagram with restored content
+      setDiagram(data.diagram);
+      lastSavedContentRef.current = data.diagram.content;
+      lastSavedTitleRef.current = data.diagram.title;
+      lastSavedDescriptionRef.current = data.diagram.description;
+      updateDiagram(diagram.id, data.diagram);
+
+      // Add new checkpoint to list
+      setCheckpoints((prev) => {
+        const next = [data.checkpoint as Checkpoint, ...prev.filter((cp) => cp.id !== data.checkpoint.id)];
+        return next.slice(0, MAX_CHECKPOINTS);
+      });
+
+      // Clear viewing mode
+      setViewingCheckpointId(null);
+      toast.success('Checkpoint restored as current');
+    } catch {
+      toast.error('Failed to restore checkpoint');
+    }
+  }, [diagram.id, updateDiagram]);
+
+  const handleDeleteCheckpoint = useCallback(async (checkpointId: string) => {
+    try {
+      const csrfToken = await ensureCsrfToken();
+      const res = await fetch(`/api/diagrams/${diagram.id}/checkpoint`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          [CSRF_HEADER_NAME]: csrfToken,
+        },
+        body: JSON.stringify({ checkpointId }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete checkpoint');
+      }
+
+      // Remove from list
+      setCheckpoints((prev) => prev.filter((cp) => cp.id !== checkpointId));
+
+      // If we were viewing the deleted checkpoint, go back to current
+      if (viewingCheckpointId === checkpointId) {
+        setViewingCheckpointId(null);
+        // Reload current content
+        loadCheckpoints();
+      }
+
+      toast.success('Checkpoint deleted');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete checkpoint');
+    }
+  }, [diagram.id, viewingCheckpointId, loadCheckpoints]);
+
+  // When returning to current (clearing viewingCheckpointId), reload current content
+  useEffect(() => {
+    if (viewingCheckpointId === null && checkpoints.length > 0) {
+      const currentCheckpoint = checkpoints[0];
+      if (currentCheckpoint && diagram.content !== currentCheckpoint.content) {
+        setDiagram((prev) => ({ ...prev, content: currentCheckpoint.content }));
+      }
+    }
+  }, [viewingCheckpointId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isViewingPastCheckpoint = viewingCheckpointId !== null;
 
   // Show loading state until client hydration is complete
   if (!mounted) {
@@ -583,203 +689,102 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     <>
       <div className="h-screen w-screen overflow-hidden bg-background text-foreground flex flex-col pb-24 sm:pb-0">
         {/* Header */}
-        <div className="h-14 border-b flex sm:grid sm:grid-cols-[1fr_auto_1fr] items-center px-3 sm:px-4 bg-background/50 backdrop-blur-sm z-10 shrink-0 gap-2 sm:gap-3 justify-between">
+        <div className="h-14 border-b flex items-center px-4 bg-background/50 backdrop-blur-sm z-10 shrink-0 justify-between gap-4">
 
-          {/* Left: Logo & Title */}
-          <div className="flex items-center gap-2 sm:gap-3 overflow-hidden flex-1 sm:flex-initial min-w-0">
-            {/* Mobile formatted title */}
-            <div className="flex sm:hidden items-center gap-2 min-w-0 text-base font-semibold">
-              <Link href="/" className="shrink-0 hover:opacity-80 transition-opacity flex items-center gap-1">
-                <span className="text-2xl">🔱</span>
-              </Link>
-              <span className="text-muted-foreground">{'//'}</span>
+          {/* Left: Branding & Title */}
+          <div className="flex items-center gap-3 overflow-hidden min-w-0 flex-1">
+            <Link href="/" className="shrink-0 hover:opacity-80 transition-opacity flex items-center gap-1">
+              <span className="text-2xl sm:hidden">🔱</span>
+              <span className="hidden sm:inline font-semibold text-lg">🔱 atlantis //</span>
+            </Link>
+
+            <div className="h-6 w-px bg-border shrink-0 hidden sm:block" />
+
+            <div className="flex items-center gap-2 min-w-0 flex-1 max-w-xl">
               <span className="text-xl shrink-0">{diagram.emoji || '📊'}</span>
               <input
                 value={diagram.title}
                 onChange={handleTitleChange}
                 onBlur={handleTitleBlur}
                 maxLength={60}
-                className="bg-transparent border-none focus:outline-none focus:ring-0 px-0 w-full min-w-[40px] max-w-[65vw] truncate text-base"
+                className="bg-transparent border-none focus:outline-none focus:ring-0 px-0 min-w-[60px] flex-1 truncate font-medium text-sm sm:text-base"
                 placeholder="Untitled Diagram"
               />
+              <div className="shrink-0">
+                <ResponsiveTagPicker
+                  selectedTags={tags}
+                  onTagsChange={setTags}
+                  maxTags={3}
+                  align="start"
+                />
+              </div>
             </div>
-
-            {/* Desktop layout */}
-            <div className="hidden sm:flex items-center gap-2 min-w-0 text-lg font-medium flex-1 sm:flex-initial">
-              <Link href="/" className="shrink-0 hover:opacity-80 transition-opacity flex items-center gap-1">
-                <span className="hidden sm:inline">🔱 atlantis //</span>
-              </Link>
-
-              <span className="text-xl shrink-0 hidden sm:inline">{diagram.emoji || '📊'}</span>
-
-              <input
-                value={diagram.title}
-                onChange={handleTitleChange}
-                onBlur={handleTitleBlur}
-                maxLength={60}
-                className="bg-transparent border-none focus:outline-none focus:ring-0 px-0 w-full min-w-[60px] max-w-[75vw] truncate font-semibold sm:font-normal"
-                placeholder="Untitled Diagram"
-              />
-            </div>
-          </div>
-
-          {/* Center: Search (Desktop only) */}
-          <div className="hidden sm:flex justify-center">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => setIsSearchOpen(true)}
-              aria-label="Search diagrams"
-            >
-              <Search className="h-4 w-4" />
-              <span className="hidden sm:inline">Search</span>
-              <span className="text-[11px] text-muted-foreground hidden lg:inline">{shortcutHint}</span>
-            </Button>
           </div>
 
           {/* Right: Actions */}
-          <div className="flex items-center justify-end gap-2 shrink-0">
-            {/* Mobile Search Button */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Search */}
             <Button
               variant="ghost"
               size="icon"
-              className="sm:hidden"
               onClick={() => setIsSearchOpen(true)}
+              title={`Search (${shortcutHint})`}
             >
               <Search className="h-4 w-4" />
             </Button>
 
-            {/* Desktop Actions Group */}
-            <div className="hidden md:flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsInfoOpen(true)}
-                aria-label="Diagram Info"
-              >
-                <Info className="h-4 w-4" />
-              </Button>
+            {/* Checkpoints */}
+            <CheckpointHistory
+              checkpoints={checkpoints}
+              currentCheckpointId={checkpoints[0]?.id}
+              viewingCheckpointId={viewingCheckpointId}
+              isLoading={isLoadingCheckpoints}
+              isSaving={isSavingCheckpoint}
+              onCreateCheckpoint={handleSaveCheckpoint}
+              onViewCheckpoint={handleViewCheckpoint}
+              onMakeCurrent={handleMakeCurrent}
+              onDeleteCheckpoint={handleDeleteCheckpoint}
+            />
 
-              <Button variant="ghost" size="icon" onClick={handleShare}>
-                <Share2 className="h-4 w-4" />
-              </Button>
+            {/* Desktop only actions moved to overflow menu on mobile if needed, but fitting key ones here */}
+            <Button variant="ghost" size="icon" onClick={handleShare} title="Share">
+              <Share2 className="h-4 w-4" />
+            </Button>
 
-              <Button
-                variant={diagram.isFavorite ? 'default' : 'ghost'}
-                size="icon"
-                onClick={handleFavorite}
-                aria-pressed={diagram.isFavorite}
-                className={diagram.isFavorite ? 'bg-amber-500 text-amber-50 hover:bg-amber-500/90' : ''}
-              >
-                <Star className={diagram.isFavorite ? 'h-4 w-4 fill-current' : 'h-4 w-4'} />
-              </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" title="More options">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setIsInfoOpen(true)}>
+                  <Info className="mr-2 h-4 w-4" />
+                  <span>Info</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleFavorite}>
+                  <Star className={cn("mr-2 h-4 w-4", diagram.isFavorite && "fill-amber-400 text-amber-400")} />
+                  <span>{diagram.isFavorite ? 'Unfavorite' : 'Favorite'}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+                  {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                  <span>Switch Theme</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings">
+                    <Settings2 className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  <span>Delete Diagram</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              >
-                <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                asChild
-                aria-label="Settings"
-              >
-                <Link href="/settings">
-                  <Settings2 className="h-4 w-4" />
-                </Link>
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-destructive hover:text-destructive"
-                onClick={() => setShowDeleteDialog(true)}
-                aria-label="Delete diagram"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Mobile Actions Menu */}
-            <div className="md:hidden">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Menu className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setIsInfoOpen(true)}>
-                    <Info className="mr-2 h-4 w-4" />
-                    <span>Info</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleShare}>
-                    <Share2 className="mr-2 h-4 w-4" />
-                    <span>Share</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleFavorite}>
-                    <Star className={cn("mr-2 h-4 w-4", diagram.isFavorite && "fill-amber-400 text-amber-400")} />
-                    <span>{diagram.isFavorite ? 'Unfavorite' : 'Favorite'}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
-                    {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
-                    <span>Switch Theme</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings" className="flex items-center">
-                      <Settings2 className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive">
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    <span>Delete Diagram</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={handleSaveCheckpoint}
-                disabled={isSavingCheckpoint}
-              >
-                <History size={16} />
-                <span className="hidden sm:inline">Checkpoint</span>
-              </Button>
-
-              <select
-                className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value) {
-                    handleSelectCheckpoint(e.target.value);
-                    e.target.value = '';
-                  }
-                }}
-                disabled={isLoadingCheckpoints || checkpoints.length === 0}
-                aria-label="Switch checkpoint"
-              >
-                <option value="" disabled>
-                  {isLoadingCheckpoints ? 'Loading...' : 'Switch checkpoint'}
-                </option>
-                {checkpoints.map((cp) => (
-                  <option key={cp.id} value={cp.id}>
-                    {new Date(cp.updatedAt).toLocaleString()}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <div className="w-px h-6 bg-border mx-1" />
 
             <Button onClick={() => saveChanges()} size="sm" className="gap-2">
               <Save size={16} />
@@ -798,7 +803,25 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
           </Link>
         </div>
 
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 flex flex-col">
+          {/* Read-only banner when viewing past checkpoint */}
+          {isViewingPastCheckpoint && (
+            <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                <AlertCircle className="h-4 w-4" />
+                <span>Viewing past checkpoint (read-only)</span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                onClick={() => viewingCheckpointId && handleMakeCurrent(viewingCheckpointId)}
+              >
+                <RotateCcw className="h-3 w-3" />
+                Make Current
+              </Button>
+            </div>
+          )}
           <div className="sm:hidden border-b bg-muted/30 px-3 py-2 flex items-center gap-2">
             <button
               type="button"

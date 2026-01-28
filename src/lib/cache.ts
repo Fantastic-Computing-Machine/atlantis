@@ -29,15 +29,15 @@ class NoOpCache implements CacheProvider {
         return null;
     }
 
-    async set<T>(key: string, value: T, ttlMs: number): Promise<void> {
+    async set<T>(_key: string, _value: T, _ttlMs: number): Promise<void> {
         // No-op
     }
 
-    async delete(key: string): Promise<void> {
+    async delete(_key: string): Promise<void> {
         // No-op
     }
 
-    async deletePrefix(prefix: string): Promise<void> {
+    async deletePrefix(_prefix: string): Promise<void> {
         // No-op
     }
 
@@ -323,6 +323,17 @@ export type CacheStatus = 'HIT' | 'MISS' | 'BYPASS';
  */
 export function withCacheHeader(response: Response, status: CacheStatus): Response {
     response.headers.set('X-Cache-Status', status);
+    return response;
+}
+
+/**
+ * Helper to add no-cache headers to prevent browser/proxy caching.
+ * Use this for live sync polling responses to ensure fresh data.
+ */
+export function withNoCacheHeaders(response: Response): Response {
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
     return response;
 }
 

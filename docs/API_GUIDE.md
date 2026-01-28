@@ -1,6 +1,6 @@
 # API Guide
 
-Atlantis provides a REST API to manage diagrams programmatically. This feature is disabled by default for security.
+Atlantis provides a REST API to manage diagrams and notes programmatically. This feature is disabled by default for security.
 
 ## Enabling the API
 
@@ -30,11 +30,13 @@ Once enabled, you can access the interactive API documentation at:
 
 Base path: `/api/access`
 
-### 1. Get All Diagrams
+### Diagrams
+
+#### 1. Get All Diagrams
 
 Retrieve a paginated list of diagrams.
 
-- **URL**: `/
+- **URL**: `/diagrams`
 - **Method**: `GET`
 - **Query Params**:
   - `page` (optional): Page number (default: 1)
@@ -55,11 +57,11 @@ Retrieve a paginated list of diagrams.
     }
     ```
 
-### 2. Get Single Diagram
+#### 2. Get Single Diagram
 
 Retrieve full details of a specific diagram.
 
-- **URL**: `/:id`
+- **URL**: `/diagrams/:id`
 - **Method**: `GET`
 - **Response**:
 
@@ -75,11 +77,11 @@ Retrieve full details of a specific diagram.
     }
     ```
 
-### 3. Create Diagram
+#### 3. Create Diagram
 
 Create a new diagram. Validates Mermaid syntax before saving.
 
-- **URL**: `/
+- **URL**: `/diagrams`
 - **Method**: `POST`
 - **Body**:
 
@@ -94,3 +96,78 @@ Create a new diagram. Validates Mermaid syntax before saving.
     Returns the created diagram object.
 - **Errors**:
   - 400 Bad Request: If content is missing or invalid Mermaid syntax.
+
+### Notes
+
+#### 1. Get All Notes
+
+Retrieve a paginated list of notes.
+
+- **URL**: `/notes`
+- **Method**: `GET`
+- **Query Params**:
+  - `page` (optional): Page number (default: 1)
+  - `limit` (optional): Items per page (default: 10)
+- **Response**:
+
+    ```json
+    {
+      "data": [
+        { 
+          "id": "note123", 
+          "title": "Meeting Notes",
+          "language": "markdown",
+          "createdAt": "...",
+          "updatedAt": "..." 
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "limit": 10,
+        "total": 5,
+        "totalPages": 1
+      }
+    }
+    ```
+
+#### 2. Get Single Note
+
+Retrieve full details of a specific note.
+
+- **URL**: `/notes/:id`
+- **Method**: `GET`
+- **Response**:
+
+    ```json
+    {
+      "id": "note123",
+      "title": "Meeting Notes",
+      "content": "# Agenda...",
+      "language": "markdown",
+      "starred": false,
+      "private": false,
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+    ```
+
+    *Note: Private notes will have their content masked if accessed publicly without authentication (though currently API access tokens are not fully specified, `ENABLE_API_ACCESS` is the main gate).*
+
+#### 3. Create Note
+
+Create a new note.
+
+- **URL**: `/notes`
+- **Method**: `POST`
+- **Body**:
+
+    ```json
+    {
+      "title": "New Note",
+      "content": "Note content here",
+      "language": "markdown" // or "todo", "javascript", etc.
+    }
+    ```
+
+- **Response** (201 Created):
+    Returns the created note object.

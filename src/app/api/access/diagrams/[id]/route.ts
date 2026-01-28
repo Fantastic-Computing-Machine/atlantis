@@ -24,7 +24,7 @@ export async function GET(
 
     return NextResponse.json(diagram);
   } catch (error) {
-    logApiError('GET /api/access/[id]', error);
+    logApiError('GET /api/access/diagrams/[id]', error);
     return NextResponse.json({ error: 'Failed to fetch diagram' }, { status: 500 });
   }
 }

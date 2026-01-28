@@ -2,7 +2,7 @@ import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { getNoteById, updateNoteById, deleteNoteById } from '@/lib/notes-data';
 import { logApiError } from '@/lib/logger';
 import { noteUpdateSchema } from '@/lib/schemas';
-import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS, withCacheHeader, type CacheStatus } from '@/lib/cache';
+import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS, withCacheHeader, withNoCacheHeaders, type CacheStatus } from '@/lib/cache';
 import { NextResponse } from 'next/server';
 
 const PRIVATE_CONTENT_MESSAGE = 'Content policy in effect.';
@@ -34,9 +34,9 @@ export async function GET(
                     createdAt: note.createdAt,
                     updatedAt: note.updatedAt,
                 };
-                return withCacheHeader(NextResponse.json(privateNote), 'BYPASS');
+                return withNoCacheHeaders(withCacheHeader(NextResponse.json(privateNote), 'BYPASS'));
             }
-            return withCacheHeader(NextResponse.json(note), 'BYPASS');
+            return withNoCacheHeaders(withCacheHeader(NextResponse.json(note), 'BYPASS'));
         }
 
         const cache = getCache();
@@ -107,6 +107,7 @@ export async function PATCH(
             language: result.data.language,
             starred: result.data.starred,
             private: result.data.private,
+            tags: result.data.tags,
         });
 
         if (!updatedNote) {

@@ -1,3 +1,10 @@
+export interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+  color: string;
+}
+
 export interface Diagram {
   id: string;
   title: string;
@@ -8,6 +15,7 @@ export interface Diagram {
   updatedAt: string;
   isFavorite: boolean;
   totalVersions: number;
+  tags?: Tag[];
 }
 
 export type SortOption = 'recent' | 'old' | 'alphabetical' | 'versions';
@@ -35,6 +43,7 @@ export interface Note {
   private: boolean;
   createdAt: string;
   updatedAt: string;
+  tags?: Tag[];
 }
 
 export type NoteSortOption = 'recent' | 'old' | 'alphabetical';

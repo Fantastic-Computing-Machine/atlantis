@@ -2,7 +2,7 @@ import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { deleteDiagramById, getDiagramById, updateDiagramById } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { diagramSchema } from '@/lib/schemas';
-import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS, withCacheHeader, type CacheStatus } from '@/lib/cache';
+import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS, withCacheHeader, withNoCacheHeaders, type CacheStatus } from '@/lib/cache';
 import { NextResponse } from 'next/server';
 
 export async function GET(
@@ -20,7 +20,7 @@ export async function GET(
       if (!diagram) {
         return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });
       }
-      return withCacheHeader(NextResponse.json(diagram), 'BYPASS');
+      return withNoCacheHeaders(withCacheHeader(NextResponse.json(diagram), 'BYPASS'));
     }
 
     const cache = getCache();
@@ -67,7 +67,10 @@ export async function PUT(
       );
     }
 
-    const updatedDiagram = await updateDiagramById(id, result.data);
+    const updatedDiagram = await updateDiagramById(id, {
+      ...result.data,
+      tags: result.data.tags,
+    });
 
     if (!updatedDiagram) {
       return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });

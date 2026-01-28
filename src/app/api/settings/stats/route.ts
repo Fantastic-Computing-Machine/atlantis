@@ -10,9 +10,10 @@ type ActivityDay = {
 export async function GET() {
     try {
         // Fetch total counts
-        const [totalNotes, totalDiagrams] = await Promise.all([
+        const [totalNotes, totalDiagrams, totalTags] = await Promise.all([
             prisma.note.count(),
             prisma.diagram.count(),
+            prisma.tag.count(),
         ]);
 
         // Calculate activity for the last 30 days
@@ -70,6 +71,7 @@ export async function GET() {
         return NextResponse.json({
             totalNotes,
             totalDiagrams,
+            totalTags,
             activity,
         });
     } catch (error) {

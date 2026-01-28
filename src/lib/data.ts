@@ -10,6 +10,7 @@ const MAX_PAGE_SIZE = 100;
 const MAX_CHECKPOINTS = 15;
 const TITLE_MAX = 100;
 const DESCRIPTION_MAX = 400;
+const MAX_TAGS_PER_ITEM = 3;
 
 type TransactionClient = typeof prisma;
 const diagramWithLatestSelect = {
@@ -22,6 +23,7 @@ const diagramWithLatestSelect = {
   isFavorite: true,
   totalVersions: true,
   searchVector: true,
+  tags: true,
   contents: {
     orderBy: { updatedAt: 'desc' as const },
     take: 1,
@@ -33,15 +35,7 @@ type DiagramWithLatest = Prisma.DiagramGetPayload<{
 }>;
 
 
-function normalizeLimit(limit?: number | null) {
-  if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
-  return Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE);
-}
 
-function normalizeOffset(offset?: number | null) {
-  if (!Number.isFinite(offset)) return 0;
-  return Math.max(Math.trunc(offset as number), 0);
-}
 
 function toDiagram(diagram: DiagramWithLatest): Diagram {
   const latest = diagram.contents[0];
@@ -55,6 +49,7 @@ function toDiagram(diagram: DiagramWithLatest): Diagram {
     updatedAt: diagram.updatedAt.toISOString(),
     isFavorite: diagram.isFavorite,
     totalVersions: diagram.totalVersions,
+    tags: diagram.tags,
   };
 }
 
@@ -91,12 +86,14 @@ export async function getDiagramPage({
   query,
   sort = 'recent',
   favoritesOnly = false,
+  tagSlug,
 }: {
   limit?: number;
   offset?: number;
   query?: string;
   sort?: import('./types').SortOption;
   favoritesOnly?: boolean;
+  tagSlug?: string;
 }): Promise<DiagramPage> {
   const normalizedLimit = normalizeLimit(limit);
   const normalizedOffset = normalizeOffset(offset);
@@ -107,6 +104,9 @@ export async function getDiagramPage({
   }
   if (favoritesOnly) {
     where.isFavorite = true;
+  }
+  if (tagSlug) {
+    where.tags = { some: { slug: tagSlug } };
   }
 
   let orderBy: Prisma.DiagramOrderByWithRelationInput = { updatedAt: 'desc' };
@@ -124,6 +124,56 @@ export async function getDiagramPage({
     default:
       orderBy = { updatedAt: 'desc' };
       break;
+  }
+
+
+
+  const diagramWithLatestSelect = {
+    id: true,
+    title: true,
+    description: true,
+    emoji: true,
+    createdAt: true,
+    updatedAt: true,
+    isFavorite: true,
+    totalVersions: true,
+    searchVector: true,
+    tags: true,
+    contents: {
+      orderBy: { updatedAt: 'desc' as const },
+      take: 1,
+      select: { id: true, content: true, updatedAt: true },
+    },
+  } satisfies Prisma.DiagramSelect;
+  type DiagramWithLatest = Prisma.DiagramGetPayload<{
+    select: typeof diagramWithLatestSelect;
+  }>;
+
+
+  function normalizeLimit(limit?: number | null) {
+    if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
+    return Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE);
+  }
+
+  function normalizeOffset(offset?: number | null) {
+    if (!Number.isFinite(offset)) return 0;
+    return Math.max(Math.trunc(offset as number), 0);
+  }
+
+  function toDiagram(diagram: DiagramWithLatest): Diagram {
+    const latest = diagram.contents[0];
+    return {
+      id: diagram.id,
+      title: diagram.title,
+      description: diagram.description,
+      content: latest?.content ?? '',
+      emoji: diagram.emoji,
+      createdAt: diagram.createdAt.toISOString(),
+      updatedAt: diagram.updatedAt.toISOString(),
+      isFavorite: diagram.isFavorite,
+      totalVersions: diagram.totalVersions,
+      tags: diagram.tags,
+    };
   }
 
   const [diagrams, total] = await Promise.all([
@@ -167,14 +217,21 @@ export async function createDiagram({
   description,
   content,
   emoji,
+  tags,
 }: {
   title?: string;
   description?: string;
   content?: string;
   emoji?: string;
+  tags?: string[];
 }): Promise<Diagram> {
   const now = new Date();
   validateLengths(title, description);
+
+  // Validate tag limit
+  if (tags && tags.length > MAX_TAGS_PER_ITEM) {
+    throw new Error(`Cannot add more than ${MAX_TAGS_PER_ITEM} tags`);
+  }
 
   const diagramId = await ensureUniqueId(async (id) => {
     const existing = await prisma.diagram.findUnique({ where: { id }, select: { id: true } });
@@ -209,6 +266,7 @@ export async function createDiagram({
             updatedAt: now,
           },
         },
+        tags: tags ? { connect: tags.map(id => ({ id })) } : undefined,
       },
       select: diagramWithLatestSelect,
     });
@@ -221,12 +279,16 @@ export async function createDiagram({
 
 export async function updateDiagramById(
   id: string,
-  updates: Partial<Pick<Diagram, 'title' | 'description' | 'content' | 'emoji' | 'isFavorite'>>
+  updates: Partial<Pick<Diagram, 'title' | 'description' | 'content' | 'emoji' | 'isFavorite'>> & { tags?: string[] }
 ): Promise<Diagram | null> {
   const existing = await prisma.diagram.findUnique({ where: { id } });
   if (!existing) return null;
 
   validateLengths(updates.title, updates.description);
+
+  if (updates.tags && updates.tags.length > MAX_TAGS_PER_ITEM) {
+    throw new Error(`Cannot add more than ${MAX_TAGS_PER_ITEM} tags`);
+  }
 
   const now = new Date();
   const hasContentUpdate = typeof updates.content === 'string';
@@ -286,6 +348,9 @@ export async function updateDiagramById(
           typeof updates.isFavorite === 'boolean' ? updates.isFavorite : existing.isFavorite,
         updatedAt: now,
         searchVector: buildSearchVector(nextTitle, nextDescription, nextContent),
+        tags: updates.tags ? {
+          set: updates.tags.map(id => ({ id })),
+        } : undefined,
       },
     });
 
@@ -412,6 +477,145 @@ export async function createCheckpoint(
   if (!result) return null;
 
   return { checkpoint: result.checkpoint, diagram: toDiagram(result.diagram) };
+}
+
+/**
+ * Delete a specific checkpoint from a diagram.
+ * Cannot delete the latest (current) checkpoint.
+ */
+export async function deleteCheckpoint(
+  diagramId: string,
+  checkpointId: string
+): Promise<boolean> {
+  return withTx(async (tx: TransactionClient) => {
+    // Check if checkpoint exists and belongs to this diagram
+    const checkpoint = await tx.content.findFirst({
+      where: { id: checkpointId, diagramId },
+    });
+
+    if (!checkpoint) return false;
+
+    // Get the latest checkpoint to prevent deleting current
+    const latest = await tx.content.findFirst({
+      where: { diagramId },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (latest?.id === checkpointId) {
+      throw new Error('Cannot delete the current checkpoint');
+    }
+
+    // Delete the checkpoint
+    await tx.content.delete({ where: { id: checkpointId } });
+
+    // Update totalVersions
+    const count = await tx.content.count({ where: { diagramId } });
+    await tx.diagram.update({
+      where: { id: diagramId },
+      data: { totalVersions: count },
+    });
+
+    return true;
+  });
+}
+
+/**
+ * Restore a checkpoint as the current version.
+ * Creates a new checkpoint with the restored content.
+ */
+export async function restoreCheckpoint(
+  diagramId: string,
+  checkpointId: string
+): Promise<{ checkpoint: Checkpoint; diagram: Diagram } | null> {
+  const now = new Date();
+
+  return withTx(async (tx: TransactionClient) => {
+    // Get the checkpoint to restore
+    const checkpoint = await tx.content.findFirst({
+      where: { id: checkpointId, diagramId },
+    });
+
+    if (!checkpoint) return null;
+
+    // Get current diagram
+    const diagram = await tx.diagram.findUnique({
+      where: { id: diagramId },
+      select: {
+        title: true,
+        description: true,
+        emoji: true,
+        isFavorite: true,
+        totalVersions: true,
+      },
+    });
+
+    if (!diagram) return null;
+
+    // Create new checkpoint with the restored content
+    const newCheckpointId = await ensureUniqueId(async (candidate) => {
+      const found = await tx.content.findUnique({
+        where: { id: candidate },
+        select: { id: true },
+      });
+      return Boolean(found);
+    });
+
+    await tx.content.create({
+      data: {
+        id: newCheckpointId,
+        diagramId,
+        content: checkpoint.content,
+        updatedAt: now,
+      },
+    });
+
+    // Update diagram timestamp and search vector
+    await tx.diagram.update({
+      where: { id: diagramId },
+      data: {
+        updatedAt: now,
+        searchVector: buildSearchVector(diagram.title, diagram.description, checkpoint.content),
+      },
+    });
+
+    // Prune old checkpoints if over limit
+    const extraContents = await tx.content.findMany({
+      where: { diagramId },
+      orderBy: { updatedAt: 'desc' },
+      skip: MAX_CHECKPOINTS,
+      select: { id: true },
+    });
+
+    if (extraContents.length > 0) {
+      await tx.content.deleteMany({
+        where: { id: { in: extraContents.map((c: { id: string }) => c.id) } },
+      });
+    }
+
+    const prunedCount = extraContents.length;
+
+    await tx.diagram.update({
+      where: { id: diagramId },
+      data: { totalVersions: diagram.totalVersions + 1 - prunedCount },
+    });
+
+    // Get updated diagram
+    const latest = await tx.diagram.findUnique({
+      where: { id: diagramId },
+      select: diagramWithLatestSelect,
+    });
+
+    if (!latest) return null;
+
+    return {
+      checkpoint: {
+        id: newCheckpointId,
+        content: checkpoint.content,
+        updatedAt: now.toISOString(),
+      },
+      diagram: toDiagram(latest as DiagramWithLatest),
+    };
+  });
 }
 
 export async function deleteDiagramById(id: string): Promise<boolean> {

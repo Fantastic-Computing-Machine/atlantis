@@ -45,7 +45,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    logApiError('GET /api/access', error);
+    logApiError('GET /api/access/diagrams', error);
     return NextResponse.json({ error: 'Failed to fetch diagrams' }, { status: 500 });
   }
 }
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(newDiagram, { status: 201 });
   } catch (error) {
-    logApiError('POST /api/access', error);
+    logApiError('POST /api/access/diagrams', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@
 
 import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
 import { PeekDiagramModal } from '@/components/PeekDiagramModal';
+import { TagBadge } from '@/components/TagBadge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -403,144 +404,153 @@ export function DiagramGrid({
   const renderDiagramGrid = (list: Diagram[]) => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {list.map((diagram) => (
-        <Link key={diagram.id} href={`/diagram/${diagram.id}`} className="group">
-          <Card
-            className={cn(
-              'overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-primary/50 h-full',
-              'cursor-pointer'
+        <Card
+          key={diagram.id}
+          className={cn(
+            'group relative overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-primary/50 h-full flex flex-col',
+          )}
+        >
+          <Link href={`/diagram/${diagram.id}`} className="absolute inset-0 z-0 focus:outline-none">
+            <span className="sr-only">Open {diagram.title}</span>
+          </Link>
+
+          <CardHeader className="pb-2 relative z-10 pointer-events-none">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="text-2xl shrink-0">{diagram.emoji || '📊'}</span>
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="text-base truncate">{diagram.title}</CardTitle>
+                  <CardDescription className="text-xs flex items-center gap-2">
+                    <span>{formatDate(diagram.updatedAt)}</span>
+                    {diagram.totalVersions > 1 && (
+                      <span className="bg-muted px-1.5 py-0.5 rounded-full text-[10px] font-medium">
+                        v{diagram.totalVersions}
+                      </span>
+                    )}
+                  </CardDescription>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 pointer-events-auto">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setPeekDiagram(diagram);
+                  }}
+                >
+                  <Eye className="h-4 w-4" />
+                  <span className="sr-only">Peek diagram</span>
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                      <span className="sr-only">Open menu</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={(e) => handleShare(e, diagram.id)}
+                    >
+                      <Share2 className="mr-2 h-4 w-4" />
+                      <span>Copy link</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => handleFavorite(e, diagram.id)}
+                    >
+                      <Star
+                        className={cn(
+                          'mr-2 h-4 w-4',
+                          diagram.isFavorite ? 'fill-yellow-400 text-yellow-400' : ''
+                        )}
+                      />
+                      <span>{diagram.isFavorite ? 'Unstar' : 'Star'}</span>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <Download className="mr-2 h-4 w-4" />
+                        <span>Download</span>
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDownload(diagram, 'svg');
+                          }}
+                        >
+                          SVG
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDownload(diagram, 'png');
+                          }}
+                        >
+                          PNG
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDownload(diagram, 'pdf');
+                          }}
+                        >
+                          PDF
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDeleteId(diagram.id);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      <span>Delete</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="relative z-10 pointer-events-none flex-1">
+            {diagram.description && (
+              <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+                {diagram.description}
+              </p>
             )}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="text-2xl shrink-0">{diagram.emoji || '📊'}</span>
-                  <div className="min-w-0 flex-1">
-                    <CardTitle className="text-base truncate">{diagram.title}</CardTitle>
-                    <CardDescription className="text-xs flex items-center gap-2">
-                      <span>{formatDate(diagram.updatedAt)}</span>
-                      {diagram.totalVersions > 1 && (
-                        <span className="bg-muted px-1.5 py-0.5 rounded-full text-[10px] font-medium">
-                          v{diagram.totalVersions}
-                        </span>
-                      )}
-                    </CardDescription>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setPeekDiagram(diagram);
-                    }}
-                  >
-                    <Eye className="h-4 w-4" />
-                    <span className="sr-only">Peek diagram</span>
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Open menu</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={(e) => handleShare(e, diagram.id)}
-                      >
-                        <Share2 className="mr-2 h-4 w-4" />
-                        <span>Copy link</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={(e) => handleFavorite(e, diagram.id)}
-                      >
-                        <Star
-                          className={cn(
-                            'mr-2 h-4 w-4',
-                            diagram.isFavorite ? 'fill-yellow-400 text-yellow-400' : ''
-                          )}
-                        />
-                        <span>{diagram.isFavorite ? 'Unstar' : 'Star'}</span>
-                      </DropdownMenuItem>
-
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>
-                          <Download className="mr-2 h-4 w-4" />
-                          <span>Download</span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDownload(diagram, 'svg');
-                            }}
-                          >
-                            SVG
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDownload(diagram, 'png');
-                            }}
-                          >
-                            PNG
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleDownload(diagram, 'pdf');
-                            }}
-                          >
-                            PDF
-                          </DropdownMenuItem>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setDeleteId(diagram.id);
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        <span>Delete</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+            {diagram.tags && diagram.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-2 pointer-events-auto">
+                {diagram.tags.map(tag => (
+                  <TagBadge key={tag.id} tag={tag} />
+                ))}
               </div>
-            </CardHeader>
-            <CardContent>
-              {diagram.description && (
-                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
-                  {diagram.description}
-                </p>
-              )}
-              <div className="bg-muted/50 rounded-md p-3 h-24 overflow-hidden">
-                <pre className="text-xs text-muted-foreground font-mono whitespace-pre-wrap line-clamp-4">
-                  {diagram.content}
-                </pre>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+            )}
+            <div className="bg-muted/50 rounded-md p-3 h-24 overflow-hidden">
+              <pre className="text-xs text-muted-foreground font-mono whitespace-pre-wrap line-clamp-4">
+                {diagram.content}
+              </pre>
+            </div>
+          </CardContent>
+        </Card>
       ))}
     </div>
   );
