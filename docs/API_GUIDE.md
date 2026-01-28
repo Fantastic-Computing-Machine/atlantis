@@ -165,7 +165,7 @@ Create a new note.
     {
       "title": "New Note",
       "content": "Note content here",
-      "language": "markdown"     
+      "language": "markdown" // or "todo", "javascript", etc.
     }
     ```
 

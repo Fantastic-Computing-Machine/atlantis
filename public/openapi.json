@@ -393,7 +393,8 @@
           },
           "language": {
             "type": "string",
-            "example": "markdown"
+            "example": "markdown",
+            "description": "Language or file type (e.g., markdown, todo, javascript)"
           }
         }
       },
