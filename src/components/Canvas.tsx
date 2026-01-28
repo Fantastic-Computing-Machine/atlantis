@@ -10,11 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, copyToClipboard } from '@/lib/utils';
 import {
   AlertCircle,
@@ -27,9 +23,8 @@ import {
   Settings2,
   Share2,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
 } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
@@ -129,8 +124,8 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
             typeof err === 'string'
               ? err
               : (err as { str?: string; message?: string }).str ||
-              (err as { str?: string; message?: string }).message ||
-              'Mermaid parse error';
+                (err as { str?: string; message?: string }).message ||
+                'Mermaid parse error';
           throw new Error(message);
         },
       });
@@ -250,7 +245,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       pointerDownRef.current = {
         x: event.clientX,
         y: event.clientY,
-        time: Date.now()
+        time: Date.now(),
       };
 
       // Prevent pan start when clicking a node
@@ -437,7 +432,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       const pdf = new jsPDF({
         orientation: isLandscape ? 'landscape' : 'portrait',
         unit: 'px',
-        format: [svgWidth + 40, svgHeight + 40] // Add margin
+        format: [svgWidth + 40, svgHeight + 40], // Add margin
       });
 
       // Add white background
@@ -448,7 +443,6 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       pdf.addImage(imgData, 'PNG', 20, 20, svgWidth, svgHeight);
       pdf.save(sanitizeFilename('pdf'));
       toast.success('PDF downloaded');
-
     } catch (err) {
       console.error('Export PDF error:', err);
       toast.error('Failed to export PDF');
@@ -470,7 +464,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
     <div
       ref={wrapperRef}
       className={cn(
-        'h-full w-full relative overflow-hidden flex flex-col group transition-colors duration-300',
+        'group relative flex h-full w-full flex-col overflow-hidden transition-colors duration-300',
         bgColorClass,
         getPatternClass()
       )}
@@ -480,7 +474,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Syntax Error</AlertTitle>
           <AlertDescription>
-            <pre className="text-xs whitespace-pre-wrap font-mono mt-1">{error}</pre>
+            <pre className="mt-1 font-mono text-xs whitespace-pre-wrap">{error}</pre>
           </AlertDescription>
         </Alert>
       )}
@@ -526,8 +520,8 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
-            <div className="absolute z-20 flex gap-2 md:flex-col md:bottom-6 md:right-6 top-4 right-3 md:top-auto md:right-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
-              <div className="hidden md:flex flex-col gap-1 bg-background/80 backdrop-blur-sm border rounded-lg p-1 shadow-sm">
+            <div className="absolute top-4 right-3 z-20 flex gap-2 opacity-100 transition-opacity duration-200 md:top-auto md:right-6 md:bottom-6 md:flex-col md:opacity-0 md:group-hover:opacity-100">
+              <div className="bg-background/80 hidden flex-col gap-1 rounded-lg border p-1 shadow-sm backdrop-blur-sm md:flex">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -556,11 +550,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleRecenter}
-                    >
+                    <Button variant="ghost" size="icon" onClick={handleRecenter}>
                       <Focus className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
@@ -581,7 +571,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                 </Tooltip>
               </div>
 
-              <div className="flex flex-row md:flex-col gap-1 bg-background/80 backdrop-blur-sm border rounded-lg p-1 shadow-sm">
+              <div className="bg-background/80 flex flex-row gap-1 rounded-lg border p-1 shadow-sm backdrop-blur-sm md:flex-col">
                 {diagramId && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -617,15 +607,9 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                     <TooltipContent side="left">Export diagram</TooltipContent>
                   </Tooltip>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleExportSvg}>
-                      Download SVG
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleExportPng}>
-                      Download PNG
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleExportPdf}>
-                      Download PDF
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportSvg}>Download SVG</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportPng}>Download PNG</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportPdf}>Download PDF</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -646,19 +630,19 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => setBgPattern('none')}>
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border rounded bg-transparent" />
+                          <div className="h-4 w-4 rounded border bg-transparent" />
                           <span>None</span>
                         </div>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setBgPattern('dots')}>
                         <div className="flex items-center gap-2">
-                          <Grid3x3 className="w-4 h-4" />
+                          <Grid3x3 className="h-4 w-4" />
                           <span>Dots</span>
                         </div>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setBgPattern('grid')}>
                         <div className="flex items-center gap-2">
-                          <Grid3x3 className="w-4 h-4 opacity-50" />
+                          <Grid3x3 className="h-4 w-4 opacity-50" />
                           <span>Grid</span>
                         </div>
                       </DropdownMenuItem>
@@ -668,19 +652,21 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => setBgColorClass('bg-muted/30')}>
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded-full border bg-muted" />
+                          <div className="bg-muted h-4 w-4 rounded-full border" />
                           Default
                         </div>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setBgColorClass('bg-background')}>
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded-full border bg-background" />
+                          <div className="bg-background h-4 w-4 rounded-full border" />
                           Plain
                         </div>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setBgColorClass('bg-blue-50/50 dark:bg-blue-950/20')}>
+                      <DropdownMenuItem
+                        onClick={() => setBgColorClass('bg-blue-50/50 dark:bg-blue-950/20')}
+                      >
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded-full border bg-blue-100 dark:bg-blue-900" />
+                          <div className="h-4 w-4 rounded-full border bg-blue-100 dark:bg-blue-900" />
                           Blue Tint
                         </div>
                       </DropdownMenuItem>
@@ -690,11 +676,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={toggleFullscreen}
-                    >
+                    <Button variant="ghost" size="icon" onClick={toggleFullscreen}>
                       {isFullscreen ? (
                         <Minimize className="h-4 w-4" />
                       ) : (
@@ -719,7 +701,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
             >
               <div
                 ref={containerRef}
-                className="[&_svg]:max-w-none [&_svg]:h-auto [&_svg]:w-auto transition-opacity duration-200"
+                className="transition-opacity duration-200 [&_svg]:h-auto [&_svg]:w-auto [&_svg]:max-w-none"
                 dangerouslySetInnerHTML={{ __html: svg }}
               />
             </TransformComponent>

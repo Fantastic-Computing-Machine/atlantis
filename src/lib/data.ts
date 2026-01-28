@@ -1,9 +1,9 @@
 import type { Prisma } from '@prisma/client';
+
 import { prisma } from './prisma';
+import { buildSearchVector, stripStopWords } from './search';
 import { Checkpoint, Diagram, DiagramPage } from './types';
 import { generateShortId, getRandomEmoji } from './utils';
-
-import { buildSearchVector, stripStopWords } from './search';
 
 const DEFAULT_PAGE_SIZE = 24;
 const MAX_PAGE_SIZE = 100;
@@ -33,9 +33,6 @@ const diagramWithLatestSelect = {
 type DiagramWithLatest = Prisma.DiagramGetPayload<{
   select: typeof diagramWithLatestSelect;
 }>;
-
-
-
 
 function toDiagram(diagram: DiagramWithLatest): Diagram {
   const latest = diagram.contents[0];
@@ -79,6 +76,18 @@ function isNotFoundError(error: unknown): boolean {
 async function withTx<T>(fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
   return prisma.$transaction(async (tx) => fn(tx as TransactionClient)) as Promise<T>;
 }
+
+const normalizeLimit = (limit?: number | null) => {
+  if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
+  return Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE);
+};
+
+const normalizeOffset = (offset?: number | null) => {
+  if (!Number.isFinite(offset)) return 0;
+  return Math.max(Math.trunc(offset as number), 0);
+};
+
+const mapTagIds = (ids: string[]) => ids.map((tagId) => ({ id: tagId }));
 
 export async function getDiagramPage({
   limit = DEFAULT_PAGE_SIZE,
@@ -124,56 +133,6 @@ export async function getDiagramPage({
     default:
       orderBy = { updatedAt: 'desc' };
       break;
-  }
-
-
-
-  const diagramWithLatestSelect = {
-    id: true,
-    title: true,
-    description: true,
-    emoji: true,
-    createdAt: true,
-    updatedAt: true,
-    isFavorite: true,
-    totalVersions: true,
-    searchVector: true,
-    tags: true,
-    contents: {
-      orderBy: { updatedAt: 'desc' as const },
-      take: 1,
-      select: { id: true, content: true, updatedAt: true },
-    },
-  } satisfies Prisma.DiagramSelect;
-  type DiagramWithLatest = Prisma.DiagramGetPayload<{
-    select: typeof diagramWithLatestSelect;
-  }>;
-
-
-  function normalizeLimit(limit?: number | null) {
-    if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
-    return Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE);
-  }
-
-  function normalizeOffset(offset?: number | null) {
-    if (!Number.isFinite(offset)) return 0;
-    return Math.max(Math.trunc(offset as number), 0);
-  }
-
-  function toDiagram(diagram: DiagramWithLatest): Diagram {
-    const latest = diagram.contents[0];
-    return {
-      id: diagram.id,
-      title: diagram.title,
-      description: diagram.description,
-      content: latest?.content ?? '',
-      emoji: diagram.emoji,
-      createdAt: diagram.createdAt.toISOString(),
-      updatedAt: diagram.updatedAt.toISOString(),
-      isFavorite: diagram.isFavorite,
-      totalVersions: diagram.totalVersions,
-      tags: diagram.tags,
-    };
   }
 
   const [diagrams, total] = await Promise.all([
@@ -266,7 +225,7 @@ export async function createDiagram({
             updatedAt: now,
           },
         },
-        tags: tags ? { connect: tags.map(id => ({ id })) } : undefined,
+        tags: tags ? { connect: mapTagIds(tags) } : undefined,
       },
       select: diagramWithLatestSelect,
     });
@@ -279,7 +238,9 @@ export async function createDiagram({
 
 export async function updateDiagramById(
   id: string,
-  updates: Partial<Pick<Diagram, 'title' | 'description' | 'content' | 'emoji' | 'isFavorite'>> & { tags?: string[] }
+  updates: Partial<Pick<Diagram, 'title' | 'description' | 'content' | 'emoji' | 'isFavorite'>> & {
+    tags?: string[];
+  }
 ): Promise<Diagram | null> {
   const existing = await prisma.diagram.findUnique({ where: { id } });
   if (!existing) return null;
@@ -348,9 +309,7 @@ export async function updateDiagramById(
           typeof updates.isFavorite === 'boolean' ? updates.isFavorite : existing.isFavorite,
         updatedAt: now,
         searchVector: buildSearchVector(nextTitle, nextDescription, nextContent),
-        tags: updates.tags ? {
-          set: updates.tags.map(id => ({ id })),
-        } : undefined,
+        tags: updates.tags ? { set: mapTagIds(updates.tags) } : undefined,
       },
     });
 
@@ -483,10 +442,7 @@ export async function createCheckpoint(
  * Delete a specific checkpoint from a diagram.
  * Cannot delete the latest (current) checkpoint.
  */
-export async function deleteCheckpoint(
-  diagramId: string,
-  checkpointId: string
-): Promise<boolean> {
+export async function deleteCheckpoint(diagramId: string, checkpointId: string): Promise<boolean> {
   return withTx(async (tx: TransactionClient) => {
     // Check if checkpoint exists and belongs to this diagram
     const checkpoint = await tx.content.findFirst({

@@ -1,24 +1,22 @@
 import crypto from 'crypto';
+
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+
 import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME } from './csrf-constants';
 
 const ONE_DAY = 60 * 60 * 24;
 
-function getCookieOptions() {
-  return {
-    httpOnly: false,
-    sameSite: 'lax' as const,
-    // sameSite: 'lax' already provides CSRF protection
-    // secure is only needed for HTTPS enforcement, not CSRF
-    secure: false,
-    path: '/',
-    maxAge: ONE_DAY,
-  };
-}
+const getCookieOptions = () => ({
+  httpOnly: false,
+  sameSite: 'lax' as const,
+  secure: false,
+  path: '/',
+  maxAge: ONE_DAY,
+});
 
 export async function ensureCsrfCookie(): Promise<string> {
-  const cookieStore = await Promise.resolve(cookies());
+  const cookieStore = await cookies();
   const existing = cookieStore.get(CSRF_COOKIE_NAME)?.value;
   const token = existing ?? crypto.randomUUID();
 
@@ -31,7 +29,7 @@ export async function ensureCsrfCookie(): Promise<string> {
 
 export async function validateCsrfToken(request: Request): Promise<boolean> {
   const headerToken = request.headers.get(CSRF_HEADER_NAME);
-  const cookieStore = await Promise.resolve(cookies());
+  const cookieStore = await cookies();
   const cookieToken = cookieStore.get(CSRF_COOKIE_NAME)?.value;
 
   if (!headerToken || !cookieToken) {
