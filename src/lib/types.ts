@@ -67,6 +67,7 @@ export interface AppSettings {
   snowMode?: boolean;
   liveSync?: boolean;
   liveSyncInterval?: number;
+  kittyMode?: boolean;
 }
 
 export interface DiagramStore {
@@ -91,4 +92,5 @@ export interface DiagramStore {
   setSnowMode: (enabled: boolean) => void;
   setLiveSync: (enabled: boolean) => void;
   setLiveSyncInterval: (ms: number) => void;
+  setKittyMode: (enabled: boolean) => void;
 }

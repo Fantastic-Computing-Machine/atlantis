@@ -60,6 +60,7 @@ export default function SettingsPage() {
     setSnowMode,
     setLiveSync,
     setLiveSyncInterval,
+    setKittyMode,
   } = useDiagramStore();
 
   // AI Settings state
@@ -807,6 +808,21 @@ export default function SettingsPage() {
                 onCheckedChange={(checked) => {
                   setSnowMode(checked);
                   toast.success(checked ? 'Let it snow! ❄️' : 'Snow stopped');
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="flex items-center gap-2 font-medium">
+                  🐱 Kitty Mode
+                </p>
+                <p className="text-muted-foreground text-sm">A playful kitty wanders across your screen!</p>
+              </div>
+              <Switch
+                checked={settings.kittyMode ?? false}
+                onCheckedChange={(checked) => {
+                  setKittyMode(checked);
+                  toast.success(checked ? 'Meow! 🐱' : 'Kitty went to sleep');
                 }}
               />
             </div>

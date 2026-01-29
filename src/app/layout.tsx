@@ -4,6 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ConsoleWelcome } from '@/components/ConsoleWelcome';
 import { GlobalShortcutsWrapper } from '@/components/GlobalShortcutsWrapper';
 import { SnowEffectWrapper } from '@/components/SnowEffectWrapper';
+import { KittyMode } from '@/components/KittyMode';
 import type { Metadata } from 'next';
 import './globals.css';
 
@@ -58,6 +59,7 @@ export default function RootLayout({
             <TooltipProvider>{children}</TooltipProvider>
           </GlobalShortcutsWrapper>
           <SnowEffectWrapper />
+          <KittyMode />
           <Toaster />
         </ThemeProvider>
       </body>
