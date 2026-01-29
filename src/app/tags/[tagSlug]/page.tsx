@@ -9,7 +9,7 @@ import { TagBadge } from '@/components/TagBadge';
 import { formatDate, cn } from '@/lib/utils';
 import { Diagram, Note } from '@/lib/types';
 import Link from 'next/link';
-import { ArrowLeft, Clock, FileText, PenSquare, Hash } from 'lucide-react';
+import { ArrowLeft, Clock, FileText, PenSquare, Hash, Settings } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { DashboardHeader } from '@/components/DashboardHeader';
 
@@ -71,8 +71,9 @@ export default async function TagPage({ params }: TagPageProps) {
                             <h1 className="text-3xl font-bold tracking-tight">#{tag.name}</h1>
                         </div>
                     </div>
-                    <Button variant="outline" asChild>
+                    <Button variant="outline" className="gap-2" asChild>
                         <Link href="/settings/tags">
+                            <Settings className="h-4 w-4" />
                             Manage Tags
                         </Link>
                     </Button>
@@ -104,7 +105,7 @@ function TagItemCard({ item }: { item: (Diagram | Omit<Note, 'content'>) & { typ
     const badgeLabel = item.type === 'diagram' ? 'Diagram' : 'Note';
 
     return (
-        <Card className="group relative h-full overflow-hidden transition-shadow hover:shadow-md hover:border-primary/50 flex flex-col">
+        <Card className="group relative h-full overflow-hidden transition-shadow hover:shadow-md hover:border-primary/50 flex flex-col py-0 gap-0">
             <Link href={href} className="absolute inset-0 z-0 focus:outline-none">
                 <span className="sr-only">View {item.title}</span>
             </Link>
@@ -123,7 +124,7 @@ function TagItemCard({ item }: { item: (Diagram | Omit<Note, 'content'>) & { typ
             </CardHeader>
             <CardContent className="p-4 pt-0 flex-1 relative z-10 pointer-events-none">
                 <p className="text-muted-foreground line-clamp-2 text-xs">
-                    {item.type === 'diagram' ? description || 'No description' : `Language: ${description}`}
+                    {item.type === 'diagram' ? description || 'No description' : `Language // ${description}`}
                 </p>
                 {/* Show tags */}
                 {item.tags && item.tags.length > 0 && (

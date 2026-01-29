@@ -2,7 +2,8 @@ import { DashboardHeader } from '@/components/DashboardHeader';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Hash } from 'lucide-react';
+import { Hash, Settings } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,11 +22,17 @@ export default async function TagsPage() {
             <DashboardHeader enableApiAccess={process.env.ENABLE_API_ACCESS === 'true'} />
 
             <main className="container mx-auto flex-1 px-4 py-8">
-                <div className="mb-8 flex items-center gap-4 border-b pb-6">
+                <div className="mb-8 flex items-center justify-between border-b pb-6">
                     <div className="flex items-center gap-3">
                         <Hash className="h-8 w-8" />
                         <h1 className="text-3xl font-bold tracking-tight">All Tags</h1>
                     </div>
+                    <Button variant="outline" className="gap-2" asChild>
+                        <Link href="/settings/tags">
+                            <Settings className="h-4 w-4" />
+                            Manage Tags
+                        </Link>
+                    </Button>
                 </div>
 
                 {tags.length === 0 ? (

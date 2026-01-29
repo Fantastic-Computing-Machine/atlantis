@@ -41,6 +41,7 @@ import {
   Snowflake,
   Zap,
   Tag,
+  Github,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -1235,8 +1236,19 @@ export default function SettingsPage() {
         <p className="text-muted-foreground text-sm">
           Made with <span className="text-red-500">❤️</span> by Terrestrian 🌏
         </p>
+        {/* Footer Link */}
+        <div className="flex justify-center pt-6 pb-2">
+          <a
+            href="https://github.com/Fantastic-Computing-Machine/atlantis"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground flex items-center gap-2 text-sm hover:underline"
+          >
+            <Github className="h-4 w-4" />
+            <span>Fantastic-Computing-Machine/atlantis</span>
+          </a>
+        </div>
       </footer >
     </div >
   );
 }
-

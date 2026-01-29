@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useDiagramStore } from '@/lib/store';
 import Link from 'next/link';
 import { useEffect } from 'react';
-import { Settings2, Keyboard, BookOpen } from 'lucide-react';
+import { Settings2, Keyboard, BookOpen, Github } from 'lucide-react';
 import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { useKeyboardShortcuts } from '@/lib/use-keyboard-shortcuts';
@@ -115,6 +115,22 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
+
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        asChild
+                        className="hidden sm:flex"
+                    >
+                        <a
+                            href="https://github.com/Fantastic-Computing-Machine/atlantis"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="GitHub Repository"
+                        >
+                            <Github className="h-4 w-4" />
+                        </a>
+                    </Button>
 
                     <Button variant="outline" className="gap-2 h-9 px-2 sm:px-3" asChild>
                         <Link href="/settings">
