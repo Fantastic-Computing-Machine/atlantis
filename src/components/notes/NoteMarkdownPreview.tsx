@@ -20,11 +20,22 @@ function parseMarkdown(text: string): string {
   let processed = text;
 
   // Extract fenced code blocks (```)
-  processed = processed.replace(/```(\w*)\n?([\s\S]*?)```/g, (_match, _lang, code) => {
+  processed = processed.replace(/```(\w*)\n?([\s\S]*?)```/g, (_match, lang, code) => {
     const escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Store raw code for copy button (escape quotes for data attribute)
+    const rawForCopy = code.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     const index = codeBlocks.length;
+    const langLabel = lang ? `<span class="absolute top-2 left-3 text-xs text-muted-foreground uppercase">${lang}</span>` : '';
     codeBlocks.push(
-      `<pre class="bg-muted p-4 rounded-lg overflow-x-auto my-4"><code class="text-sm font-mono block whitespace-pre">${escaped}</code></pre>`
+      `<div class="relative group">
+        ${langLabel}
+        <button 
+          class="absolute top-2 right-2 p-1.5 rounded bg-muted-foreground/10 hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+          onclick="navigator.clipboard.writeText(this.dataset.code).then(() => { this.textContent = '✓'; setTimeout(() => this.textContent = 'Copy', 1500); })"
+          data-code="${rawForCopy}"
+        >Copy</button>
+        <pre class="bg-muted p-4 ${lang ? 'pt-8' : ''} rounded-lg overflow-x-auto my-4"><code class="text-sm font-mono block whitespace-pre">${escaped}</code></pre>
+      </div>`
     );
     return `${codeBlockMarker}${index}${codeBlockMarker}`;
   });
@@ -64,6 +75,15 @@ function parseMarkdown(text: string): string {
   // Strikethrough
   processed = processed.replace(/~~(.+?)~~/g, '<del>$1</del>');
 
+  // Highlight (==text==)
+  processed = processed.replace(/==(.+?)==/g, '<mark class="bg-yellow-200 dark:bg-yellow-900 px-0.5 rounded">$1</mark>');
+
+  // Subscript (~text~) - single tilde, not double
+  processed = processed.replace(/~([^~\s][^~]*)~/g, '<sub>$1</sub>');
+
+  // Superscript (^text^)
+  processed = processed.replace(/\^([^\^\s][^\^]*)\^/g, '<sup>$1</sup>');
+
   // Blockquotes (> becomes &gt; after escaping)
   processed = processed.replace(
     /^&gt;\s+(.*)$/gm,
@@ -74,6 +94,55 @@ function parseMarkdown(text: string): string {
   processed = processed
     .replace(/^---$/gm, '<hr class="my-6 border-border" />')
     .replace(/^\*\*\*$/gm, '<hr class="my-6 border-border" />');
+
+  // Tables - parse markdown tables into HTML
+  // First, ensure text ends with newline for easier parsing
+  processed = processed.endsWith('\n') ? processed : processed + '\n';
+
+  // Match table blocks: lines that start with | and end with |
+  processed = processed.replace(
+    /(?:^|\n)((?:\|[^\n]+\|\n)+)/g,
+    (_match, tableBlock) => {
+      const lines = tableBlock.trim().split('\n').filter((line: string) => line.trim());
+      if (lines.length < 2) return _match;
+
+      // Check for separator row (e.g., |---|---|)
+      const separatorIndex = lines.findIndex((line: string) =>
+        /^\|[\s\-:|]+\|$/.test(line.trim())
+      );
+
+      if (separatorIndex === -1) return _match;
+
+      const headerLines = lines.slice(0, separatorIndex);
+      // Filter out any separator-like rows from body (handles adjacent tables)
+      const isSeparatorRow = (line: string) => /^\|[\s\-:|]+\|$/.test(line.trim());
+      const bodyLines = lines.slice(separatorIndex + 1).filter((line: string) => !isSeparatorRow(line));
+
+      const parseRow = (line: string, cellTag: string) => {
+        const cells = line
+          .split('|')
+          .slice(1, -1) // Remove empty first/last from split
+          .map((cell: string) => cell.trim());
+        return `<tr>${cells.map((cell: string) => `<${cellTag} class="border border-border px-3 py-2">${cell}</${cellTag}>`).join('')}</tr>`;
+      };
+
+      const headerHtml = headerLines.map((line: string) => parseRow(line, 'th')).join('');
+      const bodyHtml = bodyLines.map((line: string) => parseRow(line, 'td')).join('');
+
+      return `\n<table class="border-collapse border border-border my-4 w-full"><thead class="bg-muted">${headerHtml}</thead><tbody>${bodyHtml}</tbody></table>\n`;
+    }
+  );
+
+  // Task lists (checkboxes) - must come before regular lists
+  processed = processed
+    .replace(
+      /^[\*\-]\s+\[x\]\s+(.*)$/gim,
+      '<li class="ml-6 list-none flex items-start gap-2"><input type="checkbox" checked disabled class="mt-1 accent-primary" /><span class="line-through opacity-70">$1</span></li>'
+    )
+    .replace(
+      /^[\*\-]\s+\[\s?\]\s+(.*)$/gm,
+      '<li class="ml-6 list-none flex items-start gap-2"><input type="checkbox" disabled class="mt-1" /><span>$1</span></li>'
+    );
 
   // Lists
   processed = processed
@@ -92,6 +161,12 @@ function parseMarkdown(text: string): string {
     '<img src="$2" alt="$1" class="max-w-full rounded my-4" />'
   );
 
+  // Auto-link bare URLs (not already in href or markdown link)
+  processed = processed.replace(
+    /(?<!["\(])(https?:\/\/[^\s<>\)]+)/g,
+    '<a href="$1" class="text-primary underline hover:no-underline" target="_blank" rel="noopener">$1</a>'
+  );
+
   // Paragraphs - split by double newlines
   const blocks = processed.split(/\n\n+/);
   processed = blocks
@@ -107,6 +182,7 @@ function parseMarkdown(text: string): string {
         trimmed.startsWith('<blockquote') ||
         trimmed.startsWith('<hr') ||
         trimmed.startsWith('<pre') ||
+        trimmed.startsWith('<table') ||
         trimmed.startsWith(codeBlockMarker)
       ) {
         return trimmed;
@@ -134,26 +210,45 @@ export function NoteMarkdownPreview({ content, filename }: NoteMarkdownPreviewPr
 
   const popOut = () => {
     const win = window.open(
-      '',
+      'about:blank',
       '_blank',
-      'noopener,noreferrer,resizable=yes,scrollbars=yes,width=1200,height=900,left=120,top=80'
+      'resizable=yes,scrollbars=yes,width=1200,height=900,left=120,top=80'
     );
     if (!win) return;
     const safeTitle = buildDownloadName(filename);
-    const doc = win.document;
-    doc.open();
-    doc.write(`<!doctype html><html><head><title>${safeTitle}</title>
+
+    // Write content to the new window
+    const htmlContent = `<!doctype html><html><head><title>${safeTitle}</title>
 <meta charset="utf-8" />
 <style>
 body { margin: 24px; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111827; line-height: 1.6; }
 h1,h2,h3,h4,h5,h6 { color: #0f172a; margin-top: 1.2em; }
-code { background: #f3f4f6; padding: 2px 4px; border-radius: 4px; }
+h1, h2 { border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
+code { background: #f3f4f6; padding: 2px 4px; border-radius: 4px; font-family: ui-monospace, monospace; }
 pre { background: #f8fafc; padding: 12px; border-radius: 8px; overflow: auto; }
-img { max-width: 100%; height: auto; }
-a { color: #2563eb; }
+pre code { background: none; padding: 0; }
+img { max-width: 100%; height: auto; border-radius: 8px; }
+a { color: #2563eb; text-decoration: underline; }
+a:hover { text-decoration: none; }
+table { border-collapse: collapse; border: 1px solid #e5e7eb; margin: 16px 0; width: 100%; }
+th, td { border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left; }
+thead { background: #f3f4f6; }
+th { font-weight: 600; }
+blockquote { border-left: 4px solid #3b82f6; padding-left: 16px; margin: 16px 0; font-style: italic; color: #6b7280; }
+mark { background: #fef08a; padding: 1px 4px; border-radius: 2px; }
+del { text-decoration: line-through; opacity: 0.7; }
+sub, sup { font-size: 0.75em; }
+ul, ol { margin: 8px 0; padding-left: 24px; }
+li { margin: 4px 0; }
+hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+input[type="checkbox"] { margin-right: 8px; }
+.line-through { text-decoration: line-through; opacity: 0.7; }
 </style>
-</head><body>${html}</body></html>`);
-    doc.close();
+</head><body>${html}</body></html>`;
+
+    win.document.open();
+    win.document.write(htmlContent);
+    win.document.close();
   };
 
   return (
