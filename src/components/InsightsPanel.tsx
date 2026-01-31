@@ -21,7 +21,7 @@ export function InsightsPanel({ topTags, filetypes, todos, activity, staleConten
             <section>
                 <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                     <Brain className="h-4 w-4" />
-                    Knowledge <span className="opacity-50">//</span> <span className="text-foreground">{knowledgeStats.totalContentItems} items</span>
+                    Knowledge <span className="opacity-50">{'//'}</span> <span className="text-foreground">{knowledgeStats.totalContentItems} items</span>
                 </h4>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-muted/50 rounded-md p-2">
@@ -39,7 +39,7 @@ export function InsightsPanel({ topTags, filetypes, todos, activity, staleConten
             <section>
                 <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    Activity <span className="opacity-50">//</span> <span className="text-foreground">Recent</span>
+                    Activity <span className="opacity-50">{'//'}</span> <span className="text-foreground">Recent</span>
                 </h4>
                 {activity.length > 0 ? (
                     <ul className="space-y-1.5">
@@ -67,7 +67,7 @@ export function InsightsPanel({ topTags, filetypes, todos, activity, staleConten
             <section>
                 <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                     <StickyNote className="h-4 w-4" />
-                    Open Tasks <span className="opacity-50">//</span> <span className="text-foreground">{todos.length}</span>
+                    Open Tasks <span className="opacity-50">{'//'}</span> <span className="text-foreground">{todos.length}</span>
                 </h4>
                 {todos.length > 0 ? (
                     <ul className="space-y-2">
@@ -92,7 +92,7 @@ export function InsightsPanel({ topTags, filetypes, todos, activity, staleConten
             <section>
                 <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                     <Hash className="h-4 w-4" />
-                    Tags <span className="opacity-50">//</span> <span className="text-foreground">{topTags.length}</span>
+                    Tags <span className="opacity-50">{'//'}</span> <span className="text-foreground">{topTags.length}</span>
                 </h4>
                 {topTags.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
@@ -118,7 +118,7 @@ export function InsightsPanel({ topTags, filetypes, todos, activity, staleConten
             <section>
                 <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                     <FileCode2 className="h-4 w-4" />
-                    Languages <span className="opacity-50">//</span> <span className="text-foreground">{filetypes.length}</span>
+                    Languages <span className="opacity-50">{'//'}</span> <span className="text-foreground">{filetypes.length}</span>
                 </h4>
                 {filetypes.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
@@ -139,7 +139,7 @@ export function InsightsPanel({ topTags, filetypes, todos, activity, staleConten
                 <section>
                     <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                         <AlertCircle className="h-4 w-4 text-amber-500" />
-                        Needs Attention <span className="opacity-50">//</span> <span className="text-foreground">{staleContent.length}</span>
+                        Needs Attention <span className="opacity-50">{'//'}</span> <span className="text-foreground">{staleContent.length}</span>
                     </h4>
                     <ul className="space-y-1.5">
                         {staleContent.map((item) => (
@@ -163,7 +163,7 @@ export function InsightsPanel({ topTags, filetypes, todos, activity, staleConten
                 <section>
                     <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                         <Sparkles className="h-4 w-4 text-purple-500" />
-                        Rediscover <span className="opacity-50">//</span> <span className="text-foreground">Random</span>
+                        Rediscover <span className="opacity-50">{'//'}</span> <span className="text-foreground">Random</span>
                     </h4>
                     <ul className="space-y-1.5">
                         {rediscovery.map((item) => (
@@ -201,7 +201,7 @@ export function DashboardStatsRow({ stats }: DashboardStatsRowProps) {
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             {items.map((item, idx) => (
                 <span key={item.label} className="inline-flex items-center gap-1.5">
-                    {idx > 0 && <span className="text-muted-foreground/50 hidden sm:inline">//</span>}
+                    {idx > 0 && <span className="text-muted-foreground/50 hidden sm:inline">{'//'}</span>}
                     <item.icon className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">{item.label}</span>
                     {item.href ? (

@@ -142,8 +142,10 @@ export function KittyMode() {
 
     useEffect(() => {
         if (!settings.kittyMode) {
-            setKitty((prev) => ({ ...prev, isVisible: false }));
-            return;
+            const timer = setTimeout(() => {
+                setKitty((prev) => ({ ...prev, isVisible: false }));
+            }, 0);
+            return () => clearTimeout(timer);
         }
 
         const startDelay = Math.random() * 2000 + 500;
@@ -174,7 +176,7 @@ export function KittyMode() {
                 if (!prev.isWalking) return prev;
 
                 let newX = prev.x;
-                let newDirection = prev.direction;
+                const newDirection = prev.direction;
                 let newIsVisible: boolean = prev.isVisible;
                 let newIsWalking: boolean = prev.isWalking;
                 let newIsResting: boolean = prev.isResting;

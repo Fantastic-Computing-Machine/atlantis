@@ -144,7 +144,7 @@ export default async function Page() {
               <section className="space-y-2">
                 <h3 className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                  Starred <span className="opacity-50">//</span> <span className="text-foreground">{starredDiagrams.items.length + starredNotes.items.length}</span>
+                  Starred <span className="opacity-50">{'//'}</span> <span className="text-foreground">{starredDiagrams.items.length + starredNotes.items.length}</span>
                 </h3>
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
                   {starredDiagrams.items.map((d) => (
@@ -166,7 +166,7 @@ export default async function Page() {
                   <div className="flex items-center justify-between">
                     <h3 className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                       <PenSquare className="h-3.5 w-3.5" />
-                      Diagrams <span className="opacity-50">//</span> <span className="text-foreground">{recentDiagrams.items.length}</span>
+                      Diagrams <span className="opacity-50">{'//'}</span> <span className="text-foreground">{recentDiagrams.items.length}</span>
                     </h3>
                     <Link
                       href="/diagram"
@@ -216,7 +216,7 @@ export default async function Page() {
                   <div className="flex items-center justify-between">
                     <h3 className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                       <FileText className="h-3.5 w-3.5" />
-                      Notes <span className="opacity-50">//</span> <span className="text-foreground">{recentNotes.items.length}</span>
+                      Notes <span className="opacity-50">{'//'}</span> <span className="text-foreground">{recentNotes.items.length}</span>
                     </h3>
                     <Link
                       href="/notes"
@@ -270,7 +270,7 @@ export default async function Page() {
               {/* Right: Insights Panel */}
               <aside>
                 <div className="rounded-lg border bg-card p-4 sticky top-20">
-                  <h3 className="text-xs font-medium mb-4">Brain <span className="text-muted-foreground opacity-50">//</span> <span className="text-muted-foreground">Insights</span></h3>
+                  <h3 className="text-xs font-medium mb-4">Brain <span className="text-muted-foreground opacity-50">{'//'}</span> <span className="text-muted-foreground">Insights</span></h3>
                   <InsightsPanel
                     topTags={topTags}
                     filetypes={filetypes}
