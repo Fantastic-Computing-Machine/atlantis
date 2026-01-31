@@ -253,7 +253,7 @@ export function GlobalSearchDialog({
           <span className="hidden sm:inline">Search...</span>
           <span className="inline sm:hidden">Search</span>
           <kbd className="ml-auto hidden lg:inline-flex h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-            {shortcutSymbol}K
+            {shortcutSymbol} + K
           </kbd>
         </Button>
       )}
@@ -282,8 +282,7 @@ export function GlobalSearchDialog({
                 aria-label="Search"
               />
               <kbd className="hidden sm:inline-flex absolute right-3 top-1/2 -translate-y-1/2 h-6 select-none items-center gap-1 rounded border bg-muted/50 px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-                <span className="text-xs">{shortcutSymbol}</span>
-                <span className="text-[11px]">K</span>
+                <span className="text-xs">{shortcutSymbol} + K</span>
               </kbd>
             </div>
           </div>

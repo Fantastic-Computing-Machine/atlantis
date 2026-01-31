@@ -84,7 +84,7 @@ export function NoteEditor({
   const [showIndentGuides, setShowIndentGuides] = useState(true);
   const [wordWrap, setWordWrap] = useState(true);
   const [showSearch, setShowSearch] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const [hideLatexPreview, setHideLatexPreview] = useState(false);
   const [editorView, setEditorView] = useState<EditorView | null>(null);
   const [scrollPercentage, setScrollPercentage] = useState(0);

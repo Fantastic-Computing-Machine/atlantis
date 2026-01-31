@@ -225,7 +225,7 @@ export function QuickActions() {
                 </Link>
             </Button>
             <Button size="sm" variant="outline" className="gap-1.5" asChild>
-                <Link href="/notes/new">
+                <Link href="/notes">
                     <Plus className="h-3.5 w-3.5" />
                     Note
                 </Link>

@@ -17,10 +17,10 @@ export function QuickCapture() {
     const [isCreating, setIsCreating] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Keyboard shortcut: Cmd/Ctrl + N to open quick capture
+    // Keyboard shortcut: Alt + N to open quick capture
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+            if (e.altKey && e.key === 'n') {
                 e.preventDefault();
                 setIsOpen(true);
             }
@@ -79,7 +79,7 @@ export function QuickCapture() {
                 <Plus className="h-3.5 w-3.5" />
                 Quick capture
                 <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                    {shortcutSymbol}+N
+                    Alt + N
                 </kbd>
             </Button>
         );
@@ -118,8 +118,8 @@ export function KeyboardShortcuts() {
     const { shortcutSymbol } = useShortcutPlatform();
 
     const shortcuts = [
-        { key: `${shortcutSymbol}+K`, label: 'Search' },
-        { key: `${shortcutSymbol}+N`, label: 'Quick note' },
+        { key: `${shortcutSymbol} + K`, label: 'Search' },
+        { key: 'Alt + N', label: 'Quick note' },
     ];
 
     return (

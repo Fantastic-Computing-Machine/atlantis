@@ -124,7 +124,7 @@ export default async function Page() {
                     </Link>
                   </Button>
                   <Button size="icon" variant="outline" className="h-8 w-8" asChild>
-                    <Link href="/notes/new" aria-label="New Note">
+                    <Link href="/notes" aria-label="New Note">
                       <FileText className="h-4 w-4" />
                     </Link>
                   </Button>

@@ -1,12 +1,85 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, FileText, GitBranch, Loader2 } from 'lucide-react';
+import type { Note, Diagram } from '@/lib/types';
 
 interface NoteMarkdownPreviewProps {
   content: string;
   filename?: string;
+}
+
+// Internal link embed component
+function InternalLinkEmbed({ type, id }: { type: 'note' | 'diagram'; id: string }) {
+  const [data, setData] = useState<Note | Diagram | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const endpoint = type === 'note' ? `/api/notes/${id}` : `/api/diagrams/${id}`;
+        const res = await fetch(endpoint);
+        if (!res.ok) throw new Error('Not found');
+        const json = await res.json();
+        setData(json);
+      } catch {
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [type, id]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 p-3 my-2 rounded-lg border border-border bg-muted/50">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">Loading {type}...</span>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <a
+        href={type === 'note' ? `/notes/${id}` : `/diagram/${id}`}
+        className="flex items-center gap-2 p-3 my-2 rounded-lg border border-border bg-muted/50 hover:bg-muted transition-colors"
+      >
+        {type === 'note' ? <FileText className="h-4 w-4" /> : <GitBranch className="h-4 w-4" />}
+        <span className="text-sm">Open {type}</span>
+      </a>
+    );
+  }
+
+  const title = data.title || 'Untitled';
+  const emoji = data.emoji || (type === 'note' ? '📝' : '📊');
+  const preview = data.content?.slice(0, 120).replace(/[#*`\n]/g, ' ').trim() || '';
+  const href = type === 'note' ? `/notes/${id}` : `/diagram/${id}`;
+
+  return (
+    <a
+      href={href}
+      className="block p-4 my-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors group"
+    >
+      <div className="flex items-start gap-3">
+        <span className="text-2xl">{emoji}</span>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-foreground group-hover:text-primary transition-colors">
+            {title}
+          </div>
+          {preview && (
+            <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
+              {preview}...
+            </div>
+          )}
+        </div>
+        <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1" />
+      </div>
+    </a>
+  );
 }
 
 // Parse markdown to HTML with proper code block handling
@@ -208,6 +281,89 @@ function parseMarkdown(text: string): string {
 export function NoteMarkdownPreview({ content, filename }: NoteMarkdownPreviewProps) {
   const html = useMemo(() => parseMarkdown(content), [content]);
 
+  // Extract internal links for embedding - find all internal link hrefs
+  const internalLinks = useMemo(() => {
+    const links: Array<{ type: 'note' | 'diagram'; id: string }> = [];
+    const seenIds = new Set<string>();
+
+    // Match both relative paths (/notes/id) and full URLs (http://host/notes/id)
+    const noteRegex = /href="(?:https?:\/\/[^"]*)?\/notes\/([a-zA-Z0-9_-]+)"/g;
+    const diagramRegex = /href="(?:https?:\/\/[^"]*)?\/diagram\/([a-zA-Z0-9_-]+)"/g;
+
+    let match;
+    while ((match = noteRegex.exec(html)) !== null) {
+      const id = match[1];
+      if (!seenIds.has(`note-${id}`)) {
+        seenIds.add(`note-${id}`);
+        links.push({ type: 'note', id });
+      }
+    }
+    while ((match = diagramRegex.exec(html)) !== null) {
+      const id = match[1];
+      if (!seenIds.has(`diagram-${id}`)) {
+        seenIds.add(`diagram-${id}`);
+        links.push({ type: 'diagram', id });
+      }
+    }
+    return links;
+  }, [html]);
+
+  // Replace ALL internal link anchors with placeholders
+  const processedHtml = useMemo(() => {
+    let result = html;
+
+    for (const link of internalLinks) {
+      const placeholder = `__EMBED_${link.type.toUpperCase()}_${link.id}__`;
+      // Pattern matches BOTH full URLs and relative paths for this ID
+      // Use a pattern that matches any anchor pointing to this note/diagram
+      const pathType = link.type === 'note' ? 'notes' : 'diagram';
+      const pattern = new RegExp(
+        `<a[^>]*href="(?:https?://[^"]*)?/${pathType}/${link.id}"[^>]*>([\\s\\S]*?)</a>`,
+        'g'
+      );
+      result = result.replace(pattern, placeholder);
+    }
+    return result;
+  }, [html, internalLinks]);
+
+  // Split HTML by placeholders and build segments
+  const segments = useMemo(() => {
+    if (internalLinks.length === 0) return [{ type: 'html' as const, content: html }];
+
+    const result: Array<{ type: 'html'; content: string } | { type: 'embed'; linkType: 'note' | 'diagram'; id: string }> = [];
+
+    // Build a map of placeholders to link info
+    const placeholderMap = new Map<string, { type: 'note' | 'diagram'; id: string }>();
+    for (const link of internalLinks) {
+      const placeholder = `__EMBED_${link.type.toUpperCase()}_${link.id}__`;
+      placeholderMap.set(placeholder, { type: link.type, id: link.id });
+    }
+
+    // Split by all placeholders using a regex that matches any of them
+    const placeholderPattern = /__EMBED_(NOTE|DIAGRAM)_([a-zA-Z0-9_-]+)__/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = placeholderPattern.exec(processedHtml)) !== null) {
+      // Add HTML before this placeholder
+      if (match.index > lastIndex) {
+        result.push({ type: 'html', content: processedHtml.slice(lastIndex, match.index) });
+      }
+      // Add the embed
+      const linkType = match[1].toLowerCase() as 'note' | 'diagram';
+      const id = match[2];
+      result.push({ type: 'embed', linkType, id });
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining HTML
+    if (lastIndex < processedHtml.length) {
+      result.push({ type: 'html', content: processedHtml.slice(lastIndex) });
+    }
+
+    return result.length > 0 ? result : [{ type: 'html' as const, content: html }];
+  }, [processedHtml, html, internalLinks]);
+
   const popOut = () => {
     const win = window.open(
       'about:blank',
@@ -265,7 +421,13 @@ input[type="checkbox"] { margin-right: 8px; }
         </Button>
       </div>
       <div className="prose prose-sm dark:prose-invert max-w-none p-6 pt-12">
-        <div dangerouslySetInnerHTML={{ __html: html }} />
+        {segments.map((segment, i) =>
+          segment.type === 'html' ? (
+            <div key={i} dangerouslySetInnerHTML={{ __html: segment.content }} />
+          ) : (
+            <InternalLinkEmbed key={i} type={segment.linkType} id={segment.id} />
+          )
+        )}
       </div>
     </div>
   );
