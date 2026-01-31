@@ -1,13 +1,17 @@
 'use client';
 
-import { useMemo, useEffect, useState, useCallback } from 'react';
+import { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, FileText, GitBranch, Loader2 } from 'lucide-react';
 import type { Note, Diagram } from '@/lib/types';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 
 interface NoteMarkdownPreviewProps {
   content: string;
   filename?: string;
+  editorScrollPercentage?: number;
+  onScroll?: (percentage: number) => void;
 }
 
 // Internal link embed component
@@ -87,12 +91,48 @@ function parseMarkdown(text: string): string {
   // Use markers that won't be affected by HTML escaping
   const codeBlockMarker = '\u0000CB';
   const inlineCodeMarker = '\u0000IC';
+  const latexBlockMarker = '\u0000LB';
+  const latexInlineMarker = '\u0000LI';
 
   // First, extract and protect code blocks
   const codeBlocks: string[] = [];
+  const latexBlocks: string[] = [];
   let processed = text;
 
-  // Extract fenced code blocks (```)
+  // 1. Extract LaTeX Blocks ($$ ... $$)
+  processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, (_match, tex) => {
+    try {
+      const rendered = katex.renderToString(tex, {
+        displayMode: true,
+        throwOnError: false,
+        strict: false
+      });
+      latexBlocks.push(rendered);
+      return `${latexBlockMarker}${latexBlocks.length - 1}${latexBlockMarker}`;
+    } catch (e) {
+      console.error(e);
+      return `$$${tex}$$`;
+    }
+  });
+
+  // 2. Extract LaTeX Inline ($ ... $)
+  // Negative lookbehind not well supported in all browsers regex, so be careful.
+  // We match $...$ where the content doesn't start or end with space (to avoid matching normal $ prices sometimes)
+  processed = processed.replace(/(?<!\\)\$([^$\n]+?)(?<!\\)\$/g, (_match, tex) => {
+    try {
+      const rendered = katex.renderToString(tex, {
+        displayMode: false,
+        throwOnError: false,
+        strict: false
+      });
+      latexBlocks.push(rendered);
+      return `${latexInlineMarker}${latexBlocks.length - 1}${latexInlineMarker}`;
+    } catch (e) {
+      return `$${tex}$`;
+    }
+  });
+
+  // 3. Extract fenced code blocks (```)
   processed = processed.replace(/```(\w*)\n?([\s\S]*?)```/g, (_match, lang, code) => {
     const escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     // Store raw code for copy button (escape quotes for data attribute)
@@ -275,11 +315,39 @@ function parseMarkdown(text: string): string {
     processed = processed.split(`${inlineCodeMarker}${i}${inlineCodeMarker}`).join(inlineCodes[i]);
   }
 
+  // Restore LaTeX
+  for (let i = 0; i < latexBlocks.length; i++) {
+    processed = processed.split(`${latexBlockMarker}${i}${latexBlockMarker}`).join(latexBlocks[i]);
+    processed = processed.split(`${latexInlineMarker}${i}${latexInlineMarker}`).join(latexBlocks[i]);
+  }
+
   return processed;
 }
 
-export function NoteMarkdownPreview({ content, filename }: NoteMarkdownPreviewProps) {
+export function NoteMarkdownPreview({ content, filename, editorScrollPercentage = 0, onScroll }: NoteMarkdownPreviewProps) {
   const html = useMemo(() => parseMarkdown(content), [content]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll Sync: Editor -> Preview
+  useEffect(() => {
+    if (containerRef.current && editorScrollPercentage >= 0) {
+      const container = containerRef.current;
+      const maxScroll = container.scrollHeight - container.clientHeight;
+      if (maxScroll > 0) {
+        container.scrollTop = maxScroll * editorScrollPercentage;
+      }
+    }
+  }, [editorScrollPercentage]);
+
+  const handleScroll = () => {
+    if (onScroll && containerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+      const maxScroll = scrollHeight - clientHeight;
+      if (maxScroll > 0) {
+        onScroll(scrollTop / maxScroll);
+      }
+    }
+  };
 
   // Extract internal links for embedding - find all internal link hrefs
   const internalLinks = useMemo(() => {
@@ -376,6 +444,7 @@ export function NoteMarkdownPreview({ content, filename }: NoteMarkdownPreviewPr
     // Write content to the new window
     const htmlContent = `<!doctype html><html><head><title>${safeTitle}</title>
 <meta charset="utf-8" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
 <style>
 body { margin: 24px; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111827; line-height: 1.6; }
 h1,h2,h3,h4,h5,h6 { color: #0f172a; margin-top: 1.2em; }
@@ -408,19 +477,23 @@ input[type="checkbox"] { margin-right: 8px; }
   };
 
   return (
-    <div className="relative h-full w-full">
-      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="relative h-full w-full overflow-auto"
+    >
+      <div className="sticky top-4 right-4 float-right z-10 flex items-center gap-2 mb-4 ml-4">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="h-8 w-8 bg-background/50 backdrop-blur-sm border shadow-sm"
           onClick={popOut}
           title="Open in new window"
         >
           <ExternalLink className="h-4 w-4" />
         </Button>
       </div>
-      <div className="prose prose-sm dark:prose-invert max-w-none p-6 pt-12">
+      <div className="prose prose-sm dark:prose-invert max-w-none p-6 pt-2 clear-both">
         {segments.map((segment, i) =>
           segment.type === 'html' ? (
             <div key={i} dangerouslySetInnerHTML={{ __html: segment.content }} />

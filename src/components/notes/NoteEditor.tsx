@@ -319,9 +319,22 @@ export function NoteEditor({
           </Panel>
           <PanelResizeHandle className="bg-border/60 hover:bg-border data-[separator-highlighted]:bg-border data-[separator-dragged]:bg-foreground/30 w-2 cursor-col-resize transition-colors" />
           <Panel defaultSize={45} minSize={20} className="min-h-0 border-l">
-            <div className="h-full overflow-auto">
+            <div className="h-full overflow-hidden">
               {isMarkdown ? (
-                <NoteMarkdownPreview content={value} filename={previewFilename} />
+                <NoteMarkdownPreview
+                  content={value}
+                  filename={previewFilename}
+                  editorScrollPercentage={scrollPercentage}
+                  onScroll={(p) => {
+                    if (editorView) {
+                      const scroller = editorView.scrollDOM;
+                      const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+                      if (maxScroll > 0) {
+                        scroller.scrollTo({ top: maxScroll * p });
+                      }
+                    }
+                  }}
+                />
               ) : (
                 <NoteLatexPreview
                   content={value}

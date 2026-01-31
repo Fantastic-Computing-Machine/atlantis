@@ -175,9 +175,9 @@ export function KittyMode() {
 
                 let newX = prev.x;
                 let newDirection = prev.direction;
-                let newIsVisible = prev.isVisible;
-                let newIsWalking = prev.isWalking;
-                let newIsResting = prev.isResting;
+                let newIsVisible: boolean = prev.isVisible;
+                let newIsWalking: boolean = prev.isWalking;
+                let newIsResting: boolean = prev.isResting;
 
                 if (prev.direction === 'right') {
                     newX = prev.x + speed;
