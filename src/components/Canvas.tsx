@@ -29,7 +29,6 @@ import {
   ZoomIn,
   ZoomOut
 } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
@@ -369,14 +368,27 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       canvas.width = svgWidth * scale;
       canvas.height = svgHeight * scale;
 
-      const img = new Image();
-      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
+      // Clone SVG to avoid modifying the original
+      const svgClone = svgEl.cloneNode(true) as SVGSVGElement;
 
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = url;
+      // Ensure SVG has proper dimensions
+      svgClone.setAttribute('width', String(svgWidth));
+      svgClone.setAttribute('height', String(svgHeight));
+
+      // Serialize SVG properly using XMLSerializer
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(svgClone);
+
+      // Encode as Base64 data URI to avoid cross-origin/tainted canvas issues
+      const svgBase64 = btoa(unescape(encodeURIComponent(svgString)));
+      const dataUrl = `data:image/svg+xml;base64,${svgBase64}`;
+
+      const img = new Image();
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load SVG image'));
+        img.src = dataUrl;
       });
 
       ctx.scale(scale, scale);
@@ -388,7 +400,6 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
       toast.success('PNG downloaded');
     } catch (err) {
       console.error('Export PNG error:', err);
@@ -416,20 +427,32 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       canvas.width = svgWidth * scale;
       canvas.height = svgHeight * scale;
 
-      const img = new Image();
-      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
+      // Clone SVG to avoid modifying the original
+      const svgClone = svgEl.cloneNode(true) as SVGSVGElement;
 
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = url;
+      // Ensure SVG has proper dimensions
+      svgClone.setAttribute('width', String(svgWidth));
+      svgClone.setAttribute('height', String(svgHeight));
+
+      // Serialize SVG properly using XMLSerializer
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(svgClone);
+
+      // Encode as Base64 data URI to avoid cross-origin/tainted canvas issues
+      const svgBase64 = btoa(unescape(encodeURIComponent(svgString)));
+      const dataUrl = `data:image/svg+xml;base64,${svgBase64}`;
+
+      const img = new Image();
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load SVG image'));
+        img.src = dataUrl;
       });
 
       ctx.scale(scale, scale);
       ctx.drawImage(img, 0, 0, svgWidth, svgHeight);
       const imgData = canvas.toDataURL('image/png');
-      URL.revokeObjectURL(url);
 
       // 2. Create PDF
       const isLandscape = svgWidth > svgHeight;
