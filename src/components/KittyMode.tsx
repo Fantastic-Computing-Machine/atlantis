@@ -175,60 +175,34 @@ export function KittyMode() {
             setKitty((prev) => {
                 if (!prev.isWalking) return prev;
 
-                let newX: number;
-                const newDirection = prev.direction;
-                let newIsVisible: boolean = prev.isVisible;
-                let newIsWalking: boolean = prev.isWalking;
-                let newIsResting: boolean = prev.isResting;
+                const isMovingRight = prev.direction === 'right';
+                const newX = isMovingRight ? prev.x + speed : prev.x - speed;
+                const isOutOfBounds = isMovingRight ? newX > maxX : newX < -60;
 
-                if (prev.direction === 'right') {
-                    newX = prev.x + speed;
-                    if (newX > maxX) {
-                        newIsVisible = false;
-                        newIsWalking = false;
-                        setTimeout(() => {
-                            setKitty((p) => ({
-                                ...p,
-                                isVisible: true,
-                                isWalking: true,
-                                x: -60,
-                                direction: Math.random() > 0.3 ? 'right' : 'left',
-                            }));
-                        }, Math.random() * 8000 + 4000);
-                    }
-                } else {
-                    newX = prev.x - speed;
-                    if (newX < -60) {
-                        newIsVisible = false;
-                        newIsWalking = false;
-                        setTimeout(() => {
-                            setKitty((p) => ({
-                                ...p,
-                                isVisible: true,
-                                isWalking: true,
-                                x: maxX,
-                                direction: 'left',
-                            }));
-                        }, Math.random() * 8000 + 4000);
-                    }
+                // Handle kitty exiting screen
+                if (isOutOfBounds) {
+                    const respawnDelay = Math.random() * 8000 + 4000;
+                    setTimeout(() => {
+                        setKitty((p) => ({
+                            ...p,
+                            isVisible: true,
+                            isWalking: true,
+                            x: isMovingRight ? -60 : maxX,
+                            direction: isMovingRight && Math.random() > 0.3 ? 'right' : 'left',
+                        }));
+                    }, respawnDelay);
+                    return { ...prev, isVisible: false, isWalking: false };
                 }
 
-                // Random chance to stop and rest (sit down)
-                if (newIsWalking && Math.random() < 0.0005) {
-                    newIsResting = true;
-                    newIsWalking = false;
+                // Random chance to stop and rest
+                if (Math.random() < 0.0005) {
                     setTimeout(() => {
                         setKitty((p) => ({ ...p, isResting: false, isWalking: true }));
                     }, Math.random() * 2500 + 1500);
+                    return { ...prev, x: newX, isResting: true, isWalking: false };
                 }
 
-                return {
-                    x: newX,
-                    direction: newDirection,
-                    isVisible: newIsVisible,
-                    isWalking: newIsWalking,
-                    isResting: newIsResting,
-                };
+                return { ...prev, x: newX };
             });
 
             animationRef.current = requestAnimationFrame(animate);

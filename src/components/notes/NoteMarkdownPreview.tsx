@@ -116,6 +116,21 @@ function parseMarkdown(text: string): string {
   });
 
   // 2. Extract LaTeX Inline ($ ... $)
+  // Helper function to render inline LaTeX
+  const renderInlineLatex = (_match: string, tex: string): string => {
+    try {
+      const rendered = katex.renderToString(tex, {
+        displayMode: false,
+        throwOnError: false,
+        strict: false
+      });
+      latexBlocks.push(rendered);
+      return `${latexInlineMarker}${latexBlocks.length - 1}${latexInlineMarker}`;
+    } catch {
+      return `$${tex}$`;
+    }
+  };
+
   // Feature-detect lookbehind support and fall back for older browsers
   const supportsLookbehind = (() => {
     try {
@@ -127,38 +142,12 @@ function parseMarkdown(text: string): string {
   })();
 
   if (supportsLookbehind) {
-    // Modern browsers: use lookbehind to avoid escaped dollars
-    processed = processed.replace(/(?<!\\)\$([^$\n]+?)(?<!\\)\$/g, (_match, tex) => {
-      try {
-        const rendered = katex.renderToString(tex, {
-          displayMode: false,
-          throwOnError: false,
-          strict: false
-        });
-        latexBlocks.push(rendered);
-        return `${latexInlineMarker}${latexBlocks.length - 1}${latexInlineMarker}`;
-      } catch {
-        return `$${tex}$`;
-      }
-    });
+    processed = processed.replace(/(?<!\\)\$([^$\n]+?)(?<!\\)\$/g, renderInlineLatex);
   } else {
-    // Fallback for older browsers: manually check for escaped dollars
+    // Fallback: manually check for escaped dollars
     processed = processed.replace(/\$([^$\n]+?)\$/g, (match, tex, offset) => {
-      // Check if the opening $ is escaped
-      if (offset > 0 && processed[offset - 1] === '\\') {
-        return match;
-      }
-      try {
-        const rendered = katex.renderToString(tex, {
-          displayMode: false,
-          throwOnError: false,
-          strict: false
-        });
-        latexBlocks.push(rendered);
-        return `${latexInlineMarker}${latexBlocks.length - 1}${latexInlineMarker}`;
-      } catch {
-        return `$${tex}$`;
-      }
+      if (offset > 0 && processed[offset - 1] === '\\') return match;
+      return renderInlineLatex(match, tex);
     });
   }
 

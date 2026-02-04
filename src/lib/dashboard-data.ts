@@ -1,4 +1,51 @@
 import { prisma } from './prisma';
+import { getDiagramPage } from './data';
+import { getNotePage } from './notes-data';
+
+export async function getHomePageData() {
+    const [
+        stats,
+        topTags,
+        filetypes,
+        todos,
+        activity,
+        staleContent,
+        rediscovery,
+        knowledgeStats,
+        starredDiagrams,
+        starredNotesRaw,
+        recentDiagrams,
+        recentNotesRaw,
+    ] = await Promise.all([
+        getDashboardStats(),
+        getTopTags(6),
+        getFiletypeStats(5),
+        getRecentTodos(5),
+        getRecentActivity(5),
+        getStaleContent(30, 3),
+        getRandomRediscovery(2),
+        getKnowledgeStats(),
+        getDiagramPage({ limit: 4, favoritesOnly: true }),
+        getNotePage({ limit: 4, starredOnly: true }),
+        getDiagramPage({ limit: 8, sort: 'recent' }),
+        getNotePage({ limit: 10, sort: 'recent' }),
+    ]);
+
+    return {
+        stats,
+        topTags,
+        filetypes,
+        todos,
+        activity,
+        staleContent,
+        rediscovery,
+        knowledgeStats,
+        starredDiagrams,
+        starredNotesRaw,
+        recentDiagrams,
+        recentNotesRaw,
+    };
+}
 
 export interface DashboardStats {
     totalDiagrams: number;
@@ -48,6 +95,33 @@ export interface KnowledgeStats {
     oldestItemDate: string | null;
     newestItemDate: string | null;
     totalContentItems: number;
+}
+
+// Helper type for database results with common fields
+type DbItem = { id: string; title: string; emoji: string; updatedAt: Date };
+
+// Helper to convert DB items to ActivityItem format
+function toActivityItem(item: DbItem, type: 'diagram' | 'note'): ActivityItem {
+    return {
+        id: item.id,
+        title: item.title,
+        emoji: item.emoji,
+        type,
+        updatedAt: item.updatedAt.toISOString(),
+    };
+}
+
+// Helper to convert DB items to StaleItem format
+function toStaleItem(item: DbItem, type: 'diagram' | 'note'): StaleItem {
+    const now = new Date();
+    const days = Math.floor((now.getTime() - item.updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+    return {
+        id: item.id,
+        title: item.title,
+        emoji: item.emoji,
+        type,
+        daysSinceUpdate: days,
+    };
 }
 
 /**
@@ -171,20 +245,8 @@ export async function getRecentActivity(limit = 5): Promise<ActivityItem[]> {
     ]);
 
     const combined: ActivityItem[] = [
-        ...diagrams.map((d) => ({
-            id: d.id,
-            title: d.title,
-            emoji: d.emoji,
-            type: 'diagram' as const,
-            updatedAt: d.updatedAt.toISOString(),
-        })),
-        ...notes.map((n) => ({
-            id: n.id,
-            title: n.title,
-            emoji: n.emoji,
-            type: 'note' as const,
-            updatedAt: n.updatedAt.toISOString(),
-        })),
+        ...diagrams.map((d) => toActivityItem(d, 'diagram')),
+        ...notes.map((n) => toActivityItem(n, 'note')),
     ];
 
     return combined
@@ -214,22 +276,9 @@ export async function getStaleContent(daysThreshold = 30, limit = 3): Promise<St
         }),
     ]);
 
-    const now = new Date();
     const combined: StaleItem[] = [
-        ...diagrams.map((d) => ({
-            id: d.id,
-            title: d.title,
-            emoji: d.emoji,
-            type: 'diagram' as const,
-            daysSinceUpdate: Math.floor((now.getTime() - d.updatedAt.getTime()) / (1000 * 60 * 60 * 24)),
-        })),
-        ...notes.map((n) => ({
-            id: n.id,
-            title: n.title,
-            emoji: n.emoji,
-            type: 'note' as const,
-            daysSinceUpdate: Math.floor((now.getTime() - n.updatedAt.getTime()) / (1000 * 60 * 60 * 24)),
-        })),
+        ...diagrams.map((d) => toStaleItem(d, 'diagram')),
+        ...notes.map((n) => toStaleItem(n, 'note')),
     ];
 
     return combined
@@ -253,20 +302,8 @@ export async function getRandomRediscovery(limit = 2): Promise<ActivityItem[]> {
     ]);
 
     const items: ActivityItem[] = [
-        ...diagrams.map((diagram) => ({
-            id: diagram.id,
-            title: diagram.title,
-            emoji: diagram.emoji,
-            type: 'diagram' as const,
-            updatedAt: diagram.updatedAt.toISOString(),
-        })),
-        ...notes.map((note) => ({
-            id: note.id,
-            title: note.title,
-            emoji: note.emoji,
-            type: 'note' as const,
-            updatedAt: note.updatedAt.toISOString(),
-        })),
+        ...diagrams.map((d) => toActivityItem(d, 'diagram')),
+        ...notes.map((n) => toActivityItem(n, 'note')),
     ];
 
     // Fisher-Yates shuffle for unbiased random ordering

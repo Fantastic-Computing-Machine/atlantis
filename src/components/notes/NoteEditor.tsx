@@ -98,13 +98,6 @@ export function NoteEditor({
     setTimeout(() => setMounted(true), 0);
   }, []);
 
-  const handleChange = useCallback(
-    (val: string) => {
-      onChange(val);
-    },
-    [onChange]
-  );
-
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(value);
     toast.success('Copied to clipboard');
@@ -289,7 +282,7 @@ export function NoteEditor({
                 value={value}
                 height="100%"
                 theme={editorTheme}
-                onChange={handleChange}
+                onChange={onChange}
                 onCreateEditor={handleCreateEditor}
                 extensions={extensions}
                 className="h-full text-sm [&_.cm-editor]:h-full [&_.cm-scroller]:!overflow-auto"
@@ -371,13 +364,13 @@ export function NoteEditor({
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="h-full w-full">
             {language === 'todo' ? (
-              <TodoList value={value} onChange={handleChange} />
+              <TodoList value={value} onChange={onChange} />
             ) : (
               <CodeMirror
                 value={value}
                 height="100%"
                 theme={editorTheme}
-                onChange={handleChange}
+                onChange={onChange}
                 onCreateEditor={handleCreateEditor}
                 extensions={extensions}
                 className="h-full text-sm [&_.cm-editor]:h-full [&_.cm-scroller]:!overflow-auto"
