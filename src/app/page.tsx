@@ -112,9 +112,6 @@ export default async function Page() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <Greeting />
-                  {/* <p className="text-muted-foreground text-sm">
-                    Your second brain <span className="opacity-50">//</span> {stats.totalDiagrams + stats.totalNotes} items
-                  </p> */}
                 </div>
                 {/* Quick Actions - always visible */}
                 <div className="flex items-center gap-2 shrink-0">

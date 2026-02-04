@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect, useState, useCallback, useRef } from 'react';
+import { useMemo, useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, FileText, GitBranch, Loader2 } from 'lucide-react';
 import type { Note, Diagram } from '@/lib/types';
@@ -116,21 +116,51 @@ function parseMarkdown(text: string): string {
   });
 
   // 2. Extract LaTeX Inline ($ ... $)
-  // Negative lookbehind not well supported in all browsers regex, so be careful.
-  // We match $...$ where the content doesn't start or end with space (to avoid matching normal $ prices sometimes)
-  processed = processed.replace(/(?<!\\)\$([^$\n]+?)(?<!\\)\$/g, (_match, tex) => {
+  // Feature-detect lookbehind support and fall back for older browsers
+  const supportsLookbehind = (() => {
     try {
-      const rendered = katex.renderToString(tex, {
-        displayMode: false,
-        throwOnError: false,
-        strict: false
-      });
-      latexBlocks.push(rendered);
-      return `${latexInlineMarker}${latexBlocks.length - 1}${latexInlineMarker}`;
-    } catch (e) {
-      return `$${tex}$`;
+      new RegExp('(?<!\\\\)\\$');
+      return true;
+    } catch {
+      return false;
     }
-  });
+  })();
+
+  if (supportsLookbehind) {
+    // Modern browsers: use lookbehind to avoid escaped dollars
+    processed = processed.replace(/(?<!\\)\$([^$\n]+?)(?<!\\)\$/g, (_match, tex) => {
+      try {
+        const rendered = katex.renderToString(tex, {
+          displayMode: false,
+          throwOnError: false,
+          strict: false
+        });
+        latexBlocks.push(rendered);
+        return `${latexInlineMarker}${latexBlocks.length - 1}${latexInlineMarker}`;
+      } catch {
+        return `$${tex}$`;
+      }
+    });
+  } else {
+    // Fallback for older browsers: manually check for escaped dollars
+    processed = processed.replace(/\$([^$\n]+?)\$/g, (match, tex, offset) => {
+      // Check if the opening $ is escaped
+      if (offset > 0 && processed[offset - 1] === '\\') {
+        return match;
+      }
+      try {
+        const rendered = katex.renderToString(tex, {
+          displayMode: false,
+          throwOnError: false,
+          strict: false
+        });
+        latexBlocks.push(rendered);
+        return `${latexInlineMarker}${latexBlocks.length - 1}${latexInlineMarker}`;
+      } catch {
+        return `$${tex}$`;
+      }
+    });
+  }
 
   // 3. Extract fenced code blocks (```)
   processed = processed.replace(/```(\w*)\n?([\s\S]*?)```/g, (_match, lang, code) => {
@@ -192,7 +222,7 @@ function parseMarkdown(text: string): string {
   processed = processed.replace(/==(.+?)==/g, '<mark class="bg-yellow-200 dark:bg-yellow-900 px-0.5 rounded">$1</mark>');
 
   // Subscript (~text~) - single tilde, not double
-  processed = processed.replace(/~([^~\s][^~]*)~/g, '<sub>$1</sub>');
+  processed = processed.replace(/~([^~\s](?:[^~]*[^~\s])?)~/g, '<sub>$1</sub>');
 
   // Superscript (^text^)
   processed = processed.replace(/\^([^\^\s][^\^]*)\^/g, '<sup>$1</sup>');
@@ -275,9 +305,17 @@ function parseMarkdown(text: string): string {
   );
 
   // Auto-link bare URLs (not already in href or markdown link)
+  // Use callback to check previous character instead of lookbehind for browser compatibility
   processed = processed.replace(
-    /(?<!["\(])(https?:\/\/[^\s<>\)]+)/g,
-    '<a href="$1" class="text-primary underline hover:no-underline" target="_blank" rel="noopener">$1</a>'
+    /(https?:\/\/[^\s<>\)]+)/g,
+    (match, url, offset) => {
+      const prevChar = offset > 0 ? processed.charAt(offset - 1) : '';
+      // Don't convert if already inside href="" or markdown link ()
+      if (prevChar === '"' || prevChar === '(') {
+        return match;
+      }
+      return `<a href="${url}" class="text-primary underline hover:no-underline" target="_blank" rel="noopener">${url}</a>`;
+    }
   );
 
   // Paragraphs - split by double newlines
@@ -325,7 +363,18 @@ function parseMarkdown(text: string): string {
 }
 
 export function NoteMarkdownPreview({ content, filename, editorScrollPercentage = 0, onScroll }: NoteMarkdownPreviewProps) {
-  const html = useMemo(() => parseMarkdown(content), [content]);
+  // Debounce content updates to improve performance with large documents
+  const [debouncedContent, setDebouncedContent] = useState(content);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setDebouncedContent(content);
+    }, 150); // 150ms debounce for responsive feel while typing
+
+    return () => window.clearTimeout(handle);
+  }, [content]);
+
+  const html = useMemo(() => parseMarkdown(debouncedContent), [debouncedContent]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Scroll Sync: Editor -> Preview
@@ -433,15 +482,9 @@ export function NoteMarkdownPreview({ content, filename, editorScrollPercentage 
   }, [processedHtml, html, internalLinks]);
 
   const popOut = () => {
-    const win = window.open(
-      'about:blank',
-      '_blank',
-      'resizable=yes,scrollbars=yes,width=1200,height=900,left=120,top=80'
-    );
-    if (!win) return;
     const safeTitle = buildDownloadName(filename);
 
-    // Write content to the new window
+    // Build HTML content for the pop-out window
     const htmlContent = `<!doctype html><html><head><title>${safeTitle}</title>
 <meta charset="utf-8" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
@@ -471,9 +514,24 @@ input[type="checkbox"] { margin-right: 8px; }
 </style>
 </head><body>${html}</body></html>`;
 
-    win.document.open();
-    win.document.write(htmlContent);
-    win.document.close();
+    // Use Blob URL for better security isolation instead of writing to about:blank
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(
+      url,
+      '_blank',
+      'resizable=yes,scrollbars=yes,width=1200,height=900,left=120,top=80'
+    );
+
+    // Clean up the Blob URL when the window closes or after a delay
+    if (win) {
+      win.addEventListener('beforeunload', () => {
+        URL.revokeObjectURL(url);
+      });
+    } else {
+      // If popup was blocked, clean up immediately
+      URL.revokeObjectURL(url);
+    }
   };
 
   return (
@@ -496,9 +554,9 @@ input[type="checkbox"] { margin-right: 8px; }
       <div className="prose prose-sm dark:prose-invert max-w-none p-6 pt-2 clear-both">
         {segments.map((segment, i) =>
           segment.type === 'html' ? (
-            <div key={i} dangerouslySetInnerHTML={{ __html: segment.content }} />
+            <div key={`html-${i}`} dangerouslySetInnerHTML={{ __html: segment.content }} />
           ) : (
-            <InternalLinkEmbed key={i} type={segment.linkType} id={segment.id} />
+            <InternalLinkEmbed key={`${segment.linkType}-${segment.id}`} type={segment.linkType} id={segment.id} />
           )
         )}
       </div>

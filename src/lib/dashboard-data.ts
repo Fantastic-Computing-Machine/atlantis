@@ -74,6 +74,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
  * Get the most used tags, sorted by usage count.
  */
 export async function getTopTags(limit = 6): Promise<TopTag[]> {
+    // Fetch more tags than needed since DB orders by diagram count only,
+    // but we want to sort by combined diagram + note count
     const tags = await prisma.tag.findMany({
         include: {
             _count: {
@@ -83,7 +85,7 @@ export async function getTopTags(limit = 6): Promise<TopTag[]> {
         orderBy: {
             diagrams: { _count: 'desc' },
         },
-        take: limit,
+        take: limit * 2, // Fetch extra to ensure we get true top tags after re-sorting
     });
 
     return tags
@@ -94,7 +96,8 @@ export async function getTopTags(limit = 6): Promise<TopTag[]> {
             color: tag.color,
             count: tag._count.diagrams + tag._count.notes,
         }))
-        .sort((a, b) => b.count - a.count);
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit); // Take only the requested limit after sorting
 }
 
 /**
@@ -236,74 +239,81 @@ export async function getStaleContent(daysThreshold = 30, limit = 3): Promise<St
 
 /**
  * Get random items for rediscovery.
+ * Uses Fisher-Yates shuffle for unbiased random sampling.
  */
 export async function getRandomRediscovery(limit = 2): Promise<ActivityItem[]> {
-    // Simple approach: get all IDs and pick random ones
-    const [diagramCount, noteCount] = await Promise.all([
-        prisma.diagram.count(),
-        prisma.note.count(),
+    // Fetch all IDs with minimal data for random sampling
+    const [diagrams, notes] = await Promise.all([
+        prisma.diagram.findMany({
+            select: { id: true, title: true, emoji: true, updatedAt: true },
+        }),
+        prisma.note.findMany({
+            select: { id: true, title: true, emoji: true, updatedAt: true },
+        }),
     ]);
 
-    const results: ActivityItem[] = [];
+    const items: ActivityItem[] = [
+        ...diagrams.map((diagram) => ({
+            id: diagram.id,
+            title: diagram.title,
+            emoji: diagram.emoji,
+            type: 'diagram' as const,
+            updatedAt: diagram.updatedAt.toISOString(),
+        })),
+        ...notes.map((note) => ({
+            id: note.id,
+            title: note.title,
+            emoji: note.emoji,
+            type: 'note' as const,
+            updatedAt: note.updatedAt.toISOString(),
+        })),
+    ];
 
-    if (diagramCount > 0) {
-        const skip = Math.floor(Math.random() * diagramCount);
-        const diagram = await prisma.diagram.findFirst({
-            skip,
-            select: { id: true, title: true, emoji: true, updatedAt: true },
-        });
-        if (diagram) {
-            results.push({
-                id: diagram.id,
-                title: diagram.title,
-                emoji: diagram.emoji,
-                type: 'diagram',
-                updatedAt: diagram.updatedAt.toISOString(),
-            });
-        }
+    // Fisher-Yates shuffle for unbiased random ordering
+    for (let i = items.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [items[i], items[j]] = [items[j], items[i]];
     }
 
-    if (noteCount > 0) {
-        const skip = Math.floor(Math.random() * noteCount);
-        const note = await prisma.note.findFirst({
-            skip,
-            select: { id: true, title: true, emoji: true, updatedAt: true },
-        });
-        if (note) {
-            results.push({
-                id: note.id,
-                title: note.title,
-                emoji: note.emoji,
-                type: 'note',
-                updatedAt: note.updatedAt.toISOString(),
-            });
-        }
-    }
-
-    return results.slice(0, limit);
+    return items.slice(0, limit);
 }
 
 /**
  * Get knowledge base stats (depth metrics).
  */
 export async function getKnowledgeStats(): Promise<KnowledgeStats> {
-    const [totalCheckpoints, diagramStats, oldest, newest] = await Promise.all([
+    const [
+        totalCheckpoints,
+        diagramStats,
+        oldestDiagram,
+        newestDiagram,
+        oldestNote,
+        newestNote,
+        diagramCount,
+        noteCount,
+    ] = await Promise.all([
         prisma.content.count(),
         prisma.diagram.aggregate({ _avg: { totalVersions: true } }),
         prisma.diagram.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
         prisma.diagram.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
-    ]);
-
-    const [diagramCount, noteCount] = await Promise.all([
+        prisma.note.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
+        prisma.note.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
         prisma.diagram.count(),
         prisma.note.count(),
     ]);
 
+    // Find the true oldest and newest across both diagrams and notes
+    const oldestDates = [oldestDiagram?.createdAt, oldestNote?.createdAt].filter(Boolean) as Date[];
+    const newestDates = [newestDiagram?.createdAt, newestNote?.createdAt].filter(Boolean) as Date[];
+
+    const oldest = oldestDates.length > 0 ? new Date(Math.min(...oldestDates.map(d => d.getTime()))) : null;
+    const newest = newestDates.length > 0 ? new Date(Math.max(...newestDates.map(d => d.getTime()))) : null;
+
     return {
         totalCheckpoints,
         avgVersionsPerDiagram: Math.round((diagramStats._avg.totalVersions || 0) * 10) / 10,
-        oldestItemDate: oldest?.createdAt.toISOString() || null,
-        newestItemDate: newest?.createdAt.toISOString() || null,
+        oldestItemDate: oldest?.toISOString() || null,
+        newestItemDate: newest?.toISOString() || null,
         totalContentItems: diagramCount + noteCount,
     };
 }

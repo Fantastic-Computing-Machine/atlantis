@@ -175,7 +175,7 @@ export function KittyMode() {
             setKitty((prev) => {
                 if (!prev.isWalking) return prev;
 
-                let newX = prev.x;
+                let newX: number;
                 const newDirection = prev.direction;
                 let newIsVisible: boolean = prev.isVisible;
                 let newIsWalking: boolean = prev.isWalking;
@@ -241,7 +241,7 @@ export function KittyMode() {
                 cancelAnimationFrame(animationRef.current);
             }
         };
-    }, [kitty.isVisible, kitty.isWalking]);
+    }, [kitty]);
 
     if (!settings.kittyMode || !kitty.isVisible) {
         return null;

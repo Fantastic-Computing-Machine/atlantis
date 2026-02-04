@@ -11,7 +11,6 @@ import { toast } from 'sonner';
 
 export function QuickCapture() {
     const router = useRouter();
-    const { shortcutSymbol } = useShortcutPlatform();
     const [isOpen, setIsOpen] = useState(false);
     const [title, setTitle] = useState('');
     const [isCreating, setIsCreating] = useState(false);
@@ -20,7 +19,13 @@ export function QuickCapture() {
     // Keyboard shortcut: Alt + N to open quick capture
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.altKey && e.key === 'n') {
+            // Ignore shortcut when user is typing in an input or textarea
+            const activeElement = document.activeElement;
+            const isTyping = activeElement instanceof HTMLInputElement ||
+                activeElement instanceof HTMLTextAreaElement ||
+                activeElement?.getAttribute('contenteditable') === 'true';
+
+            if (e.altKey && e.key === 'n' && !isTyping) {
                 e.preventDefault();
                 setIsOpen(true);
             }
@@ -61,7 +66,8 @@ export function QuickCapture() {
             setTitle('');
             setIsOpen(false);
             router.push(`/notes/${newNote.id}`);
-        } catch {
+        } catch (error) {
+            console.error('QuickCapture: Failed to create note:', error);
             toast.error('Failed to create note');
         } finally {
             setIsCreating(false);

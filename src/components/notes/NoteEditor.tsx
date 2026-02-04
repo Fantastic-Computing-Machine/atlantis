@@ -25,7 +25,7 @@ import { StreamLanguage } from '@codemirror/language';
 import { stex } from '@codemirror/legacy-modes/mode/stex';
 import { Copy, Settings2, WrapText, Search, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { NoteSearchReplace } from './NoteSearchReplace';
 import { NoteMarkdownPreview } from './NoteMarkdownPreview';
@@ -88,6 +88,7 @@ export function NoteEditor({
   const [hideLatexPreview, setHideLatexPreview] = useState(false);
   const [editorView, setEditorView] = useState<EditorView | null>(null);
   const [scrollPercentage, setScrollPercentage] = useState(0);
+  const isScrollingSyncRef = useRef(false); // Prevent recursive scroll updates
 
   const isMarkdown = language === 'markdown' || language === 'md';
   const isLatex = language === 'latex' || language === 'tex';
@@ -305,6 +306,8 @@ export function NoteEditor({
                 }}
                 onUpdate={(update) => {
                   if (update.docChanged || update.geometryChanged) {
+                    // Only update if we didn't trigger this scroll from preview
+                    if (isScrollingSyncRef.current) return;
                     const scroller = update.view.scrollDOM;
                     const maxScroll = scroller.scrollHeight - scroller.clientHeight;
                     if (maxScroll > 0) {
@@ -327,11 +330,16 @@ export function NoteEditor({
                   editorScrollPercentage={scrollPercentage}
                   onScroll={(p) => {
                     if (editorView) {
+                      isScrollingSyncRef.current = true;
                       const scroller = editorView.scrollDOM;
                       const maxScroll = scroller.scrollHeight - scroller.clientHeight;
                       if (maxScroll > 0) {
                         scroller.scrollTo({ top: maxScroll * p });
                       }
+                      // Reset flag after a short delay
+                      requestAnimationFrame(() => {
+                        isScrollingSyncRef.current = false;
+                      });
                     }
                   }}
                 />
@@ -342,11 +350,16 @@ export function NoteEditor({
                   filename={previewFilename}
                   onScroll={(p) => {
                     if (editorView) {
+                      isScrollingSyncRef.current = true;
                       const scroller = editorView.scrollDOM;
                       const maxScroll = scroller.scrollHeight - scroller.clientHeight;
                       if (maxScroll > 0) {
                         scroller.scrollTo({ top: maxScroll * p });
                       }
+                      // Reset flag after a short delay
+                      requestAnimationFrame(() => {
+                        isScrollingSyncRef.current = false;
+                      });
                     }
                   }}
                 />

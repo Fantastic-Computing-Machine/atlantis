@@ -60,7 +60,8 @@ export function DashboardCardMenu({ id, title, type, isStarred }: DashboardCardM
 
             if (!res.ok) throw new Error('Failed to update');
             router.refresh();
-        } catch {
+        } catch (error) {
+            console.error('DashboardCardMenu: Failed to update star status:', error);
             setStarred(!newStarred);
             toast.error('Failed to update');
         }
@@ -81,7 +82,8 @@ export function DashboardCardMenu({ id, title, type, isStarred }: DashboardCardM
             if (!res.ok) throw new Error('Failed to delete');
             toast.success(`${type === 'diagram' ? 'Diagram' : 'Note'} deleted`);
             router.refresh();
-        } catch {
+        } catch (error) {
+            console.error('DashboardCardMenu: Failed to delete item:', error);
             toast.error('Failed to delete');
         }
         setShowDelete(false);
@@ -119,7 +121,8 @@ export function DashboardCardMenu({ id, title, type, isStarred }: DashboardCardM
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
                 toast.success('Downloaded');
-            } catch {
+            } catch (error) {
+                console.error('DashboardCardMenu: Failed to download:', error);
                 toast.error('Failed to download');
             }
         } else {
