@@ -39,18 +39,19 @@ export function TodoList({ value, onChange }: TodoListProps) {
                 };
             });
 
-        // Only update if we have a different number of items or if the parsed content is significantly different
-        // This is a naive check to prevent feedback loops, but for a true two-way binding we might need more robust diffing.
-        // For now, we'll just initialize if empty or assume the editor controls the state.
+        // Check if incoming value is different from current serialized state
+        // This prevents circular updates when this component calls onChange
+        const currentSerialized = items
+            .map((item) => `- [${item.completed ? 'x' : ' '}] ${item.text}`)
+            .join('\n');
 
-        if (items.length === 0 && parsedItems.length > 0) {
+        if (value.trim() !== currentSerialized.trim()) {
+            // Basic structure matching to preserve IDs if possible would be better, 
+            // but for now, completely replacing is the safest way to ensure AI changes are reflected.
+            // We can optimize diffing later if typing performance is an issue.
             setItems(parsedItems);
-        } else if (parsedItems.length === 0 && items.length === 0 && value.trim().length === 0) {
-            // Initial empty state, do nothing or set empty
         }
-
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Run once on mount.
+    }, [value]); // Run when value changes
 
     const serialize = useCallback((currentItems: TodoItem[]) => {
         const markdown = currentItems

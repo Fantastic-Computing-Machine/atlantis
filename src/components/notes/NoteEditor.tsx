@@ -23,12 +23,13 @@ import { json } from '@codemirror/lang-json';
 import { markdown } from '@codemirror/lang-markdown';
 import { StreamLanguage } from '@codemirror/language';
 import { stex } from '@codemirror/legacy-modes/mode/stex';
-import { Copy, Settings2, WrapText, Search, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
+import { Copy, Settings2, WrapText, Search, Eye, EyeOff, Lock, Unlock, Sparkles } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { NoteSearchReplace } from './NoteSearchReplace';
 import { NoteMarkdownPreview } from './NoteMarkdownPreview';
+import { AiNotesPanel } from '@/components/notes/AiNotesPanel';
 import dynamic from 'next/dynamic';
 import { TodoList } from './TodoList';
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
@@ -94,8 +95,24 @@ export function NoteEditor({
   const isLatex = language === 'latex' || language === 'tex';
   const effectiveShowPreview = isLatex ? !hideLatexPreview : showPreview;
 
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [hasAiKey, setHasAiKey] = useState(false);
+
   useEffect(() => {
     setTimeout(() => setMounted(true), 0);
+  }, []);
+
+  useEffect(() => {
+    const checkAiKey = async () => {
+      try {
+        const res = await fetch('/api/settings/ai-key');
+        const data = await res.json();
+        if (data.hasKey) setHasAiKey(true);
+      } catch {
+        // failed to check key
+      }
+    };
+    checkAiKey();
   }, []);
 
   const handleCopy = useCallback(() => {
@@ -161,6 +178,24 @@ export function NoteEditor({
           {language || 'txt'}
         </span>
         <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={aiPanelOpen ? 'secondary' : 'ghost'}
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => {
+                  if (!hasAiKey) {
+                    toast.info('Add an AI key in settings to enable assistance');
+                  }
+                  setAiPanelOpen(!aiPanelOpen);
+                }}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>AI Assistant</TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -272,6 +307,9 @@ export function NoteEditor({
       {showSearch && (
         <NoteSearchReplace editorView={editorView} onClose={() => setShowSearch(false)} />
       )}
+
+      {/* AI Panel */}
+      {aiPanelOpen && <AiNotesPanel noteContent={value} language={language} onApply={onChange} />}
 
       {/* Code Editor + Optional Preview */}
       {(isMarkdown || isLatex) && effectiveShowPreview ? (
