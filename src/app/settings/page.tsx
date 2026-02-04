@@ -41,6 +41,7 @@ import {
   Snowflake,
   Zap,
   Tag,
+  Github,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +60,7 @@ export default function SettingsPage() {
     setSnowMode,
     setLiveSync,
     setLiveSyncInterval,
+    setKittyMode,
   } = useDiagramStore();
 
   // AI Settings state
@@ -809,6 +811,21 @@ export default function SettingsPage() {
                 }}
               />
             </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="flex items-center gap-2 font-medium">
+                  🐱 Kitty Mode
+                </p>
+                <p className="text-muted-foreground text-sm">A playful kitty wanders across your screen!</p>
+              </div>
+              <Switch
+                checked={settings.kittyMode ?? false}
+                onCheckedChange={(checked) => {
+                  setKittyMode(checked);
+                  toast.success(checked ? 'Meow! 🐱' : 'Kitty went to sleep');
+                }}
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -1235,8 +1252,19 @@ export default function SettingsPage() {
         <p className="text-muted-foreground text-sm">
           Made with <span className="text-red-500">❤️</span> by Terrestrian 🌏
         </p>
+        {/* Footer Link */}
+        <div className="flex justify-center pt-6 pb-2">
+          <a
+            href="https://github.com/Fantastic-Computing-Machine/atlantis"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground flex items-center gap-2 text-sm hover:underline"
+          >
+            <Github className="h-4 w-4" />
+            <span>Fantastic-Computing-Machine/atlantis</span>
+          </a>
+        </div>
       </footer >
     </div >
   );
 }
-

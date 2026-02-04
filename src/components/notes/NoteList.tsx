@@ -172,6 +172,15 @@ export function NoteList() {
                     <span>·</span>
                     <span>{formatDate(note.updatedAt)}</span>
                   </div>
+                  {note.tags && note.tags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {note.tags.map(tag => (
+                        <div key={tag.id} className="rounded-full px-1.5 py-0.5 text-[10px] font-medium border bg-opacity-50" style={{ backgroundColor: `${tag.color}20`, borderColor: `${tag.color}40`, color: tag.color }}>
+                          #{tag.slug}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </Link>
               );
             })

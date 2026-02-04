@@ -45,3 +45,7 @@ next-env.d.ts
 TODO.md
 build.log
 image*.png
+
+# PWA cache files (generated at runtime, not tracked)
+# Note: public/sw.js and public/manifest.json are tracked
+

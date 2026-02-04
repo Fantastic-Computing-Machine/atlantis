@@ -25,7 +25,7 @@ import { StreamLanguage } from '@codemirror/language';
 import { stex } from '@codemirror/legacy-modes/mode/stex';
 import { Copy, Settings2, WrapText, Search, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { NoteSearchReplace } from './NoteSearchReplace';
 import { NoteMarkdownPreview } from './NoteMarkdownPreview';
@@ -84,10 +84,11 @@ export function NoteEditor({
   const [showIndentGuides, setShowIndentGuides] = useState(true);
   const [wordWrap, setWordWrap] = useState(true);
   const [showSearch, setShowSearch] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const [hideLatexPreview, setHideLatexPreview] = useState(false);
   const [editorView, setEditorView] = useState<EditorView | null>(null);
   const [scrollPercentage, setScrollPercentage] = useState(0);
+  const isScrollingSyncRef = useRef(false); // Prevent recursive scroll updates
 
   const isMarkdown = language === 'markdown' || language === 'md';
   const isLatex = language === 'latex' || language === 'tex';
@@ -96,13 +97,6 @@ export function NoteEditor({
   useEffect(() => {
     setTimeout(() => setMounted(true), 0);
   }, []);
-
-  const handleChange = useCallback(
-    (val: string) => {
-      onChange(val);
-    },
-    [onChange]
-  );
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(value);
@@ -288,7 +282,7 @@ export function NoteEditor({
                 value={value}
                 height="100%"
                 theme={editorTheme}
-                onChange={handleChange}
+                onChange={onChange}
                 onCreateEditor={handleCreateEditor}
                 extensions={extensions}
                 className="h-full text-sm [&_.cm-editor]:h-full [&_.cm-scroller]:!overflow-auto"
@@ -305,6 +299,8 @@ export function NoteEditor({
                 }}
                 onUpdate={(update) => {
                   if (update.docChanged || update.geometryChanged) {
+                    // Only update if we didn't trigger this scroll from preview
+                    if (isScrollingSyncRef.current) return;
                     const scroller = update.view.scrollDOM;
                     const maxScroll = scroller.scrollHeight - scroller.clientHeight;
                     if (maxScroll > 0) {
@@ -319,9 +315,27 @@ export function NoteEditor({
           </Panel>
           <PanelResizeHandle className="bg-border/60 hover:bg-border data-[separator-highlighted]:bg-border data-[separator-dragged]:bg-foreground/30 w-2 cursor-col-resize transition-colors" />
           <Panel defaultSize={45} minSize={20} className="min-h-0 border-l">
-            <div className="h-full overflow-auto">
+            <div className="h-full overflow-hidden">
               {isMarkdown ? (
-                <NoteMarkdownPreview content={value} filename={previewFilename} />
+                <NoteMarkdownPreview
+                  content={value}
+                  filename={previewFilename}
+                  editorScrollPercentage={scrollPercentage}
+                  onScroll={(p) => {
+                    if (editorView) {
+                      isScrollingSyncRef.current = true;
+                      const scroller = editorView.scrollDOM;
+                      const maxScroll = scroller.scrollHeight - scroller.clientHeight;
+                      if (maxScroll > 0) {
+                        scroller.scrollTo({ top: maxScroll * p });
+                      }
+                      // Reset flag after a short delay
+                      requestAnimationFrame(() => {
+                        isScrollingSyncRef.current = false;
+                      });
+                    }
+                  }}
+                />
               ) : (
                 <NoteLatexPreview
                   content={value}
@@ -329,11 +343,16 @@ export function NoteEditor({
                   filename={previewFilename}
                   onScroll={(p) => {
                     if (editorView) {
+                      isScrollingSyncRef.current = true;
                       const scroller = editorView.scrollDOM;
                       const maxScroll = scroller.scrollHeight - scroller.clientHeight;
                       if (maxScroll > 0) {
                         scroller.scrollTo({ top: maxScroll * p });
                       }
+                      // Reset flag after a short delay
+                      requestAnimationFrame(() => {
+                        isScrollingSyncRef.current = false;
+                      });
                     }
                   }}
                 />
@@ -345,13 +364,13 @@ export function NoteEditor({
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="h-full w-full">
             {language === 'todo' ? (
-              <TodoList value={value} onChange={handleChange} />
+              <TodoList value={value} onChange={onChange} />
             ) : (
               <CodeMirror
                 value={value}
                 height="100%"
                 theme={editorTheme}
-                onChange={handleChange}
+                onChange={onChange}
                 onCreateEditor={handleCreateEditor}
                 extensions={extensions}
                 className="h-full text-sm [&_.cm-editor]:h-full [&_.cm-scroller]:!overflow-auto"

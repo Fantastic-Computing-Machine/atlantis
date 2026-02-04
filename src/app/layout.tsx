@@ -4,6 +4,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ConsoleWelcome } from '@/components/ConsoleWelcome';
 import { GlobalShortcutsWrapper } from '@/components/GlobalShortcutsWrapper';
 import { SnowEffectWrapper } from '@/components/SnowEffectWrapper';
+import { KittyMode } from '@/components/KittyMode';
+import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
 import type { Metadata } from 'next';
 import './globals.css';
 
@@ -14,6 +16,7 @@ export const metadata: Metadata = {
   title: 'atlantis',
   description: 'Self-hosted diagrams and notes platform',
   metadataBase: new URL(process.env.APP_URL || 'http://localhost:3000'),
+  manifest: '/manifest.json',
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔱</text></svg>",
   },
@@ -58,6 +61,8 @@ export default function RootLayout({
             <TooltipProvider>{children}</TooltipProvider>
           </GlobalShortcutsWrapper>
           <SnowEffectWrapper />
+          <KittyMode />
+          <ServiceWorkerRegistration />
           <Toaster />
         </ThemeProvider>
       </body>

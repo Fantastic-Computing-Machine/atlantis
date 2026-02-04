@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   snowMode: false,
   liveSync: true,
   liveSyncInterval: 5000,
+  kittyMode: false,
 };
 
 export const useDiagramStore = create<DiagramStore>()(
@@ -96,6 +97,10 @@ export const useDiagramStore = create<DiagramStore>()(
       setLiveSyncInterval: (ms) =>
         set((state) => ({
           settings: { ...state.settings, liveSyncInterval: ms },
+        })),
+      setKittyMode: (enabled) =>
+        set((state) => ({
+          settings: { ...state.settings, kittyMode: enabled },
         })),
     }),
     {
