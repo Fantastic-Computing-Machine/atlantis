@@ -33,7 +33,7 @@ export function TodoList({ value, onChange }: TodoListProps) {
                 const completed = match?.[1]?.toLowerCase() === 'x';
                 const text = match ? (match[2] ?? '') : line;
                 return {
-                    id: Math.random().toString(36).substring(7),
+                    id: crypto.randomUUID(),
                     text,
                     completed,
                 };
@@ -89,7 +89,7 @@ export function TodoList({ value, onChange }: TodoListProps) {
 
     const handleAdd = () => {
         const newItem: TodoItem = {
-            id: Math.random().toString(36).substring(7),
+            id: crypto.randomUUID(),
             text: '',
             completed: false,
         };

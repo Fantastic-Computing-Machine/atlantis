@@ -129,12 +129,13 @@ export function AiNotesPanel({ noteContent, language, onApply }: AiNotesPanelPro
                 {isLoading && <span className="text-[10px] text-muted-foreground animate-pulse whitespace-nowrap">Thinking...</span>}
             </div>
 
-            <div className="relative flex items-end gap-2">
+            <div className="flex items-end gap-2">
                 <Textarea
                     placeholder="Tell the expert writer what to do..."
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    className="min-h-[40px] max-h-[120px] resize-y text-sm py-2 pr-12 bg-background/50 focus:bg-background transition-colors"
+                    disabled={isLoading}
+                    className="min-h-[40px] max-h-[120px] resize-y text-sm py-2 bg-background/50 focus:bg-background transition-colors disabled:opacity-50 flex-1"
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
@@ -144,12 +145,12 @@ export function AiNotesPanel({ noteContent, language, onApply }: AiNotesPanelPro
                 />
                 <Button
                     size="icon"
-                    className="absolute right-1 bottom-1 h-7 w-7"
+                    className="h-9 w-9 shrink-0"
                     onClick={() => handleSend()}
                     disabled={isLoading || !prompt.trim()}
-                    variant="ghost"
+                    variant="secondary"
                 >
-                    <SendHorizontal className="h-4 w-4 text-primary" />
+                    <SendHorizontal className="h-4 w-4" />
                 </Button>
             </div>
 

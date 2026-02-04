@@ -1,10 +1,13 @@
 'use client';
 
-import { useMemo, useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, type ComponentPropsWithoutRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, FileText, GitBranch, Loader2 } from 'lucide-react';
+import { ExternalLink, FileText, GitBranch, Loader2, Copy, Check } from 'lucide-react';
 import type { Note, Diagram } from '@/lib/types';
-import katex from 'katex';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 
 interface NoteMarkdownPreviewProps {
@@ -86,285 +89,200 @@ function InternalLinkEmbed({ type, id }: { type: 'note' | 'diagram'; id: string 
   );
 }
 
-// Parse markdown to HTML with proper code block handling
-function parseMarkdown(text: string): string {
-  // Use markers that won't be affected by HTML escaping
-  const codeBlockMarker = '\u0000CB';
-  const inlineCodeMarker = '\u0000IC';
-  const latexBlockMarker = '\u0000LB';
-  const latexInlineMarker = '\u0000LI';
+// Code block component with copy button
+function CodeBlock({ children, className, ...props }: ComponentPropsWithoutRef<'code'>) {
+  const [copied, setCopied] = useState(false);
+  const match = /language-(\w+)/.exec(className || '');
+  const language = match ? match[1] : '';
+  const isInline = !className?.includes('language-');
 
-  // First, extract and protect code blocks
-  const codeBlocks: string[] = [];
-  const latexBlocks: string[] = [];
-  let processed = text;
+  // For inline code
+  if (isInline) {
+    return (
+      <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+        {children}
+      </code>
+    );
+  }
 
-  // 1. Extract LaTeX Blocks ($$ ... $$)
-  processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, (_match, tex) => {
-    try {
-      const rendered = katex.renderToString(tex, {
-        displayMode: true,
-        throwOnError: false,
-        strict: false
-      });
-      latexBlocks.push(rendered);
-      return `${latexBlockMarker}${latexBlocks.length - 1}${latexBlockMarker}`;
-    } catch (e) {
-      console.error(e);
-      return `$$${tex}$$`;
-    }
-  });
+  const codeString = String(children).replace(/\n$/, '');
 
-  // 2. Extract LaTeX Inline ($ ... $)
-  // Helper function to render inline LaTeX
-  const renderInlineLatex = (_match: string, tex: string): string => {
-    try {
-      const rendered = katex.renderToString(tex, {
-        displayMode: false,
-        throwOnError: false,
-        strict: false
-      });
-      latexBlocks.push(rendered);
-      return `${latexInlineMarker}${latexBlocks.length - 1}${latexInlineMarker}`;
-    } catch {
-      return `$${tex}$`;
-    }
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(codeString);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  // Feature-detect lookbehind support and fall back for older browsers
-  const supportsLookbehind = (() => {
-    try {
-      new RegExp('(?<!\\\\)\\$');
-      return true;
-    } catch {
-      return false;
-    }
-  })();
+  return (
+    <div className="relative group my-4">
+      {language && (
+        <span className="absolute top-2 left-3 text-xs text-muted-foreground uppercase">
+          {language}
+        </span>
+      )}
+      <button
+        className="absolute top-2 right-2 p-1.5 rounded bg-muted-foreground/10 hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={handleCopy}
+      >
+        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+      </button>
+      <pre className={`bg-muted p-4 ${language ? 'pt-8' : ''} rounded-lg overflow-x-auto`}>
+        <code className="text-sm font-mono block whitespace-pre">{codeString}</code>
+      </pre>
+    </div>
+  );
+}
 
-  if (supportsLookbehind) {
-    processed = processed.replace(/(?<!\\)\$([^$\n]+?)(?<!\\)\$/g, renderInlineLatex);
-  } else {
-    // Fallback: manually check for escaped dollars
-    processed = processed.replace(/\$([^$\n]+?)\$/g, (match, tex, offset) => {
-      if (offset > 0 && processed[offset - 1] === '\\') return match;
-      return renderInlineLatex(match, tex);
-    });
+// Custom link component that detects internal links
+function CustomLink({ href, children, ...props }: ComponentPropsWithoutRef<'a'>) {
+  // Check for internal note/diagram links
+  const noteMatch = href?.match(/\/notes\/([a-zA-Z0-9_-]+)$/);
+  const diagramMatch = href?.match(/\/diagram\/([a-zA-Z0-9_-]+)$/);
+
+  if (noteMatch) {
+    return <InternalLinkEmbed type="note" id={noteMatch[1]} />;
   }
 
-  // 3. Extract fenced code blocks (```)
-  processed = processed.replace(/```(\w*)\n?([\s\S]*?)```/g, (_match, lang, code) => {
-    const escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    // Store raw code for copy button (escape quotes for data attribute)
-    const rawForCopy = code.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    const index = codeBlocks.length;
-    const langLabel = lang ? `<span class="absolute top-2 left-3 text-xs text-muted-foreground uppercase">${lang}</span>` : '';
-    codeBlocks.push(
-      `<div class="relative group">
-        ${langLabel}
-        <button 
-          class="absolute top-2 right-2 p-1.5 rounded bg-muted-foreground/10 hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-          onclick="navigator.clipboard.writeText(this.dataset.code).then(() => { this.textContent = '✓'; setTimeout(() => this.textContent = 'Copy', 1500); })"
-          data-code="${rawForCopy}"
-        >Copy</button>
-        <pre class="bg-muted p-4 ${lang ? 'pt-8' : ''} rounded-lg overflow-x-auto my-4"><code class="text-sm font-mono block whitespace-pre">${escaped}</code></pre>
-      </div>`
-    );
-    return `${codeBlockMarker}${index}${codeBlockMarker}`;
-  });
+  if (diagramMatch) {
+    return <InternalLinkEmbed type="diagram" id={diagramMatch[1]} />;
+  }
 
-  // Extract inline code (`)
-  const inlineCodes: string[] = [];
-  processed = processed.replace(/`([^`\n]+)`/g, (_match, code) => {
-    const escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const index = inlineCodes.length;
-    inlineCodes.push(
-      `<code class="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">${escaped}</code>`
-    );
-    return `${inlineCodeMarker}${index}${inlineCodeMarker}`;
-  });
-
-  // Now escape remaining HTML
-  processed = processed.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-  // Headers (process from h6 to h1 to avoid conflicts)
-  processed = processed
-    .replace(/^######\s+(.*)$/gm, '<h6 class="text-sm font-semibold mt-4 mb-2">$1</h6>')
-    .replace(/^#####\s+(.*)$/gm, '<h5 class="text-sm font-semibold mt-4 mb-2">$1</h5>')
-    .replace(/^####\s+(.*)$/gm, '<h4 class="text-base font-semibold mt-4 mb-2">$1</h4>')
-    .replace(/^###\s+(.*)$/gm, '<h3 class="text-lg font-semibold mt-5 mb-2">$1</h3>')
-    .replace(/^##\s+(.*)$/gm, '<h2 class="text-xl font-semibold mt-6 mb-3 border-b pb-2">$1</h2>')
-    .replace(/^#\s+(.*)$/gm, '<h1 class="text-2xl font-bold mt-6 mb-4 border-b pb-2">$1</h1>');
-
-  // Bold and italic
-  processed = processed
-    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^\s*][^*]*[^\s*])\*/g, '<em>$1</em>')
-    .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>')
-    .replace(/__(.+?)__/g, '<strong>$1</strong>')
-    .replace(/_([^\s_][^_]*[^\s_])_/g, '<em>$1</em>');
-
-  // Strikethrough
-  processed = processed.replace(/~~(.+?)~~/g, '<del>$1</del>');
-
-  // Highlight (==text==)
-  processed = processed.replace(/==(.+?)==/g, '<mark class="bg-yellow-200 dark:bg-yellow-900 px-0.5 rounded">$1</mark>');
-
-  // Subscript (~text~) - single tilde, not double
-  processed = processed.replace(/~([^~\s](?:[^~]*[^~\s])?)~/g, '<sub>$1</sub>');
-
-  // Superscript (^text^)
-  processed = processed.replace(/\^([^\^\s][^\^]*)\^/g, '<sup>$1</sup>');
-
-  // Blockquotes (> becomes &gt; after escaping)
-  processed = processed.replace(
-    /^&gt;\s+(.*)$/gm,
-    '<blockquote class="border-l-4 border-primary/50 pl-4 italic text-muted-foreground my-2">$1</blockquote>'
+  // Regular external link
+  return (
+    <a
+      href={href}
+      className="text-primary underline hover:no-underline"
+      target="_blank"
+      rel="noopener noreferrer"
+      {...props}
+    >
+      {children}
+    </a>
   );
+}
 
-  // Horizontal rules
-  processed = processed
-    .replace(/^---$/gm, '<hr class="my-6 border-border" />')
-    .replace(/^\*\*\*$/gm, '<hr class="my-6 border-border" />');
+// Custom components for react-markdown
+const markdownComponents = {
+  // Headings with proper styling
+  h1: ({ children, ...props }: ComponentPropsWithoutRef<'h1'>) => (
+    <h1 className="text-2xl font-bold mt-6 mb-4 border-b pb-2" {...props}>{children}</h1>
+  ),
+  h2: ({ children, ...props }: ComponentPropsWithoutRef<'h2'>) => (
+    <h2 className="text-xl font-semibold mt-6 mb-3 border-b pb-2" {...props}>{children}</h2>
+  ),
+  h3: ({ children, ...props }: ComponentPropsWithoutRef<'h3'>) => (
+    <h3 className="text-lg font-semibold mt-5 mb-2" {...props}>{children}</h3>
+  ),
+  h4: ({ children, ...props }: ComponentPropsWithoutRef<'h4'>) => (
+    <h4 className="text-base font-semibold mt-4 mb-2" {...props}>{children}</h4>
+  ),
+  h5: ({ children, ...props }: ComponentPropsWithoutRef<'h5'>) => (
+    <h5 className="text-sm font-semibold mt-4 mb-2" {...props}>{children}</h5>
+  ),
+  h6: ({ children, ...props }: ComponentPropsWithoutRef<'h6'>) => (
+    <h6 className="text-sm font-semibold mt-4 mb-2" {...props}>{children}</h6>
+  ),
 
-  // Tables - parse markdown tables into HTML
-  // First, ensure text ends with newline for easier parsing
-  processed = processed.endsWith('\n') ? processed : processed + '\n';
-
-  // Match table blocks: lines that start with | and end with |
-  processed = processed.replace(
-    /(?:^|\n)((?:\|[^\n]+\|\n)+)/g,
-    (_match, tableBlock) => {
-      const lines = tableBlock.trim().split('\n').filter((line: string) => line.trim());
-      if (lines.length < 2) return _match;
-
-      // Check for separator row (e.g., |---|---|)
-      const separatorIndex = lines.findIndex((line: string) =>
-        /^\|[\s\-:|]+\|$/.test(line.trim())
-      );
-
-      if (separatorIndex === -1) return _match;
-
-      const headerLines = lines.slice(0, separatorIndex);
-      // Filter out any separator-like rows from body (handles adjacent tables)
-      const isSeparatorRow = (line: string) => /^\|[\s\-:|]+\|$/.test(line.trim());
-      const bodyLines = lines.slice(separatorIndex + 1).filter((line: string) => !isSeparatorRow(line));
-
-      const parseRow = (line: string, cellTag: string) => {
-        const cells = line
-          .split('|')
-          .slice(1, -1) // Remove empty first/last from split
-          .map((cell: string) => cell.trim());
-        return `<tr>${cells.map((cell: string) => `<${cellTag} class="border border-border px-3 py-2">${cell}</${cellTag}>`).join('')}</tr>`;
-      };
-
-      const headerHtml = headerLines.map((line: string) => parseRow(line, 'th')).join('');
-      const bodyHtml = bodyLines.map((line: string) => parseRow(line, 'td')).join('');
-
-      return `\n<table class="border-collapse border border-border my-4 w-full"><thead class="bg-muted">${headerHtml}</thead><tbody>${bodyHtml}</tbody></table>\n`;
-    }
-  );
-
-  // Task lists (checkboxes) - must come before regular lists
-  processed = processed
-    .replace(
-      /^[\*\-]\s+\[x\]\s+(.*)$/gim,
-      '<li class="ml-6 list-none flex items-start gap-2"><input type="checkbox" checked disabled class="mt-1 accent-primary" /><span class="line-through opacity-70">$1</span></li>'
-    )
-    .replace(
-      /^[\*\-]\s+\[\s?\]\s+(.*)$/gm,
-      '<li class="ml-6 list-none flex items-start gap-2"><input type="checkbox" disabled class="mt-1" /><span>$1</span></li>'
-    );
+  // Paragraphs
+  p: ({ children, ...props }: ComponentPropsWithoutRef<'p'>) => (
+    <p className="my-3" {...props}>{children}</p>
+  ),
 
   // Lists
-  processed = processed
-    .replace(/^[\*\-]\s+(.*)$/gm, '<li class="ml-6 list-disc">$1</li>')
-    .replace(/^\d+\.\s+(.*)$/gm, '<li class="ml-6 list-decimal">$1</li>');
+  ul: ({ children, ...props }: ComponentPropsWithoutRef<'ul'>) => (
+    <ul className="my-2 ml-6 list-disc space-y-1" {...props}>{children}</ul>
+  ),
+  ol: ({ children, ...props }: ComponentPropsWithoutRef<'ol'>) => (
+    <ol className="my-2 ml-6 list-decimal space-y-1" {...props}>{children}</ol>
+  ),
+  li: ({ children, ...props }: ComponentPropsWithoutRef<'li'>) => (
+    <li className="pl-1" {...props}>{children}</li>
+  ),
 
-  // Links
-  processed = processed.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" class="text-primary underline hover:no-underline" target="_blank" rel="noopener">$1</a>'
-  );
+  // Blockquote
+  blockquote: ({ children, ...props }: ComponentPropsWithoutRef<'blockquote'>) => (
+    <blockquote className="border-l-4 border-primary/50 pl-4 italic text-muted-foreground my-4" {...props}>
+      {children}
+    </blockquote>
+  ),
+
+  // Horizontal rule
+  hr: ({ ...props }: ComponentPropsWithoutRef<'hr'>) => (
+    <hr className="my-6 border-border" {...props} />
+  ),
+
+  // Tables
+  table: ({ children, ...props }: ComponentPropsWithoutRef<'table'>) => (
+    <table className="border-collapse border border-border my-4 w-full" {...props}>{children}</table>
+  ),
+  thead: ({ children, ...props }: ComponentPropsWithoutRef<'thead'>) => (
+    <thead className="bg-muted" {...props}>{children}</thead>
+  ),
+  th: ({ children, ...props }: ComponentPropsWithoutRef<'th'>) => (
+    <th className="border border-border px-3 py-2 text-left font-semibold" {...props}>{children}</th>
+  ),
+  td: ({ children, ...props }: ComponentPropsWithoutRef<'td'>) => (
+    <td className="border border-border px-3 py-2" {...props}>{children}</td>
+  ),
 
   // Images
-  processed = processed.replace(
-    /!\[([^\]]*)\]\(([^)]+)\)/g,
-    '<img src="$2" alt="$1" class="max-w-full rounded my-4" />'
-  );
+  img: ({ src, alt, ...props }: ComponentPropsWithoutRef<'img'>) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt || ''} className="max-w-full rounded my-4" {...props} />
+  ),
 
-  // Auto-link bare URLs (not already in href or markdown link)
-  // Use callback to check previous character instead of lookbehind for browser compatibility
-  processed = processed.replace(
-    /(https?:\/\/[^\s<>\)]+)/g,
-    (match, url, offset) => {
-      const prevChar = offset > 0 ? processed.charAt(offset - 1) : '';
-      // Don't convert if already inside href="" or markdown link ()
-      if (prevChar === '"' || prevChar === '(') {
-        return match;
-      }
-      return `<a href="${url}" class="text-primary underline hover:no-underline" target="_blank" rel="noopener">${url}</a>`;
-    }
-  );
+  // Code
+  code: CodeBlock,
 
-  // Paragraphs - split by double newlines
-  const blocks = processed.split(/\n\n+/);
-  processed = blocks
-    .map((block) => {
-      const trimmed = block.trim();
-      if (!trimmed) return '';
-      // Don't wrap block elements or code block placeholders
-      if (
-        trimmed.startsWith('<h') ||
-        trimmed.startsWith('<ul') ||
-        trimmed.startsWith('<ol') ||
-        trimmed.startsWith('<li') ||
-        trimmed.startsWith('<blockquote') ||
-        trimmed.startsWith('<hr') ||
-        trimmed.startsWith('<pre') ||
-        trimmed.startsWith('<table') ||
-        trimmed.startsWith(codeBlockMarker)
-      ) {
-        return trimmed;
-      }
-      // Wrap in paragraph
-      return `<p class="my-3">${trimmed.replace(/\n/g, '<br />')}</p>`;
-    })
-    .join('\n');
+  // Links
+  a: CustomLink,
 
-  // Restore code blocks
-  for (let i = 0; i < codeBlocks.length; i++) {
-    processed = processed.split(`${codeBlockMarker}${i}${codeBlockMarker}`).join(codeBlocks[i]);
-  }
+  // Text formatting - only del needs custom styling
+  del: ({ children, ...props }: ComponentPropsWithoutRef<'del'>) => (
+    <del className="opacity-70" {...props}>{children}</del>
+  ),
 
-  // Restore inline code
-  for (let i = 0; i < inlineCodes.length; i++) {
-    processed = processed.split(`${inlineCodeMarker}${i}${inlineCodeMarker}`).join(inlineCodes[i]);
-  }
+  // Task list items (GFM)
+  input: ({ checked, ...props }: ComponentPropsWithoutRef<'input'>) => (
+    <input
+      type="checkbox"
+      checked={checked}
+      disabled
+      className="mr-2 accent-primary"
+      {...props}
+    />
+  ),
+};
 
-  // Restore LaTeX
-  for (let i = 0; i < latexBlocks.length; i++) {
-    processed = processed.split(`${latexBlockMarker}${i}${latexBlockMarker}`).join(latexBlocks[i]);
-    processed = processed.split(`${latexInlineMarker}${i}${latexInlineMarker}`).join(latexBlocks[i]);
-  }
+/**
+ * Normalize markdown to fix common formatting issues that cause parsing problems.
+ * - Fixes double spaces after list numbers (1.  -> 1. )
+ * - Normalizes multiple spaces after list markers (*   -> - )
+ * - Converts * to - for list items (clearer parsing)
+ */
+function normalizeMarkdown(content: string): string {
+  let normalized = content;
 
-  return processed;
+  // Fix double+ spaces after numbered list markers: "1.  " -> "1. "
+  normalized = normalized.replace(/^(\d+\.)\s{2,}/gm, '$1 ');
+
+  // Convert "*" list markers to "-" and normalize spacing: "*   " -> "- "
+  normalized = normalized.replace(/^(\s*)\*\s+/gm, '$1- ');
+
+  return normalized;
 }
 
 export function NoteMarkdownPreview({ content, filename, editorScrollPercentage = 0, onScroll }: NoteMarkdownPreviewProps) {
-  // Debounce content updates to improve performance with large documents
   const [debouncedContent, setDebouncedContent] = useState(content);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  // Debounce content updates for performance
   useEffect(() => {
     const handle = window.setTimeout(() => {
       setDebouncedContent(content);
-    }, 150); // 150ms debounce for responsive feel while typing
-
+    }, 150);
     return () => window.clearTimeout(handle);
   }, [content]);
-
-  const html = useMemo(() => parseMarkdown(debouncedContent), [debouncedContent]);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Scroll Sync: Editor -> Preview
   useEffect(() => {
@@ -387,93 +305,10 @@ export function NoteMarkdownPreview({ content, filename, editorScrollPercentage 
     }
   };
 
-  // Extract internal links for embedding - find all internal link hrefs
-  const internalLinks = useMemo(() => {
-    const links: Array<{ type: 'note' | 'diagram'; id: string }> = [];
-    const seenIds = new Set<string>();
-
-    // Match both relative paths (/notes/id) and full URLs (http://host/notes/id)
-    const noteRegex = /href="(?:https?:\/\/[^"]*)?\/notes\/([a-zA-Z0-9_-]+)"/g;
-    const diagramRegex = /href="(?:https?:\/\/[^"]*)?\/diagram\/([a-zA-Z0-9_-]+)"/g;
-
-    let match;
-    while ((match = noteRegex.exec(html)) !== null) {
-      const id = match[1];
-      if (!seenIds.has(`note-${id}`)) {
-        seenIds.add(`note-${id}`);
-        links.push({ type: 'note', id });
-      }
-    }
-    while ((match = diagramRegex.exec(html)) !== null) {
-      const id = match[1];
-      if (!seenIds.has(`diagram-${id}`)) {
-        seenIds.add(`diagram-${id}`);
-        links.push({ type: 'diagram', id });
-      }
-    }
-    return links;
-  }, [html]);
-
-  // Replace ALL internal link anchors with placeholders
-  const processedHtml = useMemo(() => {
-    let result = html;
-
-    for (const link of internalLinks) {
-      const placeholder = `__EMBED_${link.type.toUpperCase()}_${link.id}__`;
-      // Pattern matches BOTH full URLs and relative paths for this ID
-      // Use a pattern that matches any anchor pointing to this note/diagram
-      const pathType = link.type === 'note' ? 'notes' : 'diagram';
-      const pattern = new RegExp(
-        `<a[^>]*href="(?:https?://[^"]*)?/${pathType}/${link.id}"[^>]*>([\\s\\S]*?)</a>`,
-        'g'
-      );
-      result = result.replace(pattern, placeholder);
-    }
-    return result;
-  }, [html, internalLinks]);
-
-  // Split HTML by placeholders and build segments
-  const segments = useMemo(() => {
-    if (internalLinks.length === 0) return [{ type: 'html' as const, content: html }];
-
-    const result: Array<{ type: 'html'; content: string } | { type: 'embed'; linkType: 'note' | 'diagram'; id: string }> = [];
-
-    // Build a map of placeholders to link info
-    const placeholderMap = new Map<string, { type: 'note' | 'diagram'; id: string }>();
-    for (const link of internalLinks) {
-      const placeholder = `__EMBED_${link.type.toUpperCase()}_${link.id}__`;
-      placeholderMap.set(placeholder, { type: link.type, id: link.id });
-    }
-
-    // Split by all placeholders using a regex that matches any of them
-    const placeholderPattern = /__EMBED_(NOTE|DIAGRAM)_([a-zA-Z0-9_-]+)__/g;
-    let lastIndex = 0;
-    let match;
-
-    while ((match = placeholderPattern.exec(processedHtml)) !== null) {
-      // Add HTML before this placeholder
-      if (match.index > lastIndex) {
-        result.push({ type: 'html', content: processedHtml.slice(lastIndex, match.index) });
-      }
-      // Add the embed
-      const linkType = match[1].toLowerCase() as 'note' | 'diagram';
-      const id = match[2];
-      result.push({ type: 'embed', linkType, id });
-      lastIndex = match.index + match[0].length;
-    }
-
-    // Add remaining HTML
-    if (lastIndex < processedHtml.length) {
-      result.push({ type: 'html', content: processedHtml.slice(lastIndex) });
-    }
-
-    return result.length > 0 ? result : [{ type: 'html' as const, content: html }];
-  }, [processedHtml, html, internalLinks]);
-
   const popOut = () => {
     const safeTitle = buildDownloadName(filename);
 
-    // Build HTML content for the pop-out window
+    // Build standalone HTML for pop-out window
     const htmlContent = `<!doctype html><html><head><title>${safeTitle}</title>
 <meta charset="utf-8" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
@@ -492,33 +327,23 @@ th, td { border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left; }
 thead { background: #f3f4f6; }
 th { font-weight: 600; }
 blockquote { border-left: 4px solid #3b82f6; padding-left: 16px; margin: 16px 0; font-style: italic; color: #6b7280; }
-mark { background: #fef08a; padding: 1px 4px; border-radius: 2px; }
-del { text-decoration: line-through; opacity: 0.7; }
-sub, sup { font-size: 0.75em; }
 ul, ol { margin: 8px 0; padding-left: 24px; }
 li { margin: 4px 0; }
 hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
 input[type="checkbox"] { margin-right: 8px; }
-.line-through { text-decoration: line-through; opacity: 0.7; }
 </style>
-</head><body>${html}</body></html>`;
+</head><body><div id="content">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>document.getElementById('content').innerHTML = marked.parse(document.getElementById('content').textContent);</script>
+</body></html>`;
 
-    // Use Blob URL for better security isolation instead of writing to about:blank
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
-    const win = window.open(
-      url,
-      '_blank',
-      'resizable=yes,scrollbars=yes,width=1200,height=900,left=120,top=80'
-    );
+    const win = window.open(url, '_blank', 'resizable=yes,scrollbars=yes,width=1200,height=900,left=120,top=80');
 
-    // Clean up the Blob URL when the window closes or after a delay
     if (win) {
-      win.addEventListener('beforeunload', () => {
-        URL.revokeObjectURL(url);
-      });
+      win.addEventListener('beforeunload', () => URL.revokeObjectURL(url));
     } else {
-      // If popup was blocked, clean up immediately
       URL.revokeObjectURL(url);
     }
   };
@@ -541,13 +366,13 @@ input[type="checkbox"] { margin-right: 8px; }
         </Button>
       </div>
       <div className="prose prose-sm dark:prose-invert max-w-none p-6 pt-2 clear-both">
-        {segments.map((segment, i) =>
-          segment.type === 'html' ? (
-            <div key={`html-${i}`} dangerouslySetInnerHTML={{ __html: segment.content }} />
-          ) : (
-            <InternalLinkEmbed key={`${segment.linkType}-${segment.id}`} type={segment.linkType} id={segment.id} />
-          )
-        )}
+        <Markdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeKatex]}
+          components={markdownComponents}
+        >
+          {normalizeMarkdown(debouncedContent)}
+        </Markdown>
       </div>
     </div>
   );

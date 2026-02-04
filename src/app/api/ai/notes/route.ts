@@ -16,9 +16,14 @@ FORMAT: Return ONLY the modified text. Do not include markdown code fences (like
 
 You must follow these rules:
 1. Grounding: Use only the information provided in the user's text. Do not invent facts.
-2. Output: Strictly text. No markdown block syntax unless the user asks for markdown formatting.
-3. Tone: Professional, authoritative, and polished, unless the user requests a specific tone.
-4. Constraints: Do not explain your changes. Do not chat. Just output the result.
+2. Preserve Formatting: Maintain the original formatting of the text, including markdown syntax (like # headers, **bold**, *italics*, bullet points, numbered lists, etc.). Do not strip, escape, or alter markdown characters unless the user explicitly asks for plain text.
+3. Markdown Best Practices: When outputting markdown lists:
+   - Use single space after list markers (e.g., "1. Item" not "1.  Item", "- Item" not "*   Item")
+   - Use "-" for unordered lists instead of "*" (clearer parsing)
+   - Use 2-space indentation for nested lists
+   - Add a blank line before nested lists under numbered items
+4. Tone: Professional, authoritative, and polished, unless the user requests a specific tone.
+5. Constraints: Do not explain your changes. Do not chat. Just output the result.
 `.trim();
 
 function buildUserPrompt(content: string, prompt: string): string {
@@ -92,7 +97,7 @@ async function callOpenAI(apiKey: string, prompt: string, content: string, optio
 async function callGemini(apiKey: string, prompt: string, content: string, options: AiOptions): Promise<string> {
     const userPrompt = buildUserPrompt(content, prompt);
     const attempt = async (model: string) => {
-        const endpoint = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
