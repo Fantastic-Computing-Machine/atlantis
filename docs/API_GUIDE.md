@@ -4,18 +4,44 @@ Atlantis provides a REST API to manage diagrams and notes programmatically. This
 
 ## Enabling the API
 
-To enable the API, set the `ENABLE_API_ACCESS` environment variable to `true`.
+To enable the API, set the `ENABLE_API_ACCESS` environment variable to `true`. The API is disabled by default for security.
 
-**Docker Compose:**
-
-```yaml
-environment:
-  - ENABLE_API_ACCESS=true
-```
-
-**Manual:**
+### Docker Run
 
 ```bash
+docker run -d -p 3000:3000 \
+  -e ENABLE_API_ACCESS=true \
+  -v $(pwd)/data:/app/data \
+  strikead/atlantis:latest
+```
+
+### Docker Compose
+
+Pass the environment variable when starting your services:
+
+```bash
+# Full stack (with Redis)
+ENABLE_API_ACCESS=true docker compose up -d
+
+# Simple stack (without Redis)
+ENABLE_API_ACCESS=true docker compose -f docker-compose.simple.yml up -d
+```
+
+Or add it directly to your compose override:
+
+```yaml
+# docker-compose.override.yml
+services:
+  atlantis:
+    environment:
+      - ENABLE_API_ACCESS=true
+```
+
+### Local Development
+
+```bash
+ENABLE_API_ACCESS=true npm run dev
+# or
 ENABLE_API_ACCESS=true npm run start
 ```
 
@@ -171,3 +197,11 @@ Create a new note.
 
 - **Response** (201 Created):
     Returns the created note object.
+
+---
+
+## Related Documentation
+
+- [Notes Feature](NOTES.md) - Full notes documentation
+- [Container Startup](CONTAINER_STARTUP.md) - Docker deployment guide
+- [Settings](settings.md) - Environment variables and configuration

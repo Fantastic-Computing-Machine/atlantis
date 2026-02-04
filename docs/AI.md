@@ -37,3 +37,11 @@ Enable AI assistance to generate and edit Mermaid diagrams using natural languag
 `POST /api/ai/assist`
 
 - Payload: `{ "prompt": "...", "diagramId": "...", "content": "..." }`
+
+---
+
+## Related Documentation
+
+- [Settings](settings.md) - AI API key configuration
+- [API Guide](API_GUIDE.md) - REST API documentation
+- [Container Startup](CONTAINER_STARTUP.md) - Docker deployment guide

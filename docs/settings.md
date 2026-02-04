@@ -55,16 +55,57 @@ Atlantis provides configurable settings accessible via the `/settings` page.
 
 ## Environment Variables
 
-Settings can also be configured via environment variables:
+Settings can also be configured via environment variables. These are especially useful for Docker deployments.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `AI_API_KEY` | AI API key (recommended for security) | _(none)_ |
-| `GEMINI_MODEL` | Gemini model to use | `gemini-2.5-flash` |
-| `ENABLE_API_ACCESS` | Enable REST API endpoints | `false` |
+### Complete Variable Reference
+
+| Variable            | Default                     | Description                                        |
+|---------------------|-----------------------------|----------------------------------------------------|
+| `PORT`              | `3000`                      | Port the application listens on                    |
+| `NODE_ENV`          | `development`               | Environment mode (`development`, `production`)     |
+| `PRISMA_PROVIDER`   | `sqlite`                    | Database provider (`sqlite`, `postgresql`, `mysql`)|
+| `DATABASE_URL`      | `file:./data/atlantis.db`   | Database connection string                         |
+| `REDIS_URL`         | _(none)_                    | Redis connection (e.g., `redis://redis:6379`)      |
+| `AI_API_KEY`        | _(none)_                    | AI API key for OpenAI/Gemini features              |
+| `GEMINI_MODEL`      | `gemini-2.5-flash`          | Gemini model to use                                |
+| `ENABLE_API_ACCESS` | `false`                     | Enable REST API endpoints and `/docs`              |
+| `PRISMA_AUTO_APPLY` | `true` (dev), `false` (prod)| Auto-run `prisma db push` on startup               |
+| `PRISMA_SKIP_AUTOPUSH` | `false`                  | Skip all db push/seed operations                   |
+
+### Docker Compose Usage
+
+Set variables inline when starting services:
+
+```bash
+PORT=8080 ENABLE_API_ACCESS=true docker compose up -d
+```
+
+Or create a `.env` file in your project root:
+
+```env
+PORT=3000
+ENABLE_API_ACCESS=true
+AI_API_KEY=your-api-key-here
+REDIS_URL=redis://redis:6379
+```
+
+Then run:
+
+```bash
+docker compose up -d
+```
 
 ### Security Notes
 
 - **AI API Key**: Using `AI_API_KEY` env var is more secure than storing in the database. When set, the key is read-only in the UI.
 - **Wipe Confirmation**: The confirmation code is generated server-side with a 5-minute TTL and timing-safe validation.
 - **Backup Restore**: Imported backups are validated against a strict Zod schema before processing.
+
+---
+
+## Related Documentation
+
+- [Container Startup](CONTAINER_STARTUP.md) - Docker deployment and environment variables
+- [API Guide](API_GUIDE.md) - REST API documentation
+- [AI Assistant Guide](AI.md) - AI feature configuration
+- [Notes Feature](NOTES.md) - Notes documentation

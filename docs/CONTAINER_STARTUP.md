@@ -33,9 +33,31 @@ docker run -p 3000:3000 strikead/atlantis:latest
 
 ### Docker Compose
 
-Alternatively, use the included docker-compose.yml. You can point it to the remote image or build it locally.
+We provide two Docker Compose configurations depending on your needs:
 
-**Using Remote Image:**
+| File | Description | Best For |
+|------|-------------|----------|
+| `docker-compose.yml` | Full stack with Redis caching | Production, multi-user setups |
+| `docker-compose.simple.yml` | Standalone without Redis | Personal use, simpler deployments |
+
+---
+
+#### Full Stack (with Redis)
+
+The default `docker-compose.yml` includes Redis for improved caching performance.
+
+```bash
+# Start the full stack
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop services
+docker compose down
+```
+
+**Configuration:**
 
 ```yaml
 services:
@@ -60,6 +82,25 @@ services:
 volumes:
   redis_data:
 ```
+
+---
+
+#### Simple Stack (without Redis)
+
+Use `docker-compose.simple.yml` for a simpler setup without Redis. The application uses in-memory caching instead.
+
+```bash
+# Start the simple stack
+docker compose -f docker-compose.simple.yml up -d
+
+# View logs
+docker compose -f docker-compose.simple.yml logs -f
+
+# Stop services
+docker compose -f docker-compose.simple.yml down
+```
+
+> **Note**: In-memory caching works well for single-instance deployments but doesn't persist across restarts.
 
 ### Building Your Own Image
 
@@ -103,3 +144,11 @@ Available tags on [Docker Hub](https://hub.docker.com/r/strikead/atlantis/tags):
 - `latest`: The most recent stable release.
 - `vX.Y.Z`: Specific version releases.
 - `sha-xxxx`: Development builds from specific commits.
+
+---
+
+## Related Documentation
+
+- [Contributing Guide](../CONTRIBUTING.md) - Development setup, LaTeX installation, and Docker workflows
+- [API Guide](API_GUIDE.md) - REST API documentation
+- [Settings](settings.md) - Configuration options
