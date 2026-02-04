@@ -123,14 +123,35 @@ async function main() {
     run('npx', ['prisma', 'generate']);
   }
 
-  // Step 3: apply schema to DB in dev (or when explicitly enabled)
-  if (!skipAutoPush && shouldAutoApply) {
+  // Step 3: apply schema to DB
+  // Always push for SQLite if database file is missing or empty (ensures tables exist)
+  // Also push in dev mode or when explicitly enabled
+  const url = process.env.DATABASE_URL || process.env.DB_CONNECTION || 'file:./data/atlantis.db';
+  const isSqlite = url.startsWith('file:');
+  const sqliteNeedsPush = isSqlite && needsSqliteDbPush(url);
+
+  if (!skipAutoPush && (shouldAutoApply || sqliteNeedsPush)) {
     run('npx', ['prisma', 'db', 'push']);
   }
 
   // Step 4: backfill search vectors for legacy rows (idempotent)
-  const url = process.env.DATABASE_URL || process.env.DB_CONNECTION || 'file:./data/atlantis.db';
   await backfillSearchVectors(url);
+}
+
+/**
+ * Check if SQLite database needs a push (missing or very small file = no tables)
+ */
+function needsSqliteDbPush(url) {
+  const filePath = url.replace('file:', '').replace(/^\.\//, path.join(root, './'));
+  try {
+    const stats = fs.statSync(filePath);
+    // SQLite header is 100 bytes; an empty schema db is typically ~12KB+
+    // If file is tiny or missing, we need to push
+    return stats.size < 1000;
+  } catch {
+    // File doesn't exist
+    return true;
+  }
 }
 
 main().catch((err) => {

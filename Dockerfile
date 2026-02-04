@@ -107,9 +107,12 @@ RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 # Install TeX Live for LaTeX support
 RUN apk add --no-cache texlive-full fontconfig
 
+# Install su-exec for privilege dropping in entrypoint
+RUN apk add --no-cache su-exec
 
-# Switch to non-root user
-USER nextjs
+# NOTE: We do NOT switch to nextjs user here because the entrypoint
+# needs to run as root initially to fix mounted volume permissions.
+# The entrypoint will drop privileges to nextjs after setup.
 
 # Expose port
 EXPOSE 3000
