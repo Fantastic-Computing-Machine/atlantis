@@ -26,8 +26,7 @@ const autoApplyEnv = process.env.PRISMA_AUTO_APPLY;
 const skipAutoPush = process.env.PRISMA_SKIP_AUTOPUSH === 'true';
 const forceGenerate = process.env.PRISMA_FORCE_GENERATE === 'true';
 const shouldAutoApply =
-  autoApplyEnv === 'true' ||
-  (autoApplyEnv !== 'false' && isDevScript && !isCI && !isProd);
+  autoApplyEnv === 'true' || (autoApplyEnv !== 'false' && isDevScript && !isCI && !isProd);
 const shouldGenerate = forceGenerate || !isProd;
 
 function run(cmd, args, options = {}) {
@@ -45,14 +44,12 @@ function run(cmd, args, options = {}) {
 function ensureDataDir() {
   const url = process.env.DATABASE_URL || process.env.DB_CONNECTION;
   if (!url || !url.startsWith('file:')) return;
-  const filePath = url.replace('file:', '');
+  const filePath = toSqlitePath(url);
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 }
-
-
 
 function createAdapter(url) {
   if (url.startsWith('file:')) {
@@ -126,7 +123,7 @@ async function main() {
   // Step 3: apply schema to DB
   // Always push for SQLite if database file is missing or empty (ensures tables exist)
   // Also push in dev mode or when explicitly enabled
-  const url = process.env.DATABASE_URL || process.env.DB_CONNECTION || 'file:./data/atlantis.db';
+  const url = ensureDatabaseUrl();
   const isSqlite = url.startsWith('file:');
   const sqliteNeedsPush = isSqlite && needsSqliteDbPush(url);
 
@@ -142,7 +139,7 @@ async function main() {
  * Check if SQLite database needs a push (missing or very small file = no tables)
  */
 function needsSqliteDbPush(url) {
-  const filePath = url.replace('file:', '').replace(/^\.\//, path.join(root, './'));
+  const filePath = toSqlitePath(url);
   try {
     const stats = fs.statSync(filePath);
     // SQLite header is 100 bytes; an empty schema db is typically ~12KB+
@@ -152,6 +149,21 @@ function needsSqliteDbPush(url) {
     // File doesn't exist
     return true;
   }
+}
+
+function toSqlitePath(url) {
+  const withoutPrefix = url.replace(/^file:/, '');
+  const withoutQuery = withoutPrefix.split('?')[0].split('#')[0];
+  return path.resolve(root, withoutQuery);
+}
+
+function ensureDatabaseUrl() {
+  const existing = process.env.DATABASE_URL || process.env.DB_CONNECTION;
+  if (existing) return existing;
+  const fallback = 'file:./data/atlantis.db';
+  process.env.DATABASE_URL = fallback;
+  ensureDataDir();
+  return fallback;
 }
 
 main().catch((err) => {
