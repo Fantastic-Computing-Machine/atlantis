@@ -14,6 +14,7 @@ Atlantis includes a built-in notetaking feature with a code-editor-like experien
 - **Supported Languages**:
   - Plain Text (txt)
   - Markdown (md) - with live preview
+  - LaTeX (tex) - with PDF compilation and preview
   - JavaScript
   - TypeScript
   - Python
@@ -127,3 +128,12 @@ When the language is set to Markdown, a preview pane becomes available showing r
 - Lists
 - Links and images
 - Horizontal rules
+
+---
+
+## Related Documentation
+
+- [Contributing Guide](../CONTRIBUTING.md) - Development setup, LaTeX installation, and Docker workflows
+- [API Guide](API_GUIDE.md) - REST API endpoints for notes
+- [Container Startup](CONTAINER_STARTUP.md) - Docker deployment guide
+- [Settings](settings.md) - Configuration options
