@@ -35,10 +35,10 @@ docker run -p 3000:3000 strikead/atlantis:latest
 
 We provide two Docker Compose configurations depending on your needs:
 
-| File | Description | Best For |
-|------|-------------|----------|
-| `docker-compose.yml` | Full stack with Redis caching | Production, multi-user setups |
-| `docker-compose.simple.yml` | Standalone without Redis | Personal use, simpler deployments |
+| File                        | Description                   | Best For                          |
+| --------------------------- | ----------------------------- | --------------------------------- |
+| `docker-compose.yml`        | Full stack with Redis caching | Production, multi-user setups     |
+| `docker-compose.simple.yml` | Standalone without Redis      | Personal use, simpler deployments |
 
 ---
 
@@ -64,7 +64,7 @@ services:
   atlantis:
     image: strikead/atlantis:latest
     ports:
-      - "3000:3000"
+      - '3000:3000'
     volumes:
       - ./data:/app/data
     environment:
@@ -87,7 +87,7 @@ volumes:
 
 #### Simple Stack (without Redis)
 
-Use `docker-compose.simple.yml` for a simpler setup without Redis. The application uses in-memory caching instead.
+Use `docker-compose.simple.yml` for a simpler setup without Redis. In Docker/production mode, caching is disabled when `REDIS_URL` is not set.
 
 ```bash
 # Start the simple stack
@@ -100,7 +100,7 @@ docker compose -f docker-compose.simple.yml logs -f
 docker compose -f docker-compose.simple.yml down
 ```
 
-> **Note**: In-memory caching works well for single-instance deployments but doesn't persist across restarts.
+> **Note**: For in-memory caching during local development, run without `NODE_ENV=production` or use `npm run dev` instead of the Docker image. In Docker/production, caching stays off unless `REDIS_URL` is provided.
 
 ### Building Your Own Image
 
@@ -126,16 +126,16 @@ PORT=8080 ATLANTIS_DATA_DIR=./my-data docker compose up -d
 
 ### Available Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3000` | The port the application will listen on. |
-| `PRISMA_PROVIDER` | `sqlite` | Database provider (`sqlite`, `postgresql`, `mysql`). |
-| `DATABASE_URL` / `DB_CONNECTION` | `file:./data/atlantis.db` | Connection string; defaults to local SQLite file. |
-| `REDIS_URL` | None | Connection string for Redis cache (e.g. `redis://redis:6379`). |
-| `AI_API_KEY` | None | API Key for AI features (OpenAI/Gemini). |
-| `PRISMA_AUTO_APPLY` | `true` (non-prod), `false` (prod) | Auto-runs `prisma db push` on server start to ensure schema exists. |
-| `PRISMA_SKIP_AUTOPUSH` | `false` | Set to `true` to skip all db push/seed operations. |
-| `ENABLE_API_ACCESS` | `false` | Set to `true` to enable the REST API and /docs. |
+| Variable                         | Default                           | Description                                                         |
+| -------------------------------- | --------------------------------- | ------------------------------------------------------------------- |
+| `PORT`                           | `3000`                            | The port the application will listen on.                            |
+| `PRISMA_PROVIDER`                | `sqlite`                          | Database provider (`sqlite`, `postgresql`, `mysql`).                |
+| `DATABASE_URL` / `DB_CONNECTION` | `file:./data/atlantis.db`         | Connection string; defaults to local SQLite file.                   |
+| `REDIS_URL`                      | None                              | Connection string for Redis cache (e.g. `redis://redis:6379`).      |
+| `AI_API_KEY`                     | None                              | API Key for AI features (OpenAI/Gemini).                            |
+| `PRISMA_AUTO_APPLY`              | `true` (non-prod), `false` (prod) | Auto-runs `prisma db push` on server start to ensure schema exists. |
+| `PRISMA_SKIP_AUTOPUSH`           | `false`                           | Set to `true` to skip all db push/seed operations.                  |
+| `ENABLE_API_ACCESS`              | `false`                           | Set to `true` to enable the REST API and /docs.                     |
 
 ## Versioning
 
