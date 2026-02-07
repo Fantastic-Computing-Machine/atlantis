@@ -99,4 +99,4 @@ run_as_app prisma db push --schema=/app/prisma/schema.prisma --config=/app/prism
 
 # Drop privileges and start the server as nextjs user
 echo "[entrypoint] Starting server as nextjs user..."
-exec run_as_app node server.js
+run_as_app node server.js
