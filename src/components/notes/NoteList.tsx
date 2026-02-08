@@ -70,7 +70,7 @@ export function NoteList() {
   };
 
   return (
-    <div className="bg-background flex h-full flex-col border-r">
+    <div className="bg-background flex h-full flex-col border-r overflow-hidden">
       {/* Header */}
       <div className="space-y-3 border-b p-3">
         <div className="flex items-center gap-2">
@@ -139,7 +139,7 @@ export function NoteList() {
       </div>
 
       {/* Notes List */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="space-y-1 p-2">
           {filteredNotes.length === 0 ? (
             <div className="text-muted-foreground py-8 text-center text-sm">

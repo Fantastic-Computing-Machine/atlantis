@@ -96,7 +96,7 @@ const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\
 
 type NodeOption = { id: string; label?: string };
 
-const EDGE_RE = /(-->|\s---\s|-\.-?>|==>|<--|<---|<-\.-?|<==|--\s*[^-]+\s*-->|==\s*[^=]+\s*==>)/;
+const EDGE_RE = /((?:--!?>)|\s---\s|-\.-?>|==>|<--|<---|<-\.-?|<==|--\s*[^-]+\s*(?:--!?>)|==\s*[^=]+\s*==>)/;
 const DIRECTIVE_RE = /^\s*(flowchart|graph|style|classDef|class|linkStyle|subgraph|end|click)\b/i;
 
 const extractMermaidNodes = (src: string): NodeOption[] => {
@@ -125,9 +125,9 @@ const extractMermaidNodes = (src: string): NodeOption[] => {
     // Edge lines: collect endpoints only
     if (EDGE_RE.test(line)) {
       const sanitized = line
-        .replace(/\s*--\s*[^-]+?\s*-->\s*/g, ' --> ')
+        .replace(/\s*--\s*[^-]+?\s*(?:--!?>)\s*/g, ' --> ')
         .replace(/\s*==\s*[^=]+?\s*==>\s*/g, ' ==> ');
-      const parts = sanitized.split(/\s+(?:-->|==>|---|-\.-?>|<--|<==)\s+/);
+      const parts = sanitized.split(/\s+(?:--!?>|==>|---|-\.-?>|<--|<==)\s+/);
       parts.forEach((part) => {
         const idMatch = part.trim().match(/^[A-Za-z0-9_][A-Za-z0-9_:-]*/);
         if (idMatch) ensureNode(idMatch[0]);
