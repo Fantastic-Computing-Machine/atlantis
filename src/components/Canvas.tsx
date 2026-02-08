@@ -105,6 +105,18 @@ const findNodeElement = (start: Element | null, root: SVGSVGElement): Element | 
   return null;
 };
 
+/**
+ * Helper to convert UTF-8 bytes to Base64 without using deprecated APIs
+ */
+const toBase64 = (bytes: Uint8Array): string => {
+  let binary = '';
+  const len = bytes.length;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+};
+
 export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -398,7 +410,8 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       const svgString = serializer.serializeToString(svgClone);
 
       // Encode as Base64 data URI to avoid cross-origin/tainted canvas issues
-      const svgBase64 = btoa(unescape(encodeURIComponent(svgString)));
+      const encoder = new TextEncoder();
+      const svgBase64 = toBase64(encoder.encode(svgString));
       const dataUrl = `data:image/svg+xml;base64,${svgBase64}`;
 
       const img = new Image();
@@ -457,7 +470,8 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       const svgString = serializer.serializeToString(svgClone);
 
       // Encode as Base64 data URI to avoid cross-origin/tainted canvas issues
-      const svgBase64 = btoa(unescape(encodeURIComponent(svgString)));
+      const encoder = new TextEncoder();
+      const svgBase64 = toBase64(encoder.encode(svgString));
       const dataUrl = `data:image/svg+xml;base64,${svgBase64}`;
 
       const img = new Image();

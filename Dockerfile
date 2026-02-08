@@ -1,4 +1,4 @@
-
+# syntax=docker/dockerfile:1
 
 # ============================================
 # Base image with security updates

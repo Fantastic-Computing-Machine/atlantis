@@ -80,7 +80,7 @@ export default function TagsSettingsPage() {
       if (!res.ok) throw new Error('Failed to delete tag');
 
       toast.success('Tag deleted');
-      setTags(tags.filter((t) => t.id !== id));
+      setTags((prevTags) => prevTags.filter((t) => t.id !== id));
     } catch {
       toast.error('Failed to delete tag');
     }

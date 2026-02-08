@@ -101,7 +101,7 @@ export async function getNotePage({
     where.tags = { some: { slug: tagSlug } };
   }
 
-  let orderBy: Prisma.NoteOrderByWithRelationInput = { updatedAt: 'desc' };
+  let orderBy: Prisma.NoteOrderByWithRelationInput;
   switch (sort) {
     case 'old':
       orderBy = { updatedAt: 'asc' };
