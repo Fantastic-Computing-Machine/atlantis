@@ -60,7 +60,24 @@ const extractNodeId = (element: Element): string | null => {
     .replace(/^graph-/, '')
     .replace(/^classDiagram-/, '')
     .replace(/^stateDiagram-/, '')
-    .replace(/^erDiagram-/, '');
+    .replace(/^erDiagram-/, '')
+    .replace(/^gitGraph-/, '')
+    .replace(/^mindmap-/, '')
+    .replace(/^timeline-/, '')
+    .replace(/^quadrantChart-/, '')
+    .replace(/^requirementDiagram-/, '')
+    .replace(/^c4-/, '')
+    .replace(/^sankey-/, '')
+    .replace(/^xyChart-/, '')
+    .replace(/^block-/, '')
+    .replace(/^packet-/, '')
+    .replace(/^kanban-/, '')
+    .replace(/^pie-/, '')
+    .replace(/^gantt-/, '')
+    .replace(/^sequence-/, '')
+    .replace(/^journey-/, '')
+    .replace(/^treemap-/, '')
+    .replace(/^architecture-/, '');
 
   const trimmed = cleaned.replace(/-\d+$/, '');
   return trimmed || null;
@@ -73,7 +90,7 @@ const isNodeElement = (element: Element): boolean => {
   if (classList.includes('node') || classList.includes('cluster')) return true;
   if (classList.some((cls) => cls.endsWith('node') || cls.includes('node'))) return true;
   const id = element.getAttribute('id') ?? '';
-  if (/^(flowchart|graph|classDiagram|stateDiagram|erDiagram)-/i.test(id)) return true;
+  if (/^(flowchart|graph|classDiagram|stateDiagram|erDiagram|gitGraph|mindmap|timeline|quadrantChart|requirementDiagram|c4|sankey|xyChart|block|packet|kanban|pie|gantt|sequence|journey|treemap|architecture)-/i.test(id)) return true;
   return !!element.querySelector('title');
 };
 
@@ -116,6 +133,11 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
         state: { useMaxWidth: false },
         er: { useMaxWidth: false },
         pie: { useMaxWidth: false },
+        // Newer diagrams often don't support useMaxWidth or handle it differently
+        // gitGraph, mindmap, timeline seem to benefit from it, but others might fail
+        gitGraph: { useMaxWidth: false },
+        mindmap: { useMaxWidth: false },
+        timeline: { useMaxWidth: false },
         // Suppress built-in error SVG/banner; handle errors ourselves
         suppressErrorRendering: true,
         // @ts-expect-error parseError exists at runtime in Mermaid 11
@@ -124,8 +146,8 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
             typeof err === 'string'
               ? err
               : (err as { str?: string; message?: string }).str ||
-                (err as { str?: string; message?: string }).message ||
-                'Mermaid parse error';
+              (err as { str?: string; message?: string }).message ||
+              'Mermaid parse error';
           throw new Error(message);
         },
       });

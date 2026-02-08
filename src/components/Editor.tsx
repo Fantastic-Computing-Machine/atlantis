@@ -17,9 +17,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import type { Extension } from '@codemirror/state';
-import { StateEffect, StateField } from '@codemirror/state';
+import { EditorState, StateEffect, StateField, Transaction } from '@codemirror/state';
 import type { ViewUpdate } from '@codemirror/view';
-import { Decoration, EditorView } from '@codemirror/view';
+import { Decoration, EditorView, keymap } from '@codemirror/view';
+import { indentWithTab } from '@codemirror/commands';
+import { indentUnit } from '@codemirror/language';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
 import CodeMirror from '@uiw/react-codemirror';
 import { githubDark, githubLight } from '@uiw/codemirror-theme-github';
@@ -67,6 +69,32 @@ const highlightLineField = StateField.define({
   },
   provide: (field) => EditorView.decorations.from(field),
 });
+
+const insertNewlineAndIndent = ({ state, dispatch }: { state: EditorState; dispatch: (tr: Transaction) => void }) => {
+  const { from, to } = state.selection.main;
+  const line = state.doc.lineAt(from);
+  const indent = line.text.match(/^\s*/)?.[0] || "";
+
+  let additionalIndent = "";
+  const trimmed = line.text.trim();
+  if (
+    trimmed.startsWith('subgraph') ||
+    trimmed.startsWith('class ') ||
+    trimmed.endsWith('{') ||
+    trimmed.endsWith('[') ||
+    trimmed.endsWith('(')
+  ) {
+    additionalIndent = state.facet(indentUnit);
+  }
+
+  const transaction = state.update({
+    changes: { from, to, insert: "\n" + indent + additionalIndent },
+    selection: { anchor: from + 1 + indent.length + additionalIndent.length },
+    scrollIntoView: true,
+  });
+  dispatch(transaction);
+  return true;
+};
 
 export function Editor({
   value,
@@ -127,6 +155,10 @@ export function Editor({
     if (showIndentGuides) {
       exts.push(indentationMarkers());
     }
+    exts.push(keymap.of([
+      { key: "Enter", run: insertNewlineAndIndent },
+      indentWithTab
+    ]));
     return exts;
   }, [wordWrap, showIndentGuides]);
 
@@ -248,8 +280,11 @@ export function Editor({
               indentOnInput: true,
               bracketMatching: true,
               closeBrackets: true,
-              autocompletion: false,
+              autocompletion: true,
               highlightSelectionMatches: true,
+              defaultKeymap: true,
+              historyKeymap: true,
+              lintKeymap: true,
             }}
           />
         </div>

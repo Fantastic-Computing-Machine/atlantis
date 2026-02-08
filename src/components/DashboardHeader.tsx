@@ -9,6 +9,7 @@ import { Settings2, Keyboard, BookOpen, Github } from 'lucide-react';
 import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { useKeyboardShortcuts } from '@/lib/use-keyboard-shortcuts';
+import { useMounted } from '@/lib/use-mounted';
 
 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -22,6 +23,7 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
     const { settings, setHasAiApiKey, setAiProvider } = useDiagramStore();
     const { isMac } = useShortcutPlatform();
     const { setPaletteOpen } = useKeyboardShortcuts();
+    const mounted = useMounted();
 
     // Load AI key status on mount
     useEffect(() => {
@@ -91,29 +93,35 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
                     </div>
 
                     <div className="lg:hidden">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                    <Menu className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem asChild>
-                                    <Link href="/diagram">Diagrams</Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                    <Link href="/notes">Notes</Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                    <Link href="/tags">Tags</Link>
-                                </DropdownMenuItem>
-                                {enableApiAccess && (
+                        {!mounted ? (
+                            <Button variant="ghost" size="icon">
+                                <Menu className="h-4 w-4" />
+                            </Button>
+                        ) : (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                        <Menu className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
                                     <DropdownMenuItem asChild>
-                                        <Link href="/docs">Docs</Link>
+                                        <Link href="/diagram">Diagrams</Link>
                                     </DropdownMenuItem>
-                                )}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/notes">Notes</Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/tags">Tags</Link>
+                                    </DropdownMenuItem>
+                                    {enableApiAccess && (
+                                        <DropdownMenuItem asChild>
+                                            <Link href="/docs">Docs</Link>
+                                        </DropdownMenuItem>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
                     </div>
 
                     <Button

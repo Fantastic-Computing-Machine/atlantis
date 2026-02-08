@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, Hash, Settings, Clock, FileText, PenSquare } from 'lucide-react';
+import { ArrowLeft, Hash, Settings } from 'lucide-react';
 
 import { DashboardHeader } from '@/components/DashboardHeader';
 import { TagBadge } from '@/components/TagBadge';

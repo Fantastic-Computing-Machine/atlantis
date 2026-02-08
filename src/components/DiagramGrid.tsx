@@ -41,7 +41,7 @@ import { useListSync } from '@/lib/useListSync';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
 
-import { Download, Eye, Github, ListFilter, Loader2, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Trash2 } from 'lucide-react';
+import { Download, Eye, ListFilter, Loader2, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Trash2 } from 'lucide-react';
 
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
