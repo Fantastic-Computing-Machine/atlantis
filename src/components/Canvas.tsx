@@ -109,12 +109,15 @@ const findNodeElement = (start: Element | null, root: SVGSVGElement): Element | 
  * Helper to convert UTF-8 bytes to Base64 without using deprecated APIs
  */
 const toBase64 = (bytes: Uint8Array): string => {
-  let binary = '';
-  const len = bytes.length;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const CHUNK_SIZE = 8192;
+  const binaryChunks: string[] = [];
+  
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    const chunk = bytes.subarray(i, i + CHUNK_SIZE);
+    binaryChunks.push(String.fromCharCode(...chunk));
   }
-  return btoa(binary);
+  
+  return btoa(binaryChunks.join(''));
 };
 
 export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }: CanvasProps) {
