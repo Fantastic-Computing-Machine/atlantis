@@ -7,7 +7,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function resolveDatabaseUrl(): string {
-  return process.env.DATABASE_URL ?? process.env.DB_CONNECTION ?? 'file:./data/atlantis.db';
+  return process.env.DATABASE_URL ?? process.env.DB_CONNECTION ?? 'file:./datas/atlantis.db';
 }
 
 function ensureDataDir(url: string) {

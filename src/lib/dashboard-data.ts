@@ -148,30 +148,20 @@ export async function getDashboardStats(): Promise<DashboardStats> {
  * Get the most used tags, sorted by usage count.
  */
 export async function getTopTags(limit = 6): Promise<TopTag[]> {
-    // Fetch more tags than needed since DB orders by diagram count only,
-    // but we want to sort by combined diagram + note count
     const tags = await prisma.tag.findMany({
-        include: {
-            _count: {
-                select: { diagrams: true, notes: true },
-            },
-        },
         orderBy: {
-            diagrams: { _count: 'desc' },
+            usageCount: 'desc',
         },
-        take: limit * 2, // Fetch extra to ensure we get true top tags after re-sorting
+        take: limit,
     });
 
-    return tags
-        .map((tag) => ({
-            id: tag.id,
-            name: tag.name,
-            slug: tag.slug,
-            color: tag.color,
-            count: tag._count.diagrams + tag._count.notes,
-        }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, limit); // Take only the requested limit after sorting
+    return tags.map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        slug: tag.slug,
+        color: tag.color,
+        count: tag.usageCount,
+    }));
 }
 
 /**
@@ -197,7 +187,7 @@ export async function getFiletypeStats(limit = 5): Promise<FiletypeStats[]> {
 export async function getRecentTodos(limit = 5): Promise<TodoItem[]> {
     const recentNotes = await prisma.note.findMany({
         where: {
-            content: { contains: '[ ]' },
+            hasTodos: true,
         },
         select: {
             id: true,

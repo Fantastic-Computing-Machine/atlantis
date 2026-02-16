@@ -17,6 +17,7 @@ model Tag {
   slug           String    @unique
   color          String    @default("#000000")
   createdAt      DateTime  @default(now())
+  usageCount     Int       @default(0)
   
   notes          Note[]
   diagrams       Diagram[]
@@ -67,11 +68,13 @@ model Note {
   starred      Boolean  @default(false)
   private      Boolean  @default(false)
   searchVector String   @default("")
+  hasTodos     Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime
   tags         Tag[]
 
   @@index([updatedAt], map: "note_updatedAt_idx")
+  @@index([hasTodos], map: "note_hasTodos_idx")
   @@NOTE_INDEX@@
   @@index([starred], map: "note_starred_idx")
 }

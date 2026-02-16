@@ -142,6 +142,8 @@ export async function getNoteById(id: string): Promise<Note | null> {
   return toNote(note);
 }
 
+const TODO_REGEX = /^\s*[-*+]\s*\[\s\]/m;
+
 export async function createNote({
   title,
   content,
@@ -164,22 +166,35 @@ export async function createNote({
   const nextTitle = title || 'Untitled Note';
   const nextContent = content || '';
   const nextLanguage = language || 'txt';
+  const hasTodos = TODO_REGEX.test(nextContent);
 
-  const note = await prisma.note.create({
-    data: {
-      id: noteId,
-      title: nextTitle,
-      content: nextContent,
-      language: nextLanguage,
-      emoji: getRandomEmoji(),
-      starred: false,
-      private: false,
-      searchVector: buildNoteSearchVector(nextTitle, nextContent),
-      createdAt: now,
-      updatedAt: now,
-      tags: tags ? { connect: mapTagIds(tags) } : undefined,
-    },
-    include: { tags: true },
+  const note = await prisma.$transaction(async (tx) => {
+    const created = await tx.note.create({
+      data: {
+        id: noteId,
+        title: nextTitle,
+        content: nextContent,
+        language: nextLanguage,
+        emoji: getRandomEmoji(),
+        starred: false,
+        private: false,
+        searchVector: buildNoteSearchVector(nextTitle, nextContent),
+        hasTodos,
+        createdAt: now,
+        updatedAt: now,
+        tags: tags ? { connect: mapTagIds(tags) } : undefined,
+      },
+      include: { tags: true },
+    });
+
+    if (tags && tags.length > 0) {
+      await tx.tag.updateMany({
+        where: { id: { in: tags } },
+        data: { usageCount: { increment: 1 } },
+      });
+    }
+
+    return created;
   });
 
   return toNote(note);
@@ -206,20 +221,49 @@ export async function updateNoteById(
   const now = new Date();
   const nextTitle = updates.title ?? existing.title;
   const nextContent = updates.content ?? existing.content;
+  const hasTodos = TODO_REGEX.test(nextContent);
 
-  const note = await prisma.note.update({
-    where: { id },
-    data: {
-      title: nextTitle,
-      content: nextContent,
-      language: updates.language ?? existing.language,
-      starred: typeof updates.starred === 'boolean' ? updates.starred : existing.starred,
-      private: typeof updates.private === 'boolean' ? updates.private : existing.private,
-      searchVector: buildNoteSearchVector(nextTitle, nextContent),
-      updatedAt: now,
-      tags: updates.tags ? { set: mapTagIds(updates.tags) } : undefined,
-    },
-    include: { tags: true },
+  const note = await prisma.$transaction(async (tx) => {
+    // Calculate tag diff
+    if (updates.tags) {
+      const oldTagIds = existing.tags.map((t) => t.id);
+      const newTagIds = updates.tags!;
+
+      const addedTags = newTagIds.filter((id) => !oldTagIds.includes(id));
+      const removedTags = oldTagIds.filter((id) => !newTagIds.includes(id));
+
+      if (addedTags.length > 0) {
+        await tx.tag.updateMany({
+          where: { id: { in: addedTags } },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
+
+      if (removedTags.length > 0) {
+        await tx.tag.updateMany({
+          where: { id: { in: removedTags } },
+          data: { usageCount: { decrement: 1 } },
+        });
+      }
+    }
+
+    const updated = await tx.note.update({
+      where: { id },
+      data: {
+        title: nextTitle,
+        content: nextContent,
+        language: updates.language ?? existing.language,
+        starred: typeof updates.starred === 'boolean' ? updates.starred : existing.starred,
+        private: typeof updates.private === 'boolean' ? updates.private : existing.private,
+        searchVector: buildNoteSearchVector(nextTitle, nextContent),
+        hasTodos,
+        updatedAt: now,
+        tags: updates.tags ? { set: mapTagIds(updates.tags) } : undefined,
+      },
+      include: { tags: true },
+    });
+
+    return updated;
   });
 
   return toNote(note);
@@ -227,8 +271,24 @@ export async function updateNoteById(
 
 export async function deleteNoteById(id: string): Promise<boolean> {
   try {
-    await prisma.note.delete({ where: { id } });
-    return true;
+    return await prisma.$transaction(async (tx) => {
+      const note = await tx.note.findUnique({
+        where: { id },
+        include: { tags: { select: { id: true } } },
+      });
+
+      if (!note) return false;
+
+      if (note.tags.length > 0) {
+        await tx.tag.updateMany({
+          where: { id: { in: note.tags.map((t) => t.id) } },
+          data: { usageCount: { decrement: 1 } },
+        });
+      }
+
+      await tx.note.delete({ where: { id } });
+      return true;
+    });
   } catch (error: unknown) {
     if (isNotFoundError(error)) {
       return false;

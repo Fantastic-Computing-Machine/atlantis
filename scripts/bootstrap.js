@@ -131,6 +131,10 @@ async function main() {
     run('npx', ['prisma', 'db', 'push']);
   }
 
+  // Step 3.5: backfill tag usage counts and note todos (idempotent)
+  // We run this after db push ensures schema exists.
+  run('node', ['scripts/backfill-tag-counts.js']);
+
   // Step 4: backfill search vectors for legacy rows (idempotent)
   await backfillSearchVectors(url);
 }
@@ -160,7 +164,7 @@ function toSqlitePath(url) {
 function ensureDatabaseUrl() {
   const existing = process.env.DATABASE_URL || process.env.DB_CONNECTION;
   if (existing) return existing;
-  const fallback = 'file:./data/atlantis.db';
+  const fallback = 'file:./datas/atlantis.db';
   process.env.DATABASE_URL = fallback;
   ensureDataDir();
   return fallback;

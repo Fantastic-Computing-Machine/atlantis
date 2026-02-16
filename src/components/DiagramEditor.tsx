@@ -252,7 +252,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedNode, setSelectedNode] = useState<NodeSelection | null>(null);
   const [selectionRange, setSelectionRange] = useState<TextRange | null>(null);
-  const { shortcutHint } = useShortcutPlatform();
+  // const { shortcutHint } = useShortcutPlatform(); // Unused
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [isLoadingCheckpoints, setIsLoadingCheckpoints] = useState(false);
   const [isSavingCheckpoint, setIsSavingCheckpoint] = useState(false);

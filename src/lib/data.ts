@@ -230,6 +230,13 @@ export async function createDiagram({
       select: diagramWithLatestSelect,
     });
 
+    if (tags && tags.length > 0) {
+      await tx.tag.updateMany({
+        where: { id: { in: tags } },
+        data: { usageCount: { increment: 1 } },
+      });
+    }
+
     return createdDiagram as DiagramWithLatest;
   });
 
@@ -259,6 +266,39 @@ export async function updateDiagramById(
       where: { diagramId: id },
       orderBy: { updatedAt: 'desc' },
     });
+
+    if (updates.tags) {
+      // oldTags was unused. Removed.
+      // Wait, getDiagramById selects tags. But here we used prisma.diagram.findUnique({ where: { id } }) at start of function (line 245).
+      // Line 245: const existing = await prisma.diagram.findUnique({ where: { id } });
+      // This DOES NOT include tags! Default select only scalar fields.
+      // I must fetch tags for existing diagram to calc diff.
+      // So I should fetch tags inside the transaction or update line 245.
+      // Updating line 245 is safer but I can also fetch here.
+
+      const currentDiagram = await tx.diagram.findUnique({
+        where: { id },
+        select: { tags: { select: { id: true } } }
+      });
+      const oldTagIds = currentDiagram?.tags.map(t => t.id) || [];
+      const newTagIds = updates.tags!;
+
+      const addedTags = newTagIds.filter(id => !oldTagIds.includes(id));
+      const removedTags = oldTagIds.filter(id => !newTagIds.includes(id));
+
+      if (addedTags.length > 0) {
+        await tx.tag.updateMany({
+          where: { id: { in: addedTags } },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
+      if (removedTags.length > 0) {
+        await tx.tag.updateMany({
+          where: { id: { in: removedTags } },
+          data: { usageCount: { decrement: 1 } },
+        });
+      }
+    }
 
     const nextTitle = updates.title ?? existing.title;
     const nextDescription = updates.description ?? existing.description;
@@ -576,8 +616,24 @@ export async function restoreCheckpoint(
 
 export async function deleteDiagramById(id: string): Promise<boolean> {
   try {
-    await prisma.diagram.delete({ where: { id } });
-    return true;
+    return await withTx(async (tx) => {
+      const diagram = await tx.diagram.findUnique({
+        where: { id },
+        include: { tags: { select: { id: true } } },
+      });
+
+      if (!diagram) return false;
+
+      if (diagram.tags.length > 0) {
+        await tx.tag.updateMany({
+          where: { id: { in: diagram.tags.map((t) => t.id) } },
+          data: { usageCount: { decrement: 1 } },
+        });
+      }
+
+      await tx.diagram.delete({ where: { id } });
+      return true;
+    });
   } catch (error: unknown) {
     if (isNotFoundError(error)) {
       return false;
