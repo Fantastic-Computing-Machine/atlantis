@@ -97,6 +97,10 @@ run_as_app prisma generate --schema=/app/prisma/schema.prisma --config=/app/pris
 echo "[entrypoint] Syncing database schema..."
 run_as_app prisma db push --schema=/app/prisma/schema.prisma --config=/app/prisma/prisma.config.ts --accept-data-loss
 
-# Drop privileges and start the server as nextjs user
+# Drop privileges and start the server as nextjs user (PID 1 is node)
 echo "[entrypoint] Starting server as nextjs user..."
-run_as_app node server.js
+if [ "$(id -u)" -eq 0 ]; then
+  exec su-exec nextjs node server.js
+else
+  exec node server.js
+fi

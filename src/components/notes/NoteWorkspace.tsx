@@ -402,11 +402,23 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
           {/* More Actions */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" title="More options">
+              <Button variant="ghost" size="icon" aria-label="More options">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {/* Language selector for mobile (hidden on sm+ where standalone dropdown is visible) */}
+              <DropdownMenuLabel className="sm:hidden">Language</DropdownMenuLabel>
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <DropdownMenuItem
+                  key={lang.value}
+                  onClick={() => setLanguage(lang.value)}
+                  className={cn('sm:hidden', language === lang.value && 'bg-muted')}
+                >
+                  {lang.label}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator className="sm:hidden" />
               <DropdownMenuItem onClick={toggleStarred}>
                 <Star className={cn('mr-2 h-4 w-4', starred && 'fill-amber-400 text-amber-400')} />
                 <span>{starred ? 'Unstar' : 'Star'}</span>
@@ -441,14 +453,15 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
             disabled={!hasChanges || isSaving}
             size="sm"
             className="gap-2"
+            aria-label="Save note"
           >
             <Save className="h-4 w-4" />
             <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save'}</span>
           </Button>
 
-          <Button size="sm" variant="ghost" onClick={handleCreateNote}>
+          <Button size="sm" variant="ghost" onClick={handleCreateNote} aria-label="Create new note">
             <Plus className="h-4 w-4" />
-            <span className="sr-only sm:not-sr-only sm:ml-1">New</span>
+            <span className="hidden sm:inline sm:ml-1">New</span>
           </Button>
         </div>
       </div>

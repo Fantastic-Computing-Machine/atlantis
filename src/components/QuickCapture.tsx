@@ -92,30 +92,33 @@ export function QuickCapture() {
     }
 
     return (
-        <form onSubmit={handleSubmit} className="flex items-center gap-2">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Input
                 ref={inputRef}
                 type="text"
                 placeholder="Note title..."
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="h-8 text-sm w-48"
+                className="h-8 text-sm w-full sm:w-48"
                 disabled={isCreating}
             />
-            <Button type="submit" size="sm" disabled={isCreating || !title.trim()}>
-                {isCreating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Create'}
-            </Button>
-            <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                    setIsOpen(false);
-                    setTitle('');
-                }}
-            >
-                Cancel
-            </Button>
+            <div className="flex items-center gap-2">
+                <Button type="submit" size="sm" className="flex-1 sm:flex-none" disabled={isCreating || !title.trim()}>
+                    {isCreating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Create'}
+                </Button>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="flex-1 sm:flex-none"
+                    onClick={() => {
+                        setIsOpen(false);
+                        setTitle('');
+                    }}
+                >
+                    Cancel
+                </Button>
+            </div>
         </form>
     );
 }

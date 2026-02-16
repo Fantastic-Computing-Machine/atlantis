@@ -734,14 +734,14 @@ export default function SettingsPage() {
               )}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex items-center justify-between">
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p className="font-medium">Manage Tags</p>
               <p className="text-muted-foreground text-sm">
                 Create, edit, and delete tags for your notes and diagrams.
               </p>
             </div>
-            <Button variant="outline" asChild>
+            <Button variant="outline" className="w-full sm:w-auto" asChild>
               <Link href="/settings/tags">Manage Tags</Link>
             </Button>
           </CardContent>
@@ -754,7 +754,7 @@ export default function SettingsPage() {
             <CardDescription>Customize the look and feel of the application.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">Theme</p>
                 <p className="text-muted-foreground text-sm">Choose your preferred theme.</p>
@@ -795,7 +795,7 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="flex items-center gap-2 font-medium">
                   <Snowflake className="h-4 w-4 text-sky-400" />
@@ -811,7 +811,7 @@ export default function SettingsPage() {
                 }}
               />
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="flex items-center gap-2 font-medium">
                   🐱 Kitty Mode
@@ -836,7 +836,7 @@ export default function SettingsPage() {
             <CardDescription>Configure editor behavior.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">Auto-save</p>
                 <p className="text-muted-foreground text-sm">
@@ -851,7 +851,7 @@ export default function SettingsPage() {
                 }}
               />
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">Auto-save Delay</p>
                 <p className="text-muted-foreground text-sm">
@@ -859,7 +859,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <select
-                className="border-input bg-background h-9 w-32 rounded-md border px-3 text-sm"
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm sm:w-32"
                 value={localAutoSaveDelay}
                 onChange={async (e) => {
                   const val = Number(e.target.value);
@@ -884,7 +884,7 @@ export default function SettingsPage() {
                 <option value={10000}>10 seconds</option>
               </select>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">Live Sync</p>
                 <p className="text-muted-foreground text-sm">
@@ -899,7 +899,7 @@ export default function SettingsPage() {
                 }}
               />
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">Sync Interval</p>
                 <p className="text-muted-foreground text-sm">
@@ -907,7 +907,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <select
-                className="border-input bg-background h-9 w-32 rounded-md border px-3 text-sm"
+                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm sm:w-32"
                 value={settings.liveSyncInterval ?? 5000}
                 onChange={(e) => {
                   const val = Number(e.target.value);
@@ -1040,26 +1040,26 @@ export default function SettingsPage() {
             <CardDescription>Backup and restore your data.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">Backup</p>
                 <p className="text-muted-foreground text-sm">
                   Download all your diagrams and notes as JSON.
                 </p>
               </div>
-              <Button variant="outline" onClick={handleBackup}>
+              <Button variant="outline" className="w-full sm:w-auto" onClick={handleBackup}>
                 <Download className="mr-2 h-4 w-4" />
                 Download Backup
               </Button>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">Restore</p>
                 <p className="text-muted-foreground text-sm">
                   Restore from a previously downloaded backup.
                 </p>
               </div>
-              <Button variant="outline" onClick={openRestorePicker}>
+              <Button variant="outline" className="w-full sm:w-auto" onClick={openRestorePicker}>
                 <Upload className="mr-2 h-4 w-4" />
                 Restore Backup
               </Button>
@@ -1166,14 +1166,14 @@ export default function SettingsPage() {
             <CardDescription>Irreversible and destructive actions.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="font-medium">Wipe All Data</p>
                 <p className="text-muted-foreground text-sm">
                   Permanently delete all diagrams, notes, and settings.
                 </p>
               </div>
-              <Button variant="destructive" onClick={() => setIsWipeDialogOpen(true)}>
+              <Button variant="destructive" className="w-full sm:w-auto" onClick={() => setIsWipeDialogOpen(true)}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Wipe Database
               </Button>

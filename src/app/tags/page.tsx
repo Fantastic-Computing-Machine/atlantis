@@ -22,12 +22,12 @@ export default async function TagsPage() {
             <DashboardHeader enableApiAccess={process.env.ENABLE_API_ACCESS === 'true'} />
 
             <main className="container mx-auto flex-1 px-4 py-8">
-                <div className="mb-8 flex items-center justify-between border-b pb-6">
+                <div className="mb-8 flex flex-col gap-3 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
                         <Hash className="h-8 w-8" />
                         <h1 className="text-3xl font-bold tracking-tight">All Tags</h1>
                     </div>
-                    <Button variant="outline" className="gap-2" asChild>
+                    <Button variant="outline" className="w-full gap-2 sm:w-auto" asChild>
                         <Link href="/settings/tags">
                             <Settings className="h-4 w-4" />
                             Manage Tags

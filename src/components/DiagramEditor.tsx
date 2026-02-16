@@ -732,7 +732,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
 
   return (
     <>
-      <div className="bg-background text-foreground flex h-screen w-screen flex-col overflow-hidden pb-24 sm:pb-0">
+      <div className="bg-background text-foreground flex h-screen w-screen flex-col overflow-hidden pb-24 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-0">
         {/* Header */}
         <div className="bg-background/50 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b px-4 backdrop-blur-sm">
           {/* Left: Branding & Title */}
@@ -775,7 +775,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
               variant="ghost"
               size="icon"
               onClick={() => setIsSearchOpen(true)}
-              title={`Search (${shortcutHint})`}
+              aria-label="Search"
             >
               <Search className="h-4 w-4" />
             </Button>
@@ -794,13 +794,13 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
             />
 
             {/* Desktop only actions moved to overflow menu on mobile if needed, but fitting key ones here */}
-            <Button variant="ghost" size="icon" onClick={handleShare} title="Share">
+            <Button variant="ghost" size="icon" onClick={handleShare} aria-label="Share">
               <Share2 className="h-4 w-4" />
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" title="More options">
+                <Button variant="ghost" size="icon" aria-label="More options">
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -845,7 +845,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
 
             <div className="bg-border mx-1 h-6 w-px" />
 
-            <Button onClick={() => saveChanges()} size="sm" className="gap-2">
+            <Button onClick={() => saveChanges()} size="sm" className="gap-2" aria-label="Save">
               <Save size={16} />
               <span className="hidden sm:inline">Save</span>
             </Button>

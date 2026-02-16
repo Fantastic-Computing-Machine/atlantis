@@ -160,13 +160,14 @@ export function NoteEditor({
         <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
           {language || 'txt'}
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant={showSearch ? 'secondary' : 'ghost'}
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 shrink-0"
+                aria-label="Search and replace"
                 onClick={toggleSearch}
               >
                 <Search className="h-3.5 w-3.5" />
@@ -181,7 +182,8 @@ export function NoteEditor({
                 <Button
                   variant={effectiveShowPreview ? 'secondary' : 'ghost'}
                   size="icon"
-                  className="h-7 w-7"
+                  className="h-7 w-7 shrink-0"
+                  aria-label={effectiveShowPreview ? 'Hide preview' : 'Show preview'}
                   onClick={togglePreview}
                 >
                   {effectiveShowPreview ? (
@@ -202,7 +204,8 @@ export function NoteEditor({
               <Button
                 variant={isPrivate ? 'secondary' : 'ghost'}
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 shrink-0"
+                aria-label={isPrivate ? 'Make public' : 'Make private'}
                 onClick={onTogglePrivate}
               >
                 {isPrivate ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
@@ -213,7 +216,7 @@ export function NoteEditor({
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopy}>
+              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Copy code" onClick={handleCopy}>
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -225,7 +228,8 @@ export function NoteEditor({
               <Button
                 variant={wordWrap ? 'secondary' : 'ghost'}
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 shrink-0"
+                aria-label={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
                 onClick={() => setWordWrap(!wordWrap)}
               >
                 <WrapText className="h-3.5 w-3.5" />
@@ -238,7 +242,7 @@ export function NoteEditor({
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Editor settings">
                     <Settings2 className="h-3.5 w-3.5" />
                   </Button>
                 </DropdownMenuTrigger>

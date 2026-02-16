@@ -177,6 +177,7 @@ export function Editor({
                 variant={aiEnabled ? 'secondary' : 'ghost'}
                 size="icon"
                 className="h-7 w-7"
+                aria-label={aiEnabled ? 'Hide AI chat' : 'AI helper'}
                 onClick={() => {
                   if (!hasAiKey) {
                     toast.info('Add an AI key in settings to enable the assistant');
@@ -197,6 +198,7 @@ export function Editor({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
+                aria-label="Copy code"
                 onClick={handleCopy}
               >
                 <Copy className="h-3.5 w-3.5" />
@@ -211,6 +213,7 @@ export function Editor({
                 variant={wordWrap ? 'secondary' : 'ghost'}
                 size="icon"
                 className="h-7 w-7"
+                aria-label={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
                 onClick={() => setWordWrap(!wordWrap)}
               >
                 <WrapText className="h-3.5 w-3.5" />
@@ -227,7 +230,7 @@ export function Editor({
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Editor settings">
                     <Settings2 className="h-3.5 w-3.5" />
                   </Button>
                 </DropdownMenuTrigger>

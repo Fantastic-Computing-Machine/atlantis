@@ -111,12 +111,12 @@ const findNodeElement = (start: Element | null, root: SVGSVGElement): Element | 
 const toBase64 = (bytes: Uint8Array): string => {
   const CHUNK_SIZE = 8192;
   const binaryChunks: string[] = [];
-  
+
   for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
     const chunk = bytes.subarray(i, i + CHUNK_SIZE);
     binaryChunks.push(String.fromCharCode(...chunk));
   }
-  
+
   return btoa(binaryChunks.join(''));
 };
 
@@ -584,12 +584,13 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
             <div className="absolute top-4 right-3 z-20 flex gap-2 opacity-100 transition-opacity duration-200 md:top-auto md:right-6 md:bottom-6 md:flex-col md:opacity-0 md:group-hover:opacity-100">
-              <div className="bg-background/80 hidden flex-col gap-1 rounded-lg border p-1 shadow-sm backdrop-blur-sm md:flex">
+              <div className="bg-background/80 flex flex-col gap-1 rounded-lg border p-1 shadow-sm backdrop-blur-sm">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Zoom in"
                       onClick={() => zoomIn(0.3, ANIMATION_DURATION)}
                     >
                       <ZoomIn className="h-4 w-4" />
@@ -603,6 +604,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Zoom out"
                       onClick={() => zoomOut(0.3, ANIMATION_DURATION)}
                     >
                       <ZoomOut className="h-4 w-4" />
@@ -613,7 +615,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={handleRecenter}>
+                    <Button variant="ghost" size="icon" aria-label="Center diagram" onClick={handleRecenter}>
                       <Focus className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
@@ -625,6 +627,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Reset view"
                       onClick={() => resetTransform(ANIMATION_DURATION)}
                     >
                       <RotateCcw className="h-4 w-4" />
@@ -641,6 +644,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label="Copy share link"
                         onClick={async () => {
                           const url = `${window.location.origin}/${diagramId}`;
                           const success = await copyToClipboard(url);
@@ -662,7 +666,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={!svg}>
+                        <Button variant="ghost" size="icon" aria-label="Export diagram" disabled={!svg}>
                           <Download className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -676,12 +680,12 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <div className="hidden md:block">
+                <div>
                   <DropdownMenu>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" aria-label="Canvas settings">
                             <Settings2 className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -739,7 +743,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" onClick={toggleFullscreen}>
+                    <Button variant="ghost" size="icon" aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={toggleFullscreen}>
                       {isFullscreen ? (
                         <Minimize className="h-4 w-4" />
                       ) : (

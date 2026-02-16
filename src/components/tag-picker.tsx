@@ -139,7 +139,9 @@ export function TagPicker({
                         })}
                     </div>
                     <div className="p-2 border-t bg-muted/50">
-                        <p className="text-[10px] text-muted-foreground text-center">Manage tags in Settings</p>
+                        <p className="text-[10px] text-muted-foreground text-center">
+                            Manage tags in <a href="/settings/tags" className="underline hover:text-foreground transition-colors">Settings</a>
+                        </p>
                     </div>
                 </DropdownMenuContent>
             </DropdownMenu>
