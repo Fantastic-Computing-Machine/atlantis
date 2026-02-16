@@ -7,17 +7,26 @@ export PATH="/app/node_modules/.bin:$PATH"
 # Normalize SQLite DATABASE_URL to an absolute path
 normalize_sqlite_url() {
   url="$1"
+  # Remove 'file:' prefix
   path_part="${url#file:}"
+  # Remove query parameters and anchors
   path_no_query="${path_part%%\?*}"
   path_clean="${path_no_query%%#*}"
 
   case "$path_clean" in
     /*)
+      # Already absolute
       resolved="$path_clean"
       ;;
+    ./*)
+      # Relative to current directory (explicit)
+      # In Docker, we assume we are at /app, so ./data/db -> /app/data/db
+      resolved="/app/${path_clean#./}"
+      ;;
     *)
-      resolved=$(cd /app && readlink -f "$path_clean" 2>/dev/null || true)
-      [ -n "$resolved" ] || resolved="/app/$path_clean"
+      # Relative (implicit) or other
+      # If it's just a filename or relative path without ./, prepend /app/
+      resolved="/app/$path_clean"
       ;;
   esac
 
@@ -41,9 +50,10 @@ fi
 case "$DATABASE_URL" in
   file:*)
     normalized=$(normalize_sqlite_url "$DATABASE_URL")
+    # ALWAYS use the normalized path for SQLite in Docker
     if [ "$DATABASE_URL" != "$normalized" ]; then
+      echo "[entrypoint] Normalizing SQLite DATABASE_URL from '$DATABASE_URL' to '$normalized'"
       export DATABASE_URL="$normalized"
-      echo "[entrypoint] Normalized SQLite DATABASE_URL to: $DATABASE_URL"
     else
       echo "[entrypoint] Using DATABASE_URL: $DATABASE_URL"
     fi
