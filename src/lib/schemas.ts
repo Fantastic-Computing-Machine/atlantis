@@ -32,6 +32,7 @@ export const noteUpdateSchema = z.object({
   starred: z.boolean().optional(),
   private: z.boolean().optional(),
   tags: z.array(z.string()).max(3).optional(),
+  emoji: z.string().max(10).optional(),
 });
 
 // Backup restore validation

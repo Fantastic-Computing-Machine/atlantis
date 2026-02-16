@@ -34,7 +34,7 @@ import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
 import { useDiagramStore } from '@/lib/store';
 import { Checkpoint, Diagram, Tag } from '@/lib/types';
 import { useLiveSync } from '@/lib/useLiveSync';
-import { useShortcutPlatform } from '@/lib/use-platform';
+
 import { copyToClipboard, formatDate, cn } from '@/lib/utils';
 import {
   Info,
@@ -422,6 +422,8 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
           title: diagram.title,
           description: diagram.description,
           content: diagram.content,
+          tags: updated.tags || [],
+          emoji: updated.emoji, // Ensure emoji is synced if changed
           updatedAt: updated.updatedAt,
         });
         lastSavedContentRef.current = diagram.content;
@@ -458,6 +460,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   }, [saveChanges, viewingCheckpointId]);
 
   // Auto-save with debounce
+  // Content-only auto-save with debounce
   useEffect(() => {
     // Don't auto-save when viewing a past checkpoint
     if (!settings.autoSave || viewingCheckpointId !== null) return;
@@ -465,9 +468,9 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     const hasContentChanged = diagram.content !== lastSavedContentRef.current;
     const hasTitleChanged = diagram.title !== lastSavedTitleRef.current;
     const hasDescriptionChanged = diagram.description !== lastSavedDescriptionRef.current;
-    const hasTagsChanged = JSON.stringify(tags) !== JSON.stringify(lastSavedTagsRef.current);
 
-    if (!hasContentChanged && !hasTitleChanged && !hasDescriptionChanged && !hasTagsChanged) return;
+    // Explicitly exclude tags from this check
+    if (!hasContentChanged && !hasTitleChanged && !hasDescriptionChanged) return;
 
     // Clear existing timer
     if (autoSaveTimerRef.current) {
@@ -488,11 +491,24 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     diagram.content,
     diagram.title,
     diagram.description,
-    tags,
+    // tags removed from dependencies
     settings.autoSave,
     saveChanges,
     viewingCheckpointId,
   ]);
+
+  // Immediate save for tags
+  useEffect(() => {
+    // Skip initial mount or if no changes
+    if (JSON.stringify(tags) === JSON.stringify(lastSavedTagsRef.current)) return;
+
+    // If we are viewing a past checkpoint, we shouldn't save tags either (or maybe we should? tags are global). 
+    // Logic above says "Don't save when viewing a past checkpoint". Following that rule.
+    if (viewingCheckpointId !== null) return;
+
+    // Save immediately
+    saveChanges(false);
+  }, [tags, saveChanges, viewingCheckpointId]);
 
   // Save on blur for title (if auto-save is off)
   const handleTitleBlur = () => {

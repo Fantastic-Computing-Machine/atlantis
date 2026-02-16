@@ -240,7 +240,7 @@ export async function createDiagram({
     return createdDiagram as DiagramWithLatest;
   });
 
-  return toDiagram(diagram as DiagramWithLatest);
+  return toDiagram(diagram);
 }
 
 export async function updateDiagramById(

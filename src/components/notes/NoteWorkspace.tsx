@@ -107,6 +107,8 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         language: remoteNote.language,
         starred: remoteNote.starred,
         private: remoteNote.private,
+        tags: remoteNote.tags || [],
+        emoji: remoteNote.emoji,
         updatedAt: remoteNote.updatedAt,
       });
     },
@@ -115,20 +117,25 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     },
   });
 
-  // Track changes
+  // Track changes (only for auto-save debounce candidates: title and content)
   useEffect(() => {
     const changed =
       title !== note.title ||
-      content !== note.content ||
-      language !== note.language ||
-      JSON.stringify(tags) !== JSON.stringify(note.tags || []) || // Simple array comparison
-      isPrivate !== note.private ||
-      starred !== note.starred;
+      content !== note.content;
     setHasChanges(changed);
-  }, [title, content, language, tags, isPrivate, starred, note]);
+  }, [title, content, note]);
+
+
 
   const handleSave = useCallback(async () => {
     if (isSaving) return;
+
+    // Clear any pending auto-save timer to avoid double pushes
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+
     setIsSaving(true);
 
     try {
@@ -164,6 +171,8 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         language: updatedNote.language,
         starred: updatedNote.starred,
         private: updatedNote.private,
+        tags: updatedNote.tags || [],
+        emoji: updatedNote.emoji,
         updatedAt: updatedNote.updatedAt,
       });
       // Sync from server after save to pull any concurrent changes
@@ -186,6 +195,17 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     tags,
   ]);
 
+  // Immediate save for settings/meta (tags, language, private)
+  useEffect(() => {
+    const tagsChanged = JSON.stringify(tags) !== JSON.stringify(note.tags || []);
+    const languageChanged = language !== note.language;
+    const privateChanged = isPrivate !== note.private;
+
+    if (tagsChanged || languageChanged || privateChanged) {
+      handleSave();
+    }
+  }, [tags, language, isPrivate, note, handleSave]);
+
   // Auto-save debounced (only if autoSave is enabled)
   useEffect(() => {
     if (!hasChanges || !settings.autoSave) return;
@@ -203,7 +223,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [content, hasChanges, settings.autoSave, handleSave]);
+  }, [hasChanges, settings.autoSave, handleSave]);
 
   // Ctrl+S to save
   useEffect(() => {
