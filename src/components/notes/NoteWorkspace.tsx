@@ -107,6 +107,8 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         language: remoteNote.language,
         starred: remoteNote.starred,
         private: remoteNote.private,
+        tags: remoteNote.tags || [],
+        emoji: remoteNote.emoji,
         updatedAt: remoteNote.updatedAt,
       });
     },
@@ -115,20 +117,25 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     },
   });
 
-  // Track changes
+  // Track changes (only for auto-save debounce candidates: title and content)
   useEffect(() => {
     const changed =
       title !== note.title ||
-      content !== note.content ||
-      language !== note.language ||
-      JSON.stringify(tags) !== JSON.stringify(note.tags || []) || // Simple array comparison
-      isPrivate !== note.private ||
-      starred !== note.starred;
+      content !== note.content;
     setHasChanges(changed);
-  }, [title, content, language, tags, isPrivate, starred, note]);
+  }, [title, content, note]);
+
+
 
   const handleSave = useCallback(async () => {
     if (isSaving) return;
+
+    // Clear any pending auto-save timer to avoid double pushes
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+
     setIsSaving(true);
 
     try {
@@ -164,6 +171,8 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         language: updatedNote.language,
         starred: updatedNote.starred,
         private: updatedNote.private,
+        tags: updatedNote.tags || [],
+        emoji: updatedNote.emoji,
         updatedAt: updatedNote.updatedAt,
       });
       // Sync from server after save to pull any concurrent changes
@@ -186,6 +195,17 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     tags,
   ]);
 
+  // Immediate save for settings/meta (tags, language, private)
+  useEffect(() => {
+    const tagsChanged = JSON.stringify(tags) !== JSON.stringify(note.tags || []);
+    const languageChanged = language !== note.language;
+    const privateChanged = isPrivate !== note.private;
+
+    if (tagsChanged || languageChanged || privateChanged) {
+      handleSave();
+    }
+  }, [tags, language, isPrivate, note, handleSave]);
+
   // Auto-save debounced (only if autoSave is enabled)
   useEffect(() => {
     if (!hasChanges || !settings.autoSave) return;
@@ -203,7 +223,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [content, hasChanges, settings.autoSave, handleSave]);
+  }, [hasChanges, settings.autoSave, handleSave]);
 
   // Ctrl+S to save
   useEffect(() => {
@@ -402,11 +422,23 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
           {/* More Actions */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" title="More options">
+              <Button variant="ghost" size="icon" aria-label="More options">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {/* Language selector for mobile (hidden on sm+ where standalone dropdown is visible) */}
+              <DropdownMenuLabel className="sm:hidden">Language</DropdownMenuLabel>
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <DropdownMenuItem
+                  key={lang.value}
+                  onClick={() => setLanguage(lang.value)}
+                  className={cn('sm:hidden', language === lang.value && 'bg-muted')}
+                >
+                  {lang.label}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator className="sm:hidden" />
               <DropdownMenuItem onClick={toggleStarred}>
                 <Star className={cn('mr-2 h-4 w-4', starred && 'fill-amber-400 text-amber-400')} />
                 <span>{starred ? 'Unstar' : 'Star'}</span>
@@ -441,14 +473,15 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
             disabled={!hasChanges || isSaving}
             size="sm"
             className="gap-2"
+            aria-label="Save note"
           >
             <Save className="h-4 w-4" />
             <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save'}</span>
           </Button>
 
-          <Button size="sm" variant="ghost" onClick={handleCreateNote}>
+          <Button size="sm" variant="ghost" onClick={handleCreateNote} aria-label="Create new note">
             <Plus className="h-4 w-4" />
-            <span className="sr-only sm:not-sr-only sm:ml-1">New</span>
+            <span className="hidden sm:inline sm:ml-1">New</span>
           </Button>
         </div>
       </div>

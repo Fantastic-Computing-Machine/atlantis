@@ -11,16 +11,7 @@ Atlantis includes a built-in notetaking feature with a code-editor-like experien
   - Word wrap toggle
   - Syntax highlighting for multiple languages
 
-- **Supported Languages**:
-  - Plain Text (txt)
-  - Markdown (md) - with live preview
-  - JavaScript
-  - TypeScript
-  - Python
-  - HTML
-  - CSS
-  - JSON
-  - Todo List (Interactive)
+- **Supported Languages** (stored as `language`): txt, markdown (with preview), tex (with LaTeX compile), javascript, typescript, python, html, css, json, todo (interactive task list).
 
 - **Search & Replace**: Notepad++ style search panel with:
   - Find Next/Previous
@@ -40,11 +31,11 @@ Atlantis includes a built-in notetaking feature with a code-editor-like experien
 
 ## Todo List
 
-When the language is set to "Todo List", the note transforms into an interactive task manager:
+When the language is `todo`, the note transforms into an interactive task manager:
 
-- **Interactive UI**: Check/uncheck items, drag and drop to reorder, and add/delete tasks easily.
-- **Markdown Backed**: The list is stored as a standard Markdown task list (e.g., `- [ ] Task`), so it remains portable and readable as plain text.
-- **Multiline Support**: Tasks can contain multiple lines of text.
+- Check/uncheck items, drag to reorder, and add/delete tasks.
+- Stored as Markdown task list (e.g., `- [ ] Task`) for portability.
+- Multiline tasks are supported.
 
 ## API Endpoints
 
@@ -59,16 +50,18 @@ Query parameters:
 - `limit` - Number of notes to return (default: 24)
 - `offset` - Pagination offset
 - `query` - Search query
-- `sort` - Sort option: `recent`, `old`, `alphabetical`
+- `sort` - `recent` | `old` | `alphabetical`
 - `starred` - Filter by starred: `true`/`false`
 
-Response: List of notes (without content).
+Response: List of notes without content (uses cache unless `fresh=true` or filters applied).
 
 ### Create Note
 
 ```http
 POST /api/notes
 ```
+
+Headers: `x-csrf-token` (set automatically by the app)
 
 Body:
 
@@ -86,7 +79,7 @@ Body:
 GET /api/notes/:id
 ```
 
-Returns full note. **Note**: If the note is marked as private, the content field returns `"Content policy in effect."` instead of actual content.
+Returns full note. If the note is marked as `private`, the `content` field returns "Content policy in effect.".
 
 ### Update Note
 
@@ -127,3 +120,12 @@ When the language is set to Markdown, a preview pane becomes available showing r
 - Lists
 - Links and images
 - Horizontal rules
+
+---
+
+## Related Documentation
+
+- [Contributing Guide](../CONTRIBUTING.md) - Development setup, LaTeX installation, and Docker workflows
+- [API Guide](API_GUIDE.md) - REST API endpoints for notes
+- [Container Startup](CONTAINER_STARTUP.md) - Docker deployment guide
+- [Settings](settings.md) - Configuration options

@@ -10,11 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, copyToClipboard } from '@/lib/utils';
 import {
   AlertCircle,
@@ -27,9 +23,8 @@ import {
   Settings2,
   Share2,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
 } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
@@ -65,7 +60,24 @@ const extractNodeId = (element: Element): string | null => {
     .replace(/^graph-/, '')
     .replace(/^classDiagram-/, '')
     .replace(/^stateDiagram-/, '')
-    .replace(/^erDiagram-/, '');
+    .replace(/^erDiagram-/, '')
+    .replace(/^gitGraph-/, '')
+    .replace(/^mindmap-/, '')
+    .replace(/^timeline-/, '')
+    .replace(/^quadrantChart-/, '')
+    .replace(/^requirementDiagram-/, '')
+    .replace(/^c4-/, '')
+    .replace(/^sankey-/, '')
+    .replace(/^xyChart-/, '')
+    .replace(/^block-/, '')
+    .replace(/^packet-/, '')
+    .replace(/^kanban-/, '')
+    .replace(/^pie-/, '')
+    .replace(/^gantt-/, '')
+    .replace(/^sequence-/, '')
+    .replace(/^journey-/, '')
+    .replace(/^treemap-/, '')
+    .replace(/^architecture-/, '');
 
   const trimmed = cleaned.replace(/-\d+$/, '');
   return trimmed || null;
@@ -78,7 +90,7 @@ const isNodeElement = (element: Element): boolean => {
   if (classList.includes('node') || classList.includes('cluster')) return true;
   if (classList.some((cls) => cls.endsWith('node') || cls.includes('node'))) return true;
   const id = element.getAttribute('id') ?? '';
-  if (/^(flowchart|graph|classDiagram|stateDiagram|erDiagram)-/i.test(id)) return true;
+  if (/^(flowchart|graph|classDiagram|stateDiagram|erDiagram|gitGraph|mindmap|timeline|quadrantChart|requirementDiagram|c4|sankey|xyChart|block|packet|kanban|pie|gantt|sequence|journey|treemap|architecture)-/i.test(id)) return true;
   return !!element.querySelector('title');
 };
 
@@ -91,6 +103,21 @@ const findNodeElement = (start: Element | null, root: SVGSVGElement): Element | 
     current = current.parentElement;
   }
   return null;
+};
+
+/**
+ * Helper to convert UTF-8 bytes to Base64 without using deprecated APIs
+ */
+const toBase64 = (bytes: Uint8Array): string => {
+  const CHUNK_SIZE = 8192;
+  const binaryChunks: string[] = [];
+
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    const chunk = bytes.subarray(i, i + CHUNK_SIZE);
+    binaryChunks.push(String.fromCharCode(...chunk));
+  }
+
+  return btoa(binaryChunks.join(''));
 };
 
 export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }: CanvasProps) {
@@ -121,6 +148,11 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
         state: { useMaxWidth: false },
         er: { useMaxWidth: false },
         pie: { useMaxWidth: false },
+        // Newer diagrams often don't support useMaxWidth or handle it differently
+        // gitGraph, mindmap, timeline seem to benefit from it, but others might fail
+        gitGraph: { useMaxWidth: false },
+        mindmap: { useMaxWidth: false },
+        timeline: { useMaxWidth: false },
         // Suppress built-in error SVG/banner; handle errors ourselves
         suppressErrorRendering: true,
         // @ts-expect-error parseError exists at runtime in Mermaid 11
@@ -250,7 +282,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       pointerDownRef.current = {
         x: event.clientX,
         y: event.clientY,
-        time: Date.now()
+        time: Date.now(),
       };
 
       // Prevent pan start when clicking a node
@@ -369,14 +401,28 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       canvas.width = svgWidth * scale;
       canvas.height = svgHeight * scale;
 
-      const img = new Image();
-      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
+      // Clone SVG to avoid modifying the original
+      const svgClone = svgEl.cloneNode(true) as SVGSVGElement;
 
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = url;
+      // Ensure SVG has proper dimensions
+      svgClone.setAttribute('width', String(svgWidth));
+      svgClone.setAttribute('height', String(svgHeight));
+
+      // Serialize SVG properly using XMLSerializer
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(svgClone);
+
+      // Encode as Base64 data URI to avoid cross-origin/tainted canvas issues
+      const encoder = new TextEncoder();
+      const svgBase64 = toBase64(encoder.encode(svgString));
+      const dataUrl = `data:image/svg+xml;base64,${svgBase64}`;
+
+      const img = new Image();
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load SVG image'));
+        img.src = dataUrl;
       });
 
       ctx.scale(scale, scale);
@@ -388,7 +434,6 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
       toast.success('PNG downloaded');
     } catch (err) {
       console.error('Export PNG error:', err);
@@ -416,20 +461,33 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       canvas.width = svgWidth * scale;
       canvas.height = svgHeight * scale;
 
-      const img = new Image();
-      const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
+      // Clone SVG to avoid modifying the original
+      const svgClone = svgEl.cloneNode(true) as SVGSVGElement;
 
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = url;
+      // Ensure SVG has proper dimensions
+      svgClone.setAttribute('width', String(svgWidth));
+      svgClone.setAttribute('height', String(svgHeight));
+
+      // Serialize SVG properly using XMLSerializer
+      const serializer = new XMLSerializer();
+      const svgString = serializer.serializeToString(svgClone);
+
+      // Encode as Base64 data URI to avoid cross-origin/tainted canvas issues
+      const encoder = new TextEncoder();
+      const svgBase64 = toBase64(encoder.encode(svgString));
+      const dataUrl = `data:image/svg+xml;base64,${svgBase64}`;
+
+      const img = new Image();
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load SVG image'));
+        img.src = dataUrl;
       });
 
       ctx.scale(scale, scale);
       ctx.drawImage(img, 0, 0, svgWidth, svgHeight);
       const imgData = canvas.toDataURL('image/png');
-      URL.revokeObjectURL(url);
 
       // 2. Create PDF
       const isLandscape = svgWidth > svgHeight;
@@ -437,7 +495,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       const pdf = new jsPDF({
         orientation: isLandscape ? 'landscape' : 'portrait',
         unit: 'px',
-        format: [svgWidth + 40, svgHeight + 40] // Add margin
+        format: [svgWidth + 40, svgHeight + 40], // Add margin
       });
 
       // Add white background
@@ -448,7 +506,6 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       pdf.addImage(imgData, 'PNG', 20, 20, svgWidth, svgHeight);
       pdf.save(sanitizeFilename('pdf'));
       toast.success('PDF downloaded');
-
     } catch (err) {
       console.error('Export PDF error:', err);
       toast.error('Failed to export PDF');
@@ -470,7 +527,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
     <div
       ref={wrapperRef}
       className={cn(
-        'h-full w-full relative overflow-hidden flex flex-col group transition-colors duration-300',
+        'group relative flex h-full w-full flex-col overflow-hidden transition-colors duration-300',
         bgColorClass,
         getPatternClass()
       )}
@@ -480,7 +537,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Syntax Error</AlertTitle>
           <AlertDescription>
-            <pre className="text-xs whitespace-pre-wrap font-mono mt-1">{error}</pre>
+            <pre className="mt-1 font-mono text-xs whitespace-pre-wrap">{error}</pre>
           </AlertDescription>
         </Alert>
       )}
@@ -526,13 +583,14 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
-            <div className="absolute z-20 flex gap-2 md:flex-col md:bottom-6 md:right-6 top-4 right-3 md:top-auto md:right-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
-              <div className="hidden md:flex flex-col gap-1 bg-background/80 backdrop-blur-sm border rounded-lg p-1 shadow-sm">
+            <div className="absolute top-4 right-3 z-20 flex gap-2 opacity-100 transition-opacity duration-200 md:top-auto md:right-6 md:bottom-6 md:flex-col md:opacity-0 md:group-hover:opacity-100">
+              <div className="bg-background/80 flex flex-col gap-1 rounded-lg border p-1 shadow-sm backdrop-blur-sm">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Zoom in"
                       onClick={() => zoomIn(0.3, ANIMATION_DURATION)}
                     >
                       <ZoomIn className="h-4 w-4" />
@@ -546,6 +604,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Zoom out"
                       onClick={() => zoomOut(0.3, ANIMATION_DURATION)}
                     >
                       <ZoomOut className="h-4 w-4" />
@@ -556,11 +615,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleRecenter}
-                    >
+                    <Button variant="ghost" size="icon" aria-label="Center diagram" onClick={handleRecenter}>
                       <Focus className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
@@ -572,6 +627,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Reset view"
                       onClick={() => resetTransform(ANIMATION_DURATION)}
                     >
                       <RotateCcw className="h-4 w-4" />
@@ -581,13 +637,14 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                 </Tooltip>
               </div>
 
-              <div className="flex flex-row md:flex-col gap-1 bg-background/80 backdrop-blur-sm border rounded-lg p-1 shadow-sm">
+              <div className="bg-background/80 flex flex-row gap-1 rounded-lg border p-1 shadow-sm backdrop-blur-sm md:flex-col">
                 {diagramId && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label="Copy share link"
                         onClick={async () => {
                           const url = `${window.location.origin}/${diagramId}`;
                           const success = await copyToClipboard(url);
@@ -609,7 +666,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" disabled={!svg}>
+                        <Button variant="ghost" size="icon" aria-label="Export diagram" disabled={!svg}>
                           <Download className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -617,24 +674,18 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                     <TooltipContent side="left">Export diagram</TooltipContent>
                   </Tooltip>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleExportSvg}>
-                      Download SVG
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleExportPng}>
-                      Download PNG
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleExportPdf}>
-                      Download PDF
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportSvg}>Download SVG</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportPng}>Download PNG</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportPdf}>Download PDF</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                <div className="hidden md:block">
+                <div>
                   <DropdownMenu>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" aria-label="Canvas settings">
                             <Settings2 className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -646,19 +697,19 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => setBgPattern('none')}>
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border rounded bg-transparent" />
+                          <div className="h-4 w-4 rounded border bg-transparent" />
                           <span>None</span>
                         </div>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setBgPattern('dots')}>
                         <div className="flex items-center gap-2">
-                          <Grid3x3 className="w-4 h-4" />
+                          <Grid3x3 className="h-4 w-4" />
                           <span>Dots</span>
                         </div>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setBgPattern('grid')}>
                         <div className="flex items-center gap-2">
-                          <Grid3x3 className="w-4 h-4 opacity-50" />
+                          <Grid3x3 className="h-4 w-4 opacity-50" />
                           <span>Grid</span>
                         </div>
                       </DropdownMenuItem>
@@ -668,19 +719,21 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => setBgColorClass('bg-muted/30')}>
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded-full border bg-muted" />
+                          <div className="bg-muted h-4 w-4 rounded-full border" />
                           Default
                         </div>
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setBgColorClass('bg-background')}>
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded-full border bg-background" />
+                          <div className="bg-background h-4 w-4 rounded-full border" />
                           Plain
                         </div>
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setBgColorClass('bg-blue-50/50 dark:bg-blue-950/20')}>
+                      <DropdownMenuItem
+                        onClick={() => setBgColorClass('bg-blue-50/50 dark:bg-blue-950/20')}
+                      >
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded-full border bg-blue-100 dark:bg-blue-900" />
+                          <div className="h-4 w-4 rounded-full border bg-blue-100 dark:bg-blue-900" />
                           Blue Tint
                         </div>
                       </DropdownMenuItem>
@@ -690,11 +743,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={toggleFullscreen}
-                    >
+                    <Button variant="ghost" size="icon" aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={toggleFullscreen}>
                       {isFullscreen ? (
                         <Minimize className="h-4 w-4" />
                       ) : (
@@ -719,7 +768,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
             >
               <div
                 ref={containerRef}
-                className="[&_svg]:max-w-none [&_svg]:h-auto [&_svg]:w-auto transition-opacity duration-200"
+                className="transition-opacity duration-200 [&_svg]:h-auto [&_svg]:w-auto [&_svg]:max-w-none"
                 dangerouslySetInnerHTML={{ __html: svg }}
               />
             </TransformComponent>

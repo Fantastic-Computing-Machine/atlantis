@@ -31,6 +31,27 @@ RUN --mount=type=cache,target=/root/.npm \
   npx prisma generate
 
 # ============================================
+# Stage 1.5: Install production dependencies only
+# ============================================
+FROM base AS production-deps
+WORKDIR /app
+
+ARG PRISMA_PROVIDER=sqlite
+ARG DATABASE_URL=file:./data/atlantis.db
+ENV PRISMA_PROVIDER=${PRISMA_PROVIDER}
+ENV DATABASE_URL=${DATABASE_URL}
+
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+COPY scripts/prepare-prisma-schema.js ./scripts/prepare-prisma-schema.js
+
+# Install only production dependencies (now includes prisma)
+RUN --mount=type=cache,target=/root/.npm \
+  npm ci --omit=dev && \
+  npm run prisma:prepare && \
+  npx prisma generate
+
+# ============================================
 # Stage 2: Build the application
 # ============================================
 FROM base AS builder
@@ -87,9 +108,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 # 3. Static files
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# 4. Full node_modules from deps stage for runtime Prisma CLI
-# (Required because prisma generate has many transitive dependencies)
-COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+# 4. Production node_modules from production-deps stage
+# (Contains only what's needed for runtime, including prisma)
+COPY --from=production-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # 5. Prisma schema template, config, and scripts for runtime generation
 COPY --from=builder --chown=nextjs:nodejs /app/prisma/schema.template.prisma ./prisma/schema.template.prisma
@@ -107,9 +128,12 @@ RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 # Install TeX Live for LaTeX support
 RUN apk add --no-cache texlive-full fontconfig
 
+# Install su-exec for privilege dropping in entrypoint
+RUN apk add --no-cache su-exec
 
-# Switch to non-root user
-USER nextjs
+# NOTE: We do NOT switch to nextjs user here because the entrypoint
+# needs to run as root initially to fix mounted volume permissions.
+# The entrypoint will drop privileges to nextjs after setup.
 
 # Expose port
 EXPOSE 3000

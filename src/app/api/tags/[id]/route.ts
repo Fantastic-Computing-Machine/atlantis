@@ -1,53 +1,98 @@
-
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { Prisma } from '@prisma/client';
+
 import { prisma } from '@/lib/prisma';
 
-export async function DELETE(
-    request: Request,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    try {
-        const { id } = await params;
-        await prisma.tag.delete({
-            where: { id },
-        });
-        return NextResponse.json({ success: true });
-    } catch (_error) {
-        return NextResponse.json({ error: 'Failed to delete tag' }, { status: 500 });
-    }
+type TagRouteParams = {
+  params: Promise<{ id: string }>;
+};
+
+const updateTagSchema = z
+  .object({
+    name: z.string().min(1).max(50).optional(),
+    color: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .optional(),
+  })
+  .strict();
+
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+export async function DELETE(request: Request, { params }: TagRouteParams) {
+  try {
+    const { id } = await params;
+    await prisma.tag.delete({
+      where: { id },
+    });
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: 'Failed to delete tag' }, { status: 500 });
+  }
 }
 
-export async function PATCH(
-    request: Request,
-    { params }: { params: Promise<{ id: string }> }
-) {
-    try {
-        const { id } = await params;
-        const body = await request.json();
-        const { name, color } = body;
+export async function PATCH(request: Request, { params }: TagRouteParams) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
 
-        // If name is updated, we might need to update slug too? 
-        // User didn't explicitly ask for update, but "manage tags (create delete update read)" was requested.
-
-        const updateData: { color: string; name?: string; slug?: string } = { color };
-
-        if (name) {
-            updateData.name = name;
-            updateData.slug = name
-                .toLowerCase()
-                .trim()
-                .replace(/[^a-z0-9]+/g, '-')
-                .replace(/^-+|-+$/g, '');
-        }
-
-        const tag = await prisma.tag.update({
-            where: { id },
-            data: updateData,
-        });
-
-        return NextResponse.json(tag);
-    } catch (_error) {
-        // Check for unique constraint violation on slug
-        return NextResponse.json({ error: 'Failed to update tag' }, { status: 500 });
+    // Validate input
+    const result = updateTagSchema.safeParse(body);
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: result.error.flatten().fieldErrors },
+        { status: 400 }
+      );
     }
+
+    const { name, color } = result.data;
+
+    // Build update data
+    const updateData: { color?: string; name?: string; slug?: string } = {};
+
+    if (color !== undefined) {
+      updateData.color = color;
+    }
+
+    if (name !== undefined) {
+      const slug = slugify(name);
+
+      // Reject empty slugs
+      if (!slug) {
+        return NextResponse.json(
+          { error: 'Invalid tag name resulting in empty slug' },
+          { status: 400 }
+        );
+      }
+
+      updateData.name = name;
+      updateData.slug = slug;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+    }
+
+    const tag = await prisma.tag.update({
+      where: { id },
+      data: updateData,
+    });
+
+    return NextResponse.json(tag);
+  } catch (error) {
+    // Handle Prisma unique constraint violations
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Tag with this name or slug already exists' },
+        { status: 409 }
+      );
+    }
+    return NextResponse.json({ error: 'Failed to update tag' }, { status: 500 });
+  }
 }

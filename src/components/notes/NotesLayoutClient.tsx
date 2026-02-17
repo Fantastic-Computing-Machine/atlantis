@@ -24,7 +24,7 @@ export function NotesLayoutClient({ children, initialNotes }: NotesLayoutClientP
                 {/* Sidebar */}
                 <aside
                     className={cn(
-                        "w-full flex-col border-r bg-background md:w-72 md:flex",
+                        "w-full flex-col border-r bg-background md:w-72 md:flex h-full overflow-hidden",
                         isNoteSelected ? "hidden" : "flex"
                     )}
                 >

@@ -1,20 +1,28 @@
+import { NextResponse } from 'next/server';
+
+import {
+  CacheKeys,
+  CachePrefixes,
+  DEFAULT_TTL_MS,
+  getCache,
+  withCacheHeader,
+  withNoCacheHeaders,
+} from '@/lib/cache';
 import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { deleteDiagramById, getDiagramById, updateDiagramById } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { diagramSchema } from '@/lib/schemas';
-import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS, withCacheHeader, withNoCacheHeaders, type CacheStatus } from '@/lib/cache';
-import { NextResponse } from 'next/server';
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+type DiagramRouteParams = {
+  params: Promise<{ id: string }>;
+};
+
+export async function GET(request: Request, { params }: DiagramRouteParams) {
   try {
     const { id } = await params;
     const url = new URL(request.url);
     const fresh = url.searchParams.get('fresh') === 'true';
 
-    // Bypass cache if fresh=true (live sync polling)
     if (fresh) {
       const diagram = await getDiagramById(id);
       if (!diagram) {
@@ -26,7 +34,6 @@ export async function GET(
     const cache = getCache();
     const cacheKey = CacheKeys.diagram(id);
 
-    // Try cache first
     const cached = await cache.get(cacheKey);
     if (cached) {
       return withCacheHeader(NextResponse.json(cached), 'HIT');
@@ -38,7 +45,6 @@ export async function GET(
       return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });
     }
 
-    // Cache the result
     await cache.set(cacheKey, diagram, DEFAULT_TTL_MS);
 
     return withCacheHeader(NextResponse.json(diagram), 'MISS');
@@ -47,10 +53,7 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to load diagram' }, { status: 500 });
   }
 }
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: Request, { params }: DiagramRouteParams) {
   if (!(await validateCsrfToken(request))) {
     return csrfFailureResponse();
   }
@@ -76,7 +79,6 @@ export async function PUT(
       return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });
     }
 
-    // Invalidate cache
     const cache = getCache();
     await cache.delete(CacheKeys.diagram(id));
     await cache.deletePrefix(CachePrefixes.diagramsList);
@@ -88,10 +90,7 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: Request, { params }: DiagramRouteParams) {
   if (!(await validateCsrfToken(request))) {
     return csrfFailureResponse();
   }
@@ -104,7 +103,6 @@ export async function DELETE(
       return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });
     }
 
-    // Invalidate cache
     const cache = getCache();
     await cache.delete(CacheKeys.diagram(id));
     await cache.deletePrefix(CachePrefixes.diagramsList);

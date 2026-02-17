@@ -1,6 +1,6 @@
 # 🔱 atlantis
 
-Self-hosted platform for Mermaid.js diagrams, notes, and knowledge management. Built with Next.js, Tailwind CSS, and Shadcn UI.
+Self-hosted platform for Mermaid.js diagrams, notes, and knowledge management. Built with Next.js 16 (App Router), Tailwind CSS v4, and Shadcn UI.
 
 ![Atlantis Preview](/public/preview.png)
 
@@ -18,23 +18,19 @@ Self-hosted platform for Mermaid.js diagrams, notes, and knowledge management. B
 
 ## Features
 
-- Modern Editor: Split-pane interface with code editor and live preview.
-- Interactive Todo Lists: Manage tasks with drag-and-drop support, backed by standard Markdown.
-- Full Mermaid Support: Supports all diagram types supported by Mermaid.js.
-- Local Persistence: Diagrams are stored in SQLite by default (data/atlantis.db), with optional Postgres/MySQL via envs.
-- Dark/Light Mode: Beautiful UI that adapts to your system preference.
-- Favorites: Organize your diagrams by marking important ones.
-- Backup & Restore: Export your data to JSON and restore it whenever needed.
-- Management: Create, edit, and delete diagrams easily.
-- Search: fast searching through your saved diagrams.
+- Modern editor with live Mermaid preview and checkpoints (keeps 15 recent versions).
+- Notes workspace with Markdown/LaTeX/code modes, interactive todo lists, tags, and search.
+- Full Mermaid support plus SVG/PNG/PDF exports and favorites.
+- Local persistence via SQLite (data/atlantis.db) with optional PostgreSQL/MySQL through env vars.
+- Optional Redis cache; light/dark themes; backup/restore to JSON.
 
 ## Screenshots
 
 ![Home Screen](screenshots/1.%20home.png)
-*Home Dashboard*
+_Home Dashboard_
 
 ![Diagram Editor](screenshots/2.%20diagram.png)
-*Diagram Editor*
+_Diagram Editor_
 
 **More Screenshots:**
 
@@ -44,61 +40,46 @@ Self-hosted platform for Mermaid.js diagrams, notes, and knowledge management. B
 
 ## Quick Start (Docker)
 
-Run Atlantis instantly with a single command:
-
 ```bash
-docker run -d -p 3000:3000 -v $(pwd)/data:/app/data --name atlantis strikead/atlantis:latest
+docker run -d -p 3000:3000 \
+  -v $(pwd)/data:/app/data \
+  --name atlantis \
+  strikead/atlantis:latest
 ```
+
+- Browse at <http://localhost:3000>
+- Set `ENABLE_API_ACCESS=true` to expose `/api/access/*` and `/docs`.
 
 ## Quick Start (Local Development)
 
-### Prerequisites
+Prerequisites: Node.js 18.18+ and npm 10+.
 
-- Node.js 18+ installed on your machine.
+```bash
+git clone https://github.com/Fantastic-Computing-Machine/atlantis.git
+cd atlantis
+npm install
+cp .env.example .env
+npm run dev
+```
 
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/yourusername/atlantis.git
-   cd atlantis
-   ```
-
-2. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-3. Setup Environment:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-4. Run Development Server:
-
-   ```bash
-   npm run dev
-   ```
+Scripts: `npm run lint` (ESLint), `npm run build` (type/check + Next build).
 
 ## Documentation
 
-- [Contributing Guide](CONTRIBUTING.md): Tech stack, workflow, and guidelines for contributors.
-- [Agent Guide](AGENTS.md): Conventions and commands for contributors and AI agents.
-- [AI Contribution Guide](docs/AI.md): Practices specific to agentic/AI contributors.
-- [Container Startup & Deployment](docs/CONTAINER_STARTUP.md): Detailed instructions for running Atlantis with Docker, Docker Compose, and configuring the environment.
-- [API Guide](docs/API_GUIDE.md): How to enable and use the REST API for programmatic access.
-- [Notes Feature](docs/NOTES.md): Guide for the notetaking feature with API documentation.
+- [Contributing Guide](CONTRIBUTING.md): Dev setup, lint/build steps, LaTeX notes, Docker workflows.
+- [AI Doc](docs/AI.md): AI assistant configuration and usage.
+- [Container Startup & Deployment](docs/CONTAINER_STARTUP.md): Docker/Docker Compose and env vars.
+- [API Guide](docs/API_GUIDE.md): Enable and use the REST API (`/api/access/*`).
+- [Notes Feature](docs/NOTES.md): Notes UX and related endpoints.
+- [Settings](docs/settings.md): UI settings and complete env var reference.
 
 ## Data & Backup
 
-Data is stored in a database (default SQLite at data/atlantis.db; switch via PRISMA_PROVIDER/DATABASE_URL).
+Default storage: SQLite at `data/atlantis.db` (override with `PRISMA_PROVIDER` + `DATABASE_URL`/`DB_CONNECTION`).
 
-- Backup: Use Settings -> Backup (homepage header) to download your diagrams.
-- Restore: Use Settings -> Restore and select a valid backup file.
-- Checkpoints: Create manual checkpoints in the editor (up to 15 recent checkpoints kept per diagram).
+- Backup: Settings → Backup downloads diagrams and notes as JSON.
+- Restore: Settings → Restore accepts validated backup JSON.
+- Checkpoints: Editor keeps up to 15 recent checkpoints per diagram.
 
 ## Support
 

@@ -79,8 +79,10 @@ export async function POST(request: Request) {
             id: newNote.id,
             title: newNote.title,
             language: newNote.language,
+            emoji: newNote.emoji,
             starred: newNote.starred,
             private: newNote.private,
+            tags: newNote.tags,
             createdAt: newNote.createdAt,
             updatedAt: newNote.updatedAt,
         });

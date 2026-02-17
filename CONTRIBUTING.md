@@ -6,9 +6,85 @@ Thank you for your interest in contributing to atlantis! This document provides 
 
 ### Prerequisites
 
-- Node.js 20.x or later
+- Node.js 18.18+ (match Next.js 16 support)
 - npm 10.x or later
 - Git
+- **LaTeX distribution** (optional, for LaTeX note compilation)
+
+#### Installing LaTeX (Optional)
+
+LaTeX is only required if you want to use the LaTeX note compilation feature during local development. The Docker image includes TeX Live by default.
+
+<details>
+<summary><strong>macOS</strong></summary>
+
+```bash
+# Full TeX Live (recommended, ~4GB)
+brew install --cask mactex
+
+# Or minimal installation (~100MB)
+brew install --cask basictex
+sudo tlmgr update --self
+sudo tlmgr install collection-fontsrecommended
+```
+
+</details>
+
+<details>
+<summary><strong>Windows</strong></summary>
+
+**MiKTeX (Recommended):** Download from [miktex.org](https://miktex.org/download) - auto-installs missing packages.
+
+**TeX Live:** Download from [tug.org/texlive](https://www.tug.org/texlive/acquire-netinstall.html)
+
+Verify installation: `pdflatex --version`
+
+</details>
+
+<details>
+<summary><strong>Debian / Ubuntu</strong></summary>
+
+```bash
+# Minimal
+sudo apt install texlive-latex-base
+
+# Recommended
+sudo apt install texlive-latex-recommended texlive-fonts-recommended
+
+# Full (~5GB)
+sudo apt install texlive-full
+```
+
+</details>
+
+<details>
+<summary><strong>Fedora / RHEL / CentOS</strong></summary>
+
+```bash
+# Minimal
+sudo dnf install texlive-scheme-basic
+
+# Recommended
+sudo dnf install texlive-scheme-medium
+
+# Full
+sudo dnf install texlive-scheme-full
+```
+
+</details>
+
+<details>
+<summary><strong>Arch Linux</strong></summary>
+
+```bash
+# Core packages
+sudo pacman -S texlive-basic texlive-latex texlive-latexrecommended
+
+# Full
+sudo pacman -S texlive-full
+```
+
+</details>
 
 ### Local Development Setup
 
@@ -34,11 +110,9 @@ Thank you for your interest in contributing to atlantis! This document provides 
 4. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
 ## Tech Stack
 
-- Framework: [Next.js 14+](https://nextjs.org/) (App Router)
+- Framework: [Next.js 16](https://nextjs.org/) (App Router)
 - Styling: [Tailwind CSS](https://tailwindcss.com/)
 - Components: [Shadcn UI](https://ui.shadcn.com/)
 - Icons: [Lucide React](https://lucide.dev/)
@@ -73,7 +147,7 @@ Use descriptive branch names:
    npm run lint
    ```
 
-4. Build to verify everything compiles
+4. Build to verify everything compiles (runs bootstrap + Next build)
 
    ```bash
    npm run build
@@ -211,21 +285,71 @@ Feature requests are welcome! Please include:
 
 ## Docker Development
 
-To run the application in Docker:
+Atlantis provides two Docker Compose configurations for different use cases:
+
+### Compose Configurations
+
+| File                        | Description           | When to Use                          |
+| --------------------------- | --------------------- | ------------------------------------ |
+| `docker-compose.yml`        | Full stack with Redis | Production, testing caching behavior |
+| `docker-compose.simple.yml` | Standalone (no Redis) | Quick testing, simpler setups        |
+
+### Running with Docker Compose
+
+**Full Stack (with Redis):**
 
 ```bash
-# Build and run
-docker compose up --build
-
-# Run in background
+# Start services
 docker compose up -d
 
 # View logs
-docker compose logs -f
+docker compose logs -f atlantis
 
-# Stop
+# Rebuild after code changes
+docker compose up --build -d
+
+# Stop and remove containers
 docker compose down
+
+# Stop and remove containers + volumes (fresh start)
+docker compose down -v
 ```
+
+**Simple Stack (without Redis):**
+
+```bash
+# Start without Redis
+docker compose -f docker-compose.simple.yml up -d
+
+# Rebuild
+docker compose -f docker-compose.simple.yml up --build -d
+```
+
+### Building a Local Image
+
+For testing changes before pushing:
+
+```bash
+# Build local image
+docker build -t atlantis:local .
+
+# Run your local build
+docker run -d -p 3000:3000 -v $(pwd)/data:/app/data atlantis:local
+```
+
+### Environment Variables
+
+Customize your deployment with environment variables:
+
+```bash
+# Custom port and data directory
+PORT=8080 ATLANTIS_DATA_DIR=./my-data docker compose up -d
+
+# Enable API access
+ENABLE_API_ACCESS=true docker compose up -d
+```
+
+See [Container Startup & Deployment](docs/CONTAINER_STARTUP.md) for the full list of configuration options.
 
 [![Docker Hub](https://img.shields.io/badge/View_on-Docker_Hub-blue?logo=docker&logoColor=white)](https://hub.docker.com/r/strikead/atlantis)
 

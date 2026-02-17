@@ -43,9 +43,11 @@ export const prisma =
 // Initialize search indexes if running in a server context (not during build)
 if (process.env.NODE_ENV !== 'test' && typeof window === 'undefined') {
   // We lazily init this to avoid blocking startup, but import dynamically to avoid cycles if any
-  import('./setup-gin-index').then(({ setupGinIndexes }) => {
-    setupGinIndexes(resolveProvider());
-  }).catch(err => console.error('Failed to init search indexes:', err));
+  import('./setup-gin-index')
+    .then(({ setupGinIndexes }) => {
+      setupGinIndexes(resolveProvider());
+    })
+    .catch((err) => console.error('Failed to init search indexes:', err));
 }
 
 if (process.env.NODE_ENV !== 'production') {

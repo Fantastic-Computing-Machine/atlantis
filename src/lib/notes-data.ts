@@ -1,241 +1,296 @@
 import type { Prisma } from '@prisma/client';
+
+import { buildSearchVector } from './search';
 import { prisma } from './prisma';
 import type { Note, NotePage, NoteSortOption } from './types';
 import { generateNoteId, getRandomEmoji } from './utils';
 
 const DEFAULT_PAGE_SIZE = 24;
 const MAX_PAGE_SIZE = 100;
+const MAX_TAGS_PER_ITEM = 3;
 const TITLE_MAX = 200;
 
-type NoteRow = Prisma.NoteGetPayload<object>;
+type TagRow = { id: string; name: string; slug: string; color: string };
+type NoteRow = Prisma.NoteGetPayload<object> & { tags?: TagRow[] };
 
-function normalizeLimit(limit?: number | null) {
-    if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
-    return Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE);
-}
+const normalizeLimit = (limit?: number | null) => {
+  if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
+  return Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE);
+};
 
-function normalizeOffset(offset?: number | null) {
-    if (!Number.isFinite(offset)) return 0;
-    return Math.max(Math.trunc(offset as number), 0);
-}
+const normalizeOffset = (offset?: number | null) => {
+  if (!Number.isFinite(offset)) return 0;
+  return Math.max(Math.trunc(offset as number), 0);
+};
 
-const MAX_TAGS_PER_ITEM = 3;
+const mapTagIds = (ids: string[]) => ids.map((tagId) => ({ id: tagId }));
 
-function toNote(row: NoteRow & { tags?: { id: string; name: string; slug: string; color: string }[] }): Note {
-    return {
-        id: row.id,
-        title: row.title,
-        content: row.content,
-        language: row.language,
-        emoji: row.emoji,
-        starred: row.starred,
-        private: row.private,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-        tags: row.tags,
-    };
-}
+const buildNoteSearchVector = (title: string, content: string): string =>
+  buildSearchVector(title, undefined, content);
 
-function toNoteListItem(row: NoteRow & { tags?: { id: string; name: string; slug: string; color: string }[] }): Omit<Note, 'content'> {
-    return {
-        id: row.id,
-        title: row.title,
-        language: row.language,
-        emoji: row.emoji,
-        starred: row.starred,
-        private: row.private,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt.toISOString(),
-        tags: row.tags,
-    };
-}
+const toNote = (row: NoteRow): Note => ({
+  id: row.id,
+  title: row.title,
+  content: row.content,
+  language: row.language,
+  emoji: row.emoji,
+  starred: row.starred,
+  private: row.private,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
+  tags: row.tags,
+});
 
-import { buildSearchVector } from './search';
+const toNoteListItem = (row: NoteRow): Omit<Note, 'content'> => ({
+  id: row.id,
+  title: row.title,
+  language: row.language,
+  emoji: row.emoji,
+  starred: row.starred,
+  private: row.private,
+  createdAt: row.createdAt.toISOString(),
+  updatedAt: row.updatedAt.toISOString(),
+  tags: row.tags,
+});
 
-function buildNoteSearchVector(title: string, content: string): string {
-    return buildSearchVector(title, undefined, content);
-}
+const validateNoteLengths = (title?: string) => {
+  if (typeof title === 'string' && title.length > TITLE_MAX) {
+    throw new Error(`Title exceeds ${TITLE_MAX} characters`);
+  }
+};
 
-function validateNoteLengths(title?: string) {
-    if (typeof title === 'string' && title.length > TITLE_MAX) {
-        throw new Error(`Title exceeds ${TITLE_MAX} characters`);
-    }
-}
+const isNotFoundError = (error: unknown): boolean =>
+  typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2025';
 
 async function ensureUniqueNoteId(): Promise<string> {
-    let id = generateNoteId();
-    let existing = await prisma.note.findUnique({ where: { id }, select: { id: true } });
-    while (existing) {
-        id = generateNoteId();
-        existing = await prisma.note.findUnique({ where: { id }, select: { id: true } });
-    }
-    return id;
+  let id = generateNoteId();
+  let existing = await prisma.note.findUnique({ where: { id }, select: { id: true } });
+  while (existing) {
+    id = generateNoteId();
+    existing = await prisma.note.findUnique({ where: { id }, select: { id: true } });
+  }
+  return id;
 }
 
 export async function getNotePage({
-    limit = DEFAULT_PAGE_SIZE,
-    offset = 0,
-    query,
-    sort = 'recent',
-    starredOnly = false,
-    tagSlug,
+  limit = DEFAULT_PAGE_SIZE,
+  offset = 0,
+  query,
+  sort = 'recent',
+  starredOnly = false,
+  tagSlug,
 }: {
-    limit?: number;
-    offset?: number;
-    query?: string;
-    sort?: NoteSortOption;
-    starredOnly?: boolean;
-    tagSlug?: string;
+  limit?: number;
+  offset?: number;
+  query?: string;
+  sort?: NoteSortOption;
+  starredOnly?: boolean;
+  tagSlug?: string;
 }): Promise<NotePage> {
-    const normalizedLimit = normalizeLimit(limit);
-    const normalizedOffset = normalizeOffset(offset);
+  const normalizedLimit = normalizeLimit(limit);
+  const normalizedOffset = normalizeOffset(offset);
 
-    const where: Prisma.NoteWhereInput = {};
+  const where: Prisma.NoteWhereInput = {};
+  if (query?.trim()) {
+    where.searchVector = { contains: query.trim().toLowerCase() };
+  }
+  if (starredOnly) {
+    where.starred = true;
+  }
+  if (tagSlug) {
+    where.tags = { some: { slug: tagSlug } };
+  }
 
-    if (query?.trim()) {
-        const cleanQuery = query.trim().toLowerCase();
-        where.searchVector = { contains: cleanQuery };
-    }
-    if (starredOnly) {
-        where.starred = true;
-    }
-    if (tagSlug) {
-        where.tags = { some: { slug: tagSlug } };
-    }
-
-    let orderBy: Prisma.NoteOrderByWithRelationInput = { updatedAt: 'desc' };
+  const orderBy: Prisma.NoteOrderByWithRelationInput = (() => {
     switch (sort) {
-        case 'old':
-            orderBy = { updatedAt: 'asc' };
-            break;
-        case 'alphabetical':
-            orderBy = { title: 'asc' };
-            break;
-        case 'recent':
-        default:
-            orderBy = { updatedAt: 'desc' };
-            break;
+      case 'old':
+        return { updatedAt: 'asc' };
+      case 'alphabetical':
+        return { title: 'asc' };
+      case 'recent':
+      default:
+        return { updatedAt: 'desc' };
     }
+  })();
 
-    const [notes, total] = await Promise.all([
-        prisma.note.findMany({
-            where,
-            orderBy,
-            skip: normalizedOffset,
-            take: normalizedLimit,
-            include: { tags: true },
-        }),
-        prisma.note.count({ where }),
-    ]);
+  const [notes, total] = await Promise.all([
+    prisma.note.findMany({
+      where,
+      orderBy,
+      skip: normalizedOffset,
+      take: normalizedLimit,
+      include: { tags: true },
+    }),
+    prisma.note.count({ where }),
+  ]);
 
-    const items = notes.map(toNoteListItem);
-    const nextOffset = normalizedOffset + items.length;
-    const hasMore = nextOffset < total;
+  const items = notes.map(toNoteListItem);
+  const nextOffset = normalizedOffset + items.length;
+  const hasMore = nextOffset < total;
 
-    return { items, total, hasMore, nextOffset };
+  return { items, total, hasMore, nextOffset };
 }
 
 export async function getNoteById(id: string): Promise<Note | null> {
-    const note = await prisma.note.findUnique({
-        where: { id },
-        include: { tags: true },
-    });
-    if (!note) return null;
-    return toNote(note);
+  const note = await prisma.note.findUnique({
+    where: { id },
+    include: { tags: true },
+  });
+  if (!note) return null;
+  return toNote(note);
 }
 
+const TODO_REGEX = /^\s*[-*+]\s*\[\s\]/m;
+
 export async function createNote({
-    title,
-    content,
-    language,
-    tags,
+  title,
+  content,
+  language,
+  tags,
 }: {
-    title?: string;
-    content?: string;
-    language?: string;
-    tags?: string[];
+  title?: string;
+  content?: string;
+  language?: string;
+  tags?: string[];
 }): Promise<Note> {
-    const now = new Date();
-    validateNoteLengths(title);
+  const now = new Date();
+  validateNoteLengths(title);
 
-    const noteId = await ensureUniqueNoteId();
-    const nextTitle = title || 'Untitled Note';
-    const nextContent = content || '';
-    const nextLanguage = language || 'txt';
+  if (tags && tags.length > MAX_TAGS_PER_ITEM) {
+    throw new Error(`Cannot add more than ${MAX_TAGS_PER_ITEM} tags`);
+  }
 
-    // Validate tag limit
-    if (tags && tags.length > MAX_TAGS_PER_ITEM) {
-        throw new Error(`Cannot add more than ${MAX_TAGS_PER_ITEM} tags`);
-    }
+  const noteId = await ensureUniqueNoteId();
+  const nextTitle = title || 'Untitled Note';
+  const nextContent = content || '';
+  const nextLanguage = language || 'txt';
+  const hasTodos = TODO_REGEX.test(nextContent);
 
-    const note = await prisma.note.create({
-        data: {
-            id: noteId,
-            title: nextTitle,
-            content: nextContent,
-            language: nextLanguage,
-            emoji: getRandomEmoji(),
-            starred: false,
-            private: false,
-            searchVector: buildNoteSearchVector(nextTitle, nextContent),
-            createdAt: now,
-            updatedAt: now,
-            tags: tags ? { connect: tags.map(id => ({ id })) } : undefined,
-        },
-        include: { tags: true },
+  const note = await prisma.$transaction(async (tx) => {
+    const created = await tx.note.create({
+      data: {
+        id: noteId,
+        title: nextTitle,
+        content: nextContent,
+        language: nextLanguage,
+        emoji: getRandomEmoji(),
+        starred: false,
+        private: false,
+        searchVector: buildNoteSearchVector(nextTitle, nextContent),
+        hasTodos,
+        createdAt: now,
+        updatedAt: now,
+        tags: tags ? { connect: mapTagIds(tags) } : undefined,
+      },
+      include: { tags: true },
     });
 
-    return toNote(note);
+    if (tags && tags.length > 0) {
+      await tx.tag.updateMany({
+        where: { id: { in: tags } },
+        data: { usageCount: { increment: 1 } },
+      });
+    }
+
+    return created;
+  });
+
+  return toNote(note);
 }
 
 export async function updateNoteById(
-    id: string,
-    updates: Partial<Pick<Note, 'title' | 'content' | 'language' | 'starred' | 'private'>> & { tags?: string[] }
+  id: string,
+  updates: Partial<Pick<Note, 'title' | 'content' | 'language' | 'starred' | 'private'>> & {
+    tags?: string[];
+  }
 ): Promise<Note | null> {
-    const existing = await prisma.note.findUnique({
-        where: { id },
-        include: { tags: { select: { id: true } } },
-    });
-    if (!existing) return null;
+  const existing = await prisma.note.findUnique({
+    where: { id },
+    include: { tags: { select: { id: true } } },
+  });
+  if (!existing) return null;
 
-    validateNoteLengths(updates.title);
+  validateNoteLengths(updates.title);
 
-    if (updates.tags && updates.tags.length > MAX_TAGS_PER_ITEM) {
-        throw new Error(`Cannot add more than ${MAX_TAGS_PER_ITEM} tags`);
+  if (updates.tags && updates.tags.length > MAX_TAGS_PER_ITEM) {
+    throw new Error(`Cannot add more than ${MAX_TAGS_PER_ITEM} tags`);
+  }
+
+  const now = new Date();
+  const nextTitle = updates.title ?? existing.title;
+  const nextContent = updates.content ?? existing.content;
+  const hasTodos = TODO_REGEX.test(nextContent);
+
+  const note = await prisma.$transaction(async (tx) => {
+    // Calculate tag diff
+    if (updates.tags) {
+      const oldTagIds = existing.tags.map((t) => t.id);
+      const newTagIds = updates.tags!;
+
+      const addedTags = newTagIds.filter((id) => !oldTagIds.includes(id));
+      const removedTags = oldTagIds.filter((id) => !newTagIds.includes(id));
+
+      if (addedTags.length > 0) {
+        await tx.tag.updateMany({
+          where: { id: { in: addedTags } },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
+
+      if (removedTags.length > 0) {
+        await tx.tag.updateMany({
+          where: { id: { in: removedTags } },
+          data: { usageCount: { decrement: 1 } },
+        });
+      }
     }
 
-    const now = new Date();
-    const nextTitle = updates.title ?? existing.title;
-    const nextContent = updates.content ?? existing.content;
-
-    const note = await prisma.note.update({
-        where: { id },
-        data: {
-            title: nextTitle,
-            content: nextContent,
-            language: updates.language ?? existing.language,
-            starred: typeof updates.starred === 'boolean' ? updates.starred : existing.starred,
-            private: typeof updates.private === 'boolean' ? updates.private : existing.private,
-            searchVector: buildNoteSearchVector(nextTitle, nextContent),
-            updatedAt: now,
-            tags: updates.tags ? {
-                set: updates.tags.map(id => ({ id })),
-            } : undefined,
-        },
-        include: { tags: true },
+    const updated = await tx.note.update({
+      where: { id },
+      data: {
+        title: nextTitle,
+        content: nextContent,
+        language: updates.language ?? existing.language,
+        starred: typeof updates.starred === 'boolean' ? updates.starred : existing.starred,
+        private: typeof updates.private === 'boolean' ? updates.private : existing.private,
+        searchVector: buildNoteSearchVector(nextTitle, nextContent),
+        hasTodos,
+        updatedAt: now,
+        tags: updates.tags ? { set: mapTagIds(updates.tags) } : undefined,
+      },
+      include: { tags: true },
     });
 
-    return toNote(note);
+    return updated;
+  });
+
+  return toNote(note);
 }
 
 export async function deleteNoteById(id: string): Promise<boolean> {
-    try {
-        await prisma.note.delete({ where: { id } });
-        return true;
-    } catch (error: unknown) {
-        if (typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2025') {
-            return false;
-        }
-        throw error;
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const note = await tx.note.findUnique({
+        where: { id },
+        include: { tags: { select: { id: true } } },
+      });
+
+      if (!note) return false;
+
+      if (note.tags.length > 0) {
+        await tx.tag.updateMany({
+          where: { id: { in: note.tags.map((t) => t.id) } },
+          data: { usageCount: { decrement: 1 } },
+        });
+      }
+
+      await tx.note.delete({ where: { id } });
+      return true;
+    });
+  } catch (error: unknown) {
+    if (isNotFoundError(error)) {
+      return false;
     }
+    throw error;
+  }
 }

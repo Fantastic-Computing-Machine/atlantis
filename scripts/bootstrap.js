@@ -26,8 +26,7 @@ const autoApplyEnv = process.env.PRISMA_AUTO_APPLY;
 const skipAutoPush = process.env.PRISMA_SKIP_AUTOPUSH === 'true';
 const forceGenerate = process.env.PRISMA_FORCE_GENERATE === 'true';
 const shouldAutoApply =
-  autoApplyEnv === 'true' ||
-  (autoApplyEnv !== 'false' && isDevScript && !isCI && !isProd);
+  autoApplyEnv === 'true' || (autoApplyEnv !== 'false' && isDevScript && !isCI && !isProd);
 const shouldGenerate = forceGenerate || !isProd;
 
 function run(cmd, args, options = {}) {
@@ -45,14 +44,12 @@ function run(cmd, args, options = {}) {
 function ensureDataDir() {
   const url = process.env.DATABASE_URL || process.env.DB_CONNECTION;
   if (!url || !url.startsWith('file:')) return;
-  const filePath = url.replace('file:', '');
+  const filePath = toSqlitePath(url);
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 }
-
-
 
 function createAdapter(url) {
   if (url.startsWith('file:')) {
@@ -123,14 +120,56 @@ async function main() {
     run('npx', ['prisma', 'generate']);
   }
 
-  // Step 3: apply schema to DB in dev (or when explicitly enabled)
-  if (!skipAutoPush && shouldAutoApply) {
+  // Step 3: apply schema to DB
+  // Always push for SQLite if database file is missing or empty (ensures tables exist)
+  // Also push in dev mode or when explicitly enabled
+  const url = ensureDatabaseUrl();
+  const isSqlite = url.startsWith('file:');
+  const sqliteNeedsPush = isSqlite && needsSqliteDbPush(url);
+
+  if (!skipAutoPush && (shouldAutoApply || sqliteNeedsPush)) {
     run('npx', ['prisma', 'db', 'push']);
   }
 
+  // Step 3.5: backfill tag usage counts and note todos (idempotent)
+  // We run this after db push ensures schema exists.
+  if (isSqlite) {
+    run('node', ['scripts/backfill-tag-counts.js']);
+  }
+
   // Step 4: backfill search vectors for legacy rows (idempotent)
-  const url = process.env.DATABASE_URL || process.env.DB_CONNECTION || 'file:./data/atlantis.db';
   await backfillSearchVectors(url);
+}
+
+/**
+ * Check if SQLite database needs a push (missing or very small file = no tables)
+ */
+function needsSqliteDbPush(url) {
+  const filePath = toSqlitePath(url);
+  try {
+    const stats = fs.statSync(filePath);
+    // SQLite header is 100 bytes; an empty schema db is typically ~12KB+
+    // If file is tiny or missing, we need to push
+    return stats.size < 1000;
+  } catch {
+    // File doesn't exist
+    return true;
+  }
+}
+
+function toSqlitePath(url) {
+  const withoutPrefix = url.replace(/^file:/, '');
+  const withoutQuery = withoutPrefix.split('?')[0].split('#')[0];
+  return path.resolve(root, withoutQuery);
+}
+
+function ensureDatabaseUrl() {
+  const existing = process.env.DATABASE_URL || process.env.DB_CONNECTION;
+  if (existing) return existing;
+  const fallback = 'file:./data/atlantis.db';
+  process.env.DATABASE_URL = fallback;
+  ensureDataDir();
+  return fallback;
 }
 
 main().catch((err) => {
