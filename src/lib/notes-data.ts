@@ -101,19 +101,17 @@ export async function getNotePage({
     where.tags = { some: { slug: tagSlug } };
   }
 
-  let orderBy: Prisma.NoteOrderByWithRelationInput;
-  switch (sort) {
-    case 'old':
-      orderBy = { updatedAt: 'asc' };
-      break;
-    case 'alphabetical':
-      orderBy = { title: 'asc' };
-      break;
-    case 'recent':
-    default:
-      orderBy = { updatedAt: 'desc' };
-      break;
-  }
+  const orderBy: Prisma.NoteOrderByWithRelationInput = (() => {
+    switch (sort) {
+      case 'old':
+        return { updatedAt: 'asc' };
+      case 'alphabetical':
+        return { title: 'asc' };
+      case 'recent':
+      default:
+        return { updatedAt: 'desc' };
+    }
+  })();
 
   const [notes, total] = await Promise.all([
     prisma.note.findMany({

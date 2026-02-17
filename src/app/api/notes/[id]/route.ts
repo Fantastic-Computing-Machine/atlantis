@@ -26,6 +26,8 @@ const maskPrivateNote = (note: Note) => ({
   language: note.language,
   starred: note.starred,
   private: note.private,
+  emoji: note.emoji,
+  tags: note.tags,
   createdAt: note.createdAt,
   updatedAt: note.updatedAt,
 });

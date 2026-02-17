@@ -268,23 +268,16 @@ export async function updateDiagramById(
     });
 
     if (updates.tags) {
-      // oldTags was unused. Removed.
-      // Wait, getDiagramById selects tags. But here we used prisma.diagram.findUnique({ where: { id } }) at start of function (line 245).
-      // Line 245: const existing = await prisma.diagram.findUnique({ where: { id } });
-      // This DOES NOT include tags! Default select only scalar fields.
-      // I must fetch tags for existing diagram to calc diff.
-      // So I should fetch tags inside the transaction or update line 245.
-      // Updating line 245 is safer but I can also fetch here.
-
+      // Fetch current tags to calculate diff
       const currentDiagram = await tx.diagram.findUnique({
         where: { id },
-        select: { tags: { select: { id: true } } }
+        select: { tags: { select: { id: true } } },
       });
-      const oldTagIds = currentDiagram?.tags.map(t => t.id) || [];
+      const oldTagIds = currentDiagram?.tags.map((t) => t.id) || [];
       const newTagIds = updates.tags!;
 
-      const addedTags = newTagIds.filter(id => !oldTagIds.includes(id));
-      const removedTags = oldTagIds.filter(id => !newTagIds.includes(id));
+      const addedTags = newTagIds.filter((id) => !oldTagIds.includes(id));
+      const removedTags = oldTagIds.filter((id) => !newTagIds.includes(id));
 
       if (addedTags.length > 0) {
         await tx.tag.updateMany({

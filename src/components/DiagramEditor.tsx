@@ -96,7 +96,8 @@ const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\
 
 type NodeOption = { id: string; label?: string };
 
-const EDGE_RE = /((?:--!?>)|\s---\s|-\.-?>|==>|<--|<---|<-\.-?|<==|--\s*[^-]+\s*(?:--!?>)|==\s*[^=]+\s*==>)/;
+const EDGE_RE =
+  /((?:--!?>)|\s---\s|-\.-?>|==>|<--|<---|<-\.-?|<==|--\s*[^-]+\s*(?:--!?>)|==\s*[^=]+\s*==>)/;
 const DIRECTIVE_RE = /^\s*(flowchart|graph|style|classDef|class|linkStyle|subgraph|end|click)\b/i;
 
 const extractMermaidNodes = (src: string): NodeOption[] => {
@@ -126,8 +127,9 @@ const extractMermaidNodes = (src: string): NodeOption[] => {
     if (EDGE_RE.test(line)) {
       const sanitized = line
         .replace(/\s*--\s*[^-]+?\s*(?:--!?>)\s*/g, ' --> ')
-        .replace(/\s*==\s*[^=]+?\s*==>\s*/g, ' ==> ');
-      const parts = sanitized.split(/\s+(?:--!?>|==>|---|-\.-?>|<--|<==)\s+/);
+        .replace(/\s*==\s*[^=]+?\s*==>\s*/g, ' ==> ')
+        .replace(/\s*-\.\s*[^-]+?\s*(?:-\.-?>)\s*/g, ' -.-> ');
+      const parts = sanitized.split(/\s+(?:--!?>|==>|---|-\.-?>|<--|<---|<-\.-?|<==)\s+/);
       parts.forEach((part) => {
         const idMatch = part.trim().match(/^[A-Za-z0-9_][A-Za-z0-9_:-]*/);
         if (idMatch) ensureNode(idMatch[0]);
@@ -502,7 +504,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     // Skip initial mount or if no changes
     if (JSON.stringify(tags) === JSON.stringify(lastSavedTagsRef.current)) return;
 
-    // If we are viewing a past checkpoint, we shouldn't save tags either (or maybe we should? tags are global). 
+    // If we are viewing a past checkpoint, we shouldn't save tags either (or maybe we should? tags are global).
     // Logic above says "Don't save when viewing a past checkpoint". Following that rule.
     if (viewingCheckpointId !== null) return;
 

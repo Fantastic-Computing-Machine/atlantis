@@ -8,13 +8,15 @@ type TagRouteParams = {
   params: Promise<{ id: string }>;
 };
 
-const updateTagSchema = z.object({
-  name: z.string().min(1).max(50).optional(),
-  color: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/)
-    .optional(),
-});
+const updateTagSchema = z
+  .object({
+    name: z.string().min(1).max(50).optional(),
+    color: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .optional(),
+  })
+  .strict();
 
 const slugify = (value: string) =>
   value
@@ -60,7 +62,7 @@ export async function PATCH(request: Request, { params }: TagRouteParams) {
 
     if (name !== undefined) {
       const slug = slugify(name);
-      
+
       // Reject empty slugs
       if (!slug) {
         return NextResponse.json(
@@ -73,12 +75,8 @@ export async function PATCH(request: Request, { params }: TagRouteParams) {
       updateData.slug = slug;
     }
 
-    // Ensure at least one field is being updated
     if (Object.keys(updateData).length === 0) {
-      return NextResponse.json(
-        { error: 'No valid fields to update' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
     }
 
     const tag = await prisma.tag.update({
