@@ -25,7 +25,7 @@ docker run -d \
 
 ### Quick Run (No Persistence)
 
-Perfect for testing:
+Perfect for testing (data is ephemeral):
 
 ```bash
 docker run -p 3000:3000 strikead/atlantis:latest
@@ -136,6 +136,8 @@ PORT=8080 ATLANTIS_DATA_DIR=./my-data docker compose up -d
 | `PRISMA_AUTO_APPLY`              | `true` (non-prod), `false` (prod) | Auto-runs `prisma db push` on server start to ensure schema exists. |
 | `PRISMA_SKIP_AUTOPUSH`           | `false`                           | Set to `true` to skip all db push/seed operations.                  |
 | `ENABLE_API_ACCESS`              | `false`                           | Set to `true` to enable the REST API and /docs.                     |
+| `GEMINI_MODEL`                   | `gemini-2.5-flash`                | Override default Gemini model when using Gemini provider.           |
+| `ATLANTIS_DATA_DIR`              | `./data`                          | Host bind mount for data when using provided compose files.         |
 
 ## Versioning
 

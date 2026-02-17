@@ -6,7 +6,7 @@ Thank you for your interest in contributing to atlantis! This document provides 
 
 ### Prerequisites
 
-- Node.js 20.x or later
+- Node.js 18.18+ (match Next.js 16 support)
 - npm 10.x or later
 - Git
 - **LaTeX distribution** (optional, for LaTeX note compilation)
@@ -110,11 +110,9 @@ sudo pacman -S texlive-full
 4. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
 ## Tech Stack
 
-- Framework: [Next.js 14+](https://nextjs.org/) (App Router)
+- Framework: [Next.js 16](https://nextjs.org/) (App Router)
 - Styling: [Tailwind CSS](https://tailwindcss.com/)
 - Components: [Shadcn UI](https://ui.shadcn.com/)
 - Icons: [Lucide React](https://lucide.dev/)
@@ -149,7 +147,7 @@ Use descriptive branch names:
    npm run lint
    ```
 
-4. Build to verify everything compiles
+4. Build to verify everything compiles (runs bootstrap + Next build)
 
    ```bash
    npm run build
@@ -291,10 +289,10 @@ Atlantis provides two Docker Compose configurations for different use cases:
 
 ### Compose Configurations
 
-| File | Description | When to Use |
-|------|-------------|-------------|
-| `docker-compose.yml` | Full stack with Redis | Production, testing caching behavior |
-| `docker-compose.simple.yml` | Standalone (no Redis) | Quick testing, simpler setups |
+| File                        | Description           | When to Use                          |
+| --------------------------- | --------------------- | ------------------------------------ |
+| `docker-compose.yml`        | Full stack with Redis | Production, testing caching behavior |
+| `docker-compose.simple.yml` | Standalone (no Redis) | Quick testing, simpler setups        |
 
 ### Running with Docker Compose
 
