@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useDiagramStore } from '@/lib/store';
 import Link from 'next/link';
 import { useEffect } from 'react';
-import { Settings2, Keyboard, BookOpen, Github } from 'lucide-react';
+import { Settings2, Keyboard, BookOpen, Github, Menu } from 'lucide-react';
 import { GlobalSearchDialog } from '@/components/GlobalSearchDialog';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { useKeyboardShortcuts } from '@/lib/use-keyboard-shortcuts';
@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu } from 'lucide-react';
+
 
 interface DashboardHeaderProps {
   enableApiAccess?: boolean;
@@ -47,16 +47,16 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
   }, [setHasAiApiKey, setAiProvider]);
 
   return (
-    <header className="bg-background/80 sticky top-0 z-50 shrink-0 border-b backdrop-blur-sm">
-      <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
-        <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
+    <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm shrink-0">
+      <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <span className="text-2xl" role="img" aria-label="atlantis logo">
             🔱
           </span>
-          <h1 className="hidden text-xl font-bold sm:block">atlantis</h1>
+          <h1 className="text-xl font-bold hidden sm:block">atlantis</h1>
         </Link>
 
-        <div className="flex max-w-md flex-1 justify-center">
+        <div className="flex-1 max-w-md flex justify-center">
           <GlobalSearchDialog />
         </div>
 
@@ -70,7 +70,7 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
                 onClick={() => setPaletteOpen(true)}
                 aria-label="Keyboard shortcuts"
               >
-                <Keyboard className="text-muted-foreground h-4 w-4" />
+                <Keyboard className="lucide lucide-keyboard h-4 w-4 text-muted-foreground" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
@@ -83,13 +83,27 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
             </TooltipContent>
           </Tooltip>
 
-          <div className="hidden items-center gap-2 lg:flex">
-            <Button asChild variant="ghost">
-              <Link href="/diagram">Diagrams</Link>
-            </Button>
-            <Button asChild variant="ghost">
-              <Link href="/notes">Notes</Link>
-            </Button>
+          <div className="hidden lg:flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="gap-1">
+                  Resources
+                  <Menu className="h-4 w-4 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/diagram">Diagrams (Mermaid)</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/notes">Notes</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/canvas">Drawings (Canvas)</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button asChild variant="ghost">
               <Link href="/tags">Tags</Link>
             </Button>
@@ -124,6 +138,9 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
                     <Link href="/docs">Docs</Link>
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem asChild>
+                  <Link href="/canvas">Canvases</Link>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

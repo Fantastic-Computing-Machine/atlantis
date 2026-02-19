@@ -46,6 +46,25 @@ export interface Note {
   tags?: Tag[];
 }
 
+export interface Canvas {
+  id: string;
+  title: string;
+  content: string;
+  preview?: string | null;
+  emoji: string;
+  isFavorite: boolean;
+  createdAt: string;
+  updatedAt: string;
+  tags?: Tag[];
+}
+
+export interface CanvasPage {
+  items: Omit<Canvas, 'content'>[];
+  total: number;
+  hasMore: boolean;
+  nextOffset: number;
+}
+
 export type NoteSortOption = 'recent' | 'old' | 'alphabetical';
 
 export interface NotePage {

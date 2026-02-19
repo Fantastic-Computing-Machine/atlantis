@@ -730,6 +730,7 @@ export function DiagramGrid({
         open={isSearchOpen}
         onOpenChange={setIsSearchOpen}
         initialDiagrams={diagrams}
+        hideTrigger
       />
 
 

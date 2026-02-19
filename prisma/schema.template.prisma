@@ -21,6 +21,7 @@ model Tag {
   
   notes          Note[]
   diagrams       Diagram[]
+  canvases       Canvas[]
   
   @@index([slug])
 }
@@ -77,5 +78,20 @@ model Note {
   @@index([hasTodos], map: "note_hasTodos_idx")
   @@NOTE_INDEX@@
   @@index([starred], map: "note_starred_idx")
+}
+
+model Canvas {
+  id        String   @id
+  content   String // JSON string for tldraw state
+  preview   String? // SVG/PNG data URI for preview
+  title     String
+  emoji     String
+  isFavorite Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  tags      Tag[]
+
+  @@index([updatedAt], map: "canvas_updatedAt_idx")
 }
 

@@ -1,6 +1,7 @@
 import { prisma } from './prisma';
 import { getDiagramPage } from './data';
 import { getNotePage } from './notes-data';
+import { getCanvasPage } from './canvas-data';
 
 export async function getHomePageData() {
     const [
@@ -14,8 +15,10 @@ export async function getHomePageData() {
         knowledgeStats,
         starredDiagrams,
         starredNotesRaw,
+        starredCanvases,
         recentDiagrams,
         recentNotesRaw,
+        recentCanvases,
     ] = await Promise.all([
         getDashboardStats(),
         getTopTags(6),
@@ -27,8 +30,10 @@ export async function getHomePageData() {
         getKnowledgeStats(),
         getDiagramPage({ limit: 4, favoritesOnly: true }),
         getNotePage({ limit: 4, starredOnly: true }),
+        getCanvasPage({ limit: 4, favoritesOnly: true }),
         getDiagramPage({ limit: 8, sort: 'recent' }),
         getNotePage({ limit: 10, sort: 'recent' }),
+        getCanvasPage({ limit: 8, sort: 'recent' }),
     ]);
 
     return {
@@ -42,8 +47,10 @@ export async function getHomePageData() {
         knowledgeStats,
         starredDiagrams,
         starredNotesRaw,
+        starredCanvases,
         recentDiagrams,
         recentNotesRaw,
+        recentCanvases,
     };
 }
 
@@ -51,6 +58,7 @@ export interface DashboardStats {
     totalDiagrams: number;
     totalNotes: number;
     totalTags: number;
+    totalCanvases: number;
     starredItems: number;
 }
 
@@ -77,7 +85,7 @@ export interface ActivityItem {
     id: string;
     title: string;
     emoji: string;
-    type: 'diagram' | 'note';
+    type: 'diagram' | 'note' | 'canvas';
     updatedAt: string;
 }
 
@@ -85,7 +93,7 @@ export interface StaleItem {
     id: string;
     title: string;
     emoji: string;
-    type: 'diagram' | 'note';
+    type: 'diagram' | 'note' | 'canvas';
     daysSinceUpdate: number;
 }
 
@@ -101,7 +109,7 @@ export interface KnowledgeStats {
 type DbItem = { id: string; title: string; emoji: string; updatedAt: Date };
 
 // Helper to convert DB items to ActivityItem format
-function toActivityItem(item: DbItem, type: 'diagram' | 'note'): ActivityItem {
+function toActivityItem(item: DbItem, type: 'diagram' | 'note' | 'canvas'): ActivityItem {
     return {
         id: item.id,
         title: item.title,
@@ -112,7 +120,7 @@ function toActivityItem(item: DbItem, type: 'diagram' | 'note'): ActivityItem {
 }
 
 // Helper to convert DB items to StaleItem format
-function toStaleItem(item: DbItem, type: 'diagram' | 'note'): StaleItem {
+function toStaleItem(item: DbItem, type: 'diagram' | 'note' | 'canvas'): StaleItem {
     const now = new Date();
     const days = Math.floor((now.getTime() - item.updatedAt.getTime()) / (1000 * 60 * 60 * 24));
     return {
@@ -128,19 +136,22 @@ function toStaleItem(item: DbItem, type: 'diagram' | 'note'): StaleItem {
  * Get aggregated dashboard stats (counts).
  */
 export async function getDashboardStats(): Promise<DashboardStats> {
-    const [totalDiagrams, totalNotes, totalTags, starredDiagrams, starredNotes] = await Promise.all([
+    const [totalDiagrams, totalNotes, totalTags, totalCanvases, starredDiagrams, starredNotes, starredCanvases] = await Promise.all([
         prisma.diagram.count(),
         prisma.note.count(),
         prisma.tag.count(),
+        prisma.canvas.count(),
         prisma.diagram.count({ where: { isFavorite: true } }),
         prisma.note.count({ where: { starred: true } }),
+        prisma.canvas.count({ where: { isFavorite: true } }),
     ]);
 
     return {
         totalDiagrams,
         totalNotes,
         totalTags,
-        starredItems: starredDiagrams + starredNotes,
+        totalCanvases,
+        starredItems: starredDiagrams + starredNotes + starredCanvases,
     };
 }
 
@@ -221,7 +232,7 @@ export async function getRecentTodos(limit = 5): Promise<TodoItem[]> {
  * Get recent activity (items edited today or recently).
  */
 export async function getRecentActivity(limit = 5): Promise<ActivityItem[]> {
-    const [diagrams, notes] = await Promise.all([
+    const [diagrams, notes, canvases] = await Promise.all([
         prisma.diagram.findMany({
             orderBy: { updatedAt: 'desc' },
             take: limit,
@@ -232,11 +243,17 @@ export async function getRecentActivity(limit = 5): Promise<ActivityItem[]> {
             take: limit,
             select: { id: true, title: true, emoji: true, updatedAt: true },
         }),
+        prisma.canvas.findMany({
+            orderBy: { updatedAt: 'desc' },
+            take: limit,
+            select: { id: true, title: true, emoji: true, updatedAt: true },
+        }),
     ]);
 
     const combined: ActivityItem[] = [
         ...diagrams.map((d) => toActivityItem(d, 'diagram')),
         ...notes.map((n) => toActivityItem(n, 'note')),
+        ...canvases.map((c) => toActivityItem(c, 'canvas')),
     ];
 
     return combined
@@ -251,7 +268,7 @@ export async function getStaleContent(daysThreshold = 30, limit = 3): Promise<St
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysThreshold);
 
-    const [diagrams, notes] = await Promise.all([
+    const [diagrams, notes, canvases] = await Promise.all([
         prisma.diagram.findMany({
             where: { updatedAt: { lt: cutoffDate } },
             orderBy: { updatedAt: 'asc' },
@@ -264,11 +281,18 @@ export async function getStaleContent(daysThreshold = 30, limit = 3): Promise<St
             take: limit,
             select: { id: true, title: true, emoji: true, updatedAt: true },
         }),
+        prisma.canvas.findMany({
+            where: { updatedAt: { lt: cutoffDate } },
+            orderBy: { updatedAt: 'asc' },
+            take: limit,
+            select: { id: true, title: true, emoji: true, updatedAt: true },
+        }),
     ]);
 
     const combined: StaleItem[] = [
         ...diagrams.map((d) => toStaleItem(d, 'diagram')),
         ...notes.map((n) => toStaleItem(n, 'note')),
+        ...canvases.map((c) => toStaleItem(c, 'canvas')),
     ];
 
     return combined
@@ -282,11 +306,14 @@ export async function getStaleContent(daysThreshold = 30, limit = 3): Promise<St
  */
 export async function getRandomRediscovery(limit = 2): Promise<ActivityItem[]> {
     // Fetch all IDs with minimal data for random sampling
-    const [diagrams, notes] = await Promise.all([
+    const [diagrams, notes, canvases] = await Promise.all([
         prisma.diagram.findMany({
             select: { id: true, title: true, emoji: true, updatedAt: true },
         }),
         prisma.note.findMany({
+            select: { id: true, title: true, emoji: true, updatedAt: true },
+        }),
+        prisma.canvas.findMany({
             select: { id: true, title: true, emoji: true, updatedAt: true },
         }),
     ]);
@@ -294,6 +321,7 @@ export async function getRandomRediscovery(limit = 2): Promise<ActivityItem[]> {
     const items: ActivityItem[] = [
         ...diagrams.map((d) => toActivityItem(d, 'diagram')),
         ...notes.map((n) => toActivityItem(n, 'note')),
+        ...canvases.map((c) => toActivityItem(c, 'canvas')),
     ];
 
     // Fisher-Yates shuffle for unbiased random ordering
@@ -316,8 +344,11 @@ export async function getKnowledgeStats(): Promise<KnowledgeStats> {
         newestDiagram,
         oldestNote,
         newestNote,
+        oldestCanvas,
+        newestCanvas,
         diagramCount,
         noteCount,
+        canvasCount,
     ] = await Promise.all([
         prisma.content.count(),
         prisma.diagram.aggregate({ _avg: { totalVersions: true } }),
@@ -325,13 +356,16 @@ export async function getKnowledgeStats(): Promise<KnowledgeStats> {
         prisma.diagram.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
         prisma.note.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
         prisma.note.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
+        prisma.canvas.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
+        prisma.canvas.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
         prisma.diagram.count(),
         prisma.note.count(),
+        prisma.canvas.count(),
     ]);
 
     // Find the true oldest and newest across both diagrams and notes
-    const oldestDates = [oldestDiagram?.createdAt, oldestNote?.createdAt].filter(Boolean) as Date[];
-    const newestDates = [newestDiagram?.createdAt, newestNote?.createdAt].filter(Boolean) as Date[];
+    const oldestDates = [oldestDiagram?.createdAt, oldestNote?.createdAt, oldestCanvas?.createdAt].filter(Boolean) as Date[];
+    const newestDates = [newestDiagram?.createdAt, newestNote?.createdAt, newestCanvas?.createdAt].filter(Boolean) as Date[];
 
     const oldest = oldestDates.length > 0 ? new Date(Math.min(...oldestDates.map(d => d.getTime()))) : null;
     const newest = newestDates.length > 0 ? new Date(Math.max(...newestDates.map(d => d.getTime()))) : null;
@@ -341,7 +375,7 @@ export async function getKnowledgeStats(): Promise<KnowledgeStats> {
         avgVersionsPerDiagram: Math.round((diagramStats._avg.totalVersions || 0) * 10) / 10,
         oldestItemDate: oldest?.toISOString() || null,
         newestItemDate: newest?.toISOString() || null,
-        totalContentItems: diagramCount + noteCount,
+        totalContentItems: diagramCount + noteCount + canvasCount,
     };
 }
 

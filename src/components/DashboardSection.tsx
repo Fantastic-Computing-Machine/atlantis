@@ -2,15 +2,15 @@
 
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { Diagram, Note } from '@/lib/types';
+import { Diagram, Note, Canvas } from '@/lib/types';
 import { DashboardCard, EmptySectionPlaceholder } from './DashboardCards';
 
 interface DashboardSectionProps {
-    items: (Diagram | Omit<Note, 'content'>)[];
+    items: (Diagram | Omit<Note, 'content'> | Omit<Canvas, 'content'>)[];
     title: string;
     icon: React.ReactNode;
     viewAllHref: string;
-    type: 'diagram' | 'note';
+    type: 'diagram' | 'note' | 'canvas';
     emptyState: {
         icon: React.ReactNode;
         title: string;

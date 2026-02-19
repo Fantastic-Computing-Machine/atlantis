@@ -81,6 +81,11 @@ Default storage: SQLite at `data/atlantis.db` (override with `PRISMA_PROVIDER` +
 - Restore: Settings → Restore accepts validated backup JSON.
 - Checkpoints: Editor keeps up to 15 recent checkpoints per diagram.
 
+## Acknowledgments
+
+- [Mermaid.js](https://mermaid.js.org/) for the diagramming capabilities.
+- [tldraw](https://tldraw.com/) for the infinite canvas drawing experience.
+
 ## Support
 
 If you find this project useful, you can support its development:

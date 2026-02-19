@@ -28,7 +28,7 @@ import { toast } from 'sonner';
 interface DashboardCardMenuProps {
     id: string;
     title: string;
-    type: 'diagram' | 'note';
+    type: 'diagram' | 'note' | 'canvas';
     isStarred: boolean;
 }
 
@@ -46,8 +46,19 @@ export function DashboardCardMenu({ id, title, type, isStarred }: DashboardCardM
 
         try {
             const csrfToken = await ensureCsrfToken();
-            const url = type === 'diagram' ? `/api/diagrams/${id}` : `/api/notes/${id}`;
-            const body = type === 'diagram' ? { isFavorite: newStarred } : { starred: newStarred };
+            let url = '';
+            let body = {};
+
+            if (type === 'diagram') {
+                url = `/api/diagrams/${id}`;
+                body = { isFavorite: newStarred };
+            } else if (type === 'note') {
+                url = `/api/notes/${id}`;
+                body = { starred: newStarred };
+            } else {
+                url = `/api/canvases/${id}`;
+                body = { isFavorite: newStarred };
+            }
 
             const res = await fetch(url, {
                 method: 'PUT',
@@ -70,7 +81,14 @@ export function DashboardCardMenu({ id, title, type, isStarred }: DashboardCardM
     const handleDelete = async () => {
         try {
             const csrfToken = await ensureCsrfToken();
-            const url = type === 'diagram' ? `/api/diagrams/${id}` : `/api/notes/${id}`;
+            let url = '';
+            if (type === 'diagram') {
+                url = `/api/diagrams/${id}`;
+            } else if (type === 'note') {
+                url = `/api/notes/${id}`;
+            } else {
+                url = `/api/canvases/${id}`;
+            }
 
             const res = await fetch(url, {
                 method: 'DELETE',
@@ -80,7 +98,7 @@ export function DashboardCardMenu({ id, title, type, isStarred }: DashboardCardM
             });
 
             if (!res.ok) throw new Error('Failed to delete');
-            toast.success(`${type === 'diagram' ? 'Diagram' : 'Note'} deleted`);
+            toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} deleted`);
             router.refresh();
         } catch (error) {
             console.error('DashboardCardMenu: Failed to delete item:', error);
@@ -92,7 +110,14 @@ export function DashboardCardMenu({ id, title, type, isStarred }: DashboardCardM
     const handleShare = async (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        const path = type === 'diagram' ? `/diagram/${id}` : `/notes/${id}`;
+        let path = '';
+        if (type === 'diagram') {
+            path = `/diagram/${id}`;
+        } else if (type === 'note') {
+            path = `/notes/${id}`;
+        } else {
+            path = `/canvas/${id}`;
+        }
         const url = `${window.location.origin}${path}`;
         const success = await copyToClipboard(url);
         if (success) {
@@ -125,6 +150,9 @@ export function DashboardCardMenu({ id, title, type, isStarred }: DashboardCardM
                 console.error('DashboardCardMenu: Failed to download:', error);
                 toast.error('Failed to download');
             }
+        } else if (type === 'canvas') {
+            // For canvas, navigate to editor for now
+            window.open(`/canvas/${id}`, '_blank');
         } else {
             // For diagrams, navigate to the diagram page where full download options exist
             window.open(`/diagram/${id}`, '_blank');

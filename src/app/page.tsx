@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Star, FileText, PenSquare } from 'lucide-react';
+import { Star, FileText, PenSquare, PenTool } from 'lucide-react';
 import { getHomePageData } from '@/lib/dashboard-data';
 import { Button } from '@/components/ui/button';
 import { DashboardHeader } from '@/components/DashboardHeader';
@@ -25,8 +25,16 @@ export default async function Page() {
     items: data.recentNotesRaw.items.filter((n) => !n.private).slice(0, 8),
   };
 
-  const hasStarred = data.starredDiagrams.items.length > 0 || starredNotes.items.length > 0;
-  const hasRecent = data.recentDiagrams.items.length > 0 || recentNotes.items.length > 0;
+  const hasStarred =
+    data.starredDiagrams.items.length > 0 ||
+    starredNotes.items.length > 0 ||
+    data.starredCanvases.items.length > 0;
+
+  const hasRecent =
+    data.recentDiagrams.items.length > 0 ||
+    recentNotes.items.length > 0 ||
+    data.recentCanvases.items.length > 0;
+
   const isCompletelyEmpty = !hasStarred && !hasRecent;
 
   return (
@@ -54,6 +62,11 @@ export default async function Page() {
                       <PenSquare className="h-4 w-4" />
                     </Link>
                   </Button>
+                  <Button size="icon" className="h-8 w-8" asChild>
+                    <Link href="/canvas/new" aria-label="New Canvas">
+                      <PenTool className="h-4 w-4" />
+                    </Link>
+                  </Button>
                   <Button size="icon" variant="outline" className="h-8 w-8" asChild>
                     <Link href="/notes" aria-label="New Note">
                       <FileText className="h-4 w-4" />
@@ -77,12 +90,15 @@ export default async function Page() {
                   <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
                   Starred <span className="opacity-50">{'//'}</span>{' '}
                   <span className="text-foreground">
-                    {data.starredDiagrams.items.length + starredNotes.items.length}
+                    {data.starredDiagrams.items.length + starredNotes.items.length + data.starredCanvases.items.length}
                   </span>
                 </h3>
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
                   {data.starredDiagrams.items.map((d) => (
                     <CompactCard key={`d-${d.id}`} type="diagram" item={d} />
+                  ))}
+                  {data.starredCanvases.items.map((c) => (
+                    <CompactCard key={`c-${c.id}`} type="canvas" item={c} />
                   ))}
                   {starredNotes.items.map((n) => (
                     <CompactCard key={`n-${n.id}`} type="note" item={n} />
@@ -95,6 +111,22 @@ export default async function Page() {
             <div className="grid gap-6 lg:grid-cols-3">
               {/* Left: Recent Items */}
               <div className="lg:col-span-2 space-y-6">
+                {/* Canvases */}
+                <DashboardSection
+                  title="Canvases"
+                  icon={<PenTool className="h-3.5 w-3.5" />}
+                  viewAllHref="/canvas"
+                  type="canvas"
+                  items={data.recentCanvases.items}
+                  emptyState={{
+                    icon: <PenTool className="h-4 w-4" />,
+                    title: 'No canvases yet',
+                    description: 'Start a freeform sketch.',
+                    ctaHref: '/canvas',
+                    ctaLabel: 'Create canvas',
+                  }}
+                />
+
                 {/* Diagrams */}
                 <DashboardSection
                   title="Diagrams"
@@ -105,7 +137,7 @@ export default async function Page() {
                   emptyState={{
                     icon: <PenSquare className="h-4 w-4" />,
                     title: 'No diagrams yet',
-                    description: 'Spin up a canvas to start.',
+                    description: 'Spin up a structured diagram.',
                     ctaHref: '/diagram',
                     ctaLabel: 'Create diagram',
                   }}

@@ -18,6 +18,10 @@
     {
       "name": "Notes",
       "description": "See and manage your notes"
+    },
+    {
+      "name": "Canvases",
+      "description": "See and manage your drawing canvases"
     }
   ],
   "paths": {
@@ -254,6 +258,127 @@
           }
         }
       }
+    },
+    "/api/access/canvases": {
+      "get": {
+        "tags": [
+          "Canvases"
+        ],
+        "summary": "List all canvases",
+        "description": "Retrieve a paginated list of all canvases. Content is omitted from the list for performance. Requires `ENABLE_API_ACCESS=true`.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number to retrieve"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            },
+            "description": "Number of items per page"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of canvases",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanvasList"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "API Access Disabled"
+          }
+        }
+      }
+    },
+    "/api/access/canvases/{id}": {
+      "get": {
+        "tags": [
+          "Canvases"
+        ],
+        "summary": "Get a single canvas",
+        "description": "Retrieve the full details of a specific canvas by ID. Requires `ENABLE_API_ACCESS=true`.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique ID of the canvas"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The canvas details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Canvas"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Canvas not found"
+          },
+          "403": {
+            "description": "API Access Disabled"
+          }
+        }
+      }
+    },
+    "/api/access/canvases/{id}/image": {
+      "get": {
+        "tags": [
+          "Canvases"
+        ],
+        "summary": "Get canvas preview image",
+        "description": "Retrieve the SVG preview image of a canvas. Returns raw SVG content. Requires `ENABLE_API_ACCESS=true`.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The unique ID of the canvas"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SVG Image",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Canvas or preview not found"
+          },
+          "403": {
+            "description": "API Access Disabled"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -405,6 +530,79 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Note"
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              },
+              "totalPages": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "Canvas": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "abc123canvas"
+          },
+          "title": {
+            "type": "string",
+            "example": "My Awesome Drawing"
+          },
+          "emoji": {
+            "type": "string",
+            "example": "🎨"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CanvasList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Canvas"
             }
           },
           "pagination": {

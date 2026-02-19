@@ -6,18 +6,29 @@ import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/com
 import { DashboardCardMenu } from '@/components/DashboardCardMenu';
 import { TagBadge } from '@/components/TagBadge';
 import { formatDate, cn } from '@/lib/utils';
-import { Diagram, Note } from '@/lib/types';
+import { Diagram, Note, Canvas } from '@/lib/types';
 import { ArrowRight } from 'lucide-react';
 
 export function CompactCard({
     type,
     item,
 }: {
-    type: 'diagram' | 'note';
-    item: Diagram | Omit<Note, 'content'>;
+    type: 'diagram' | 'note' | 'canvas';
+    item: Diagram | Omit<Note, 'content'> | Omit<Canvas, 'content'>;
 }) {
-    const href = type === 'diagram' ? `/diagram/${item.id}` : `/notes/${item.id}`;
-    const icon = item.emoji || (type === 'diagram' ? '📊' : '📝');
+    let href = '';
+    let icon = item.emoji;
+
+    if (type === 'diagram') {
+        href = `/diagram/${item.id}`;
+        icon = icon || '📊';
+    } else if (type === 'note') {
+        href = `/notes/${item.id}`;
+        icon = icon || '📝';
+    } else {
+        href = `/canvas/${item.id}`;
+        icon = icon || '🎨';
+    }
 
     return (
         <Link
@@ -34,14 +45,41 @@ export function DashboardCard({
     type,
     item,
 }: {
-    type: 'diagram' | 'note';
-    item: Diagram | Omit<Note, 'content'>;
+    type: 'diagram' | 'note' | 'canvas';
+    item: Diagram | Omit<Note, 'content'> | Omit<Canvas, 'content'>;
 }) {
-    const href = type === 'diagram' ? `/diagram/${item.id}` : `/notes/${item.id}`;
-    const icon = item.emoji || (type === 'diagram' ? '📊' : '📝');
-    const description = type === 'diagram' ? (item as Diagram).description : (item as Note).language;
-    const badgeLabel = type === 'diagram' ? 'Diagram' : 'Note';
-    const isStarred = type === 'diagram' ? (item as Diagram).isFavorite : (item as Omit<Note, 'content'>).starred;
+    let href = '';
+    let icon = item.emoji;
+    let description = '';
+    let badgeLabel = '';
+    let isStarred = false;
+    let badgeClass = '';
+
+    if (type === 'diagram') {
+        const d = item as Diagram;
+        href = `/diagram/${d.id}`;
+        icon = icon || '📊';
+        description = d.description || 'No description';
+        badgeLabel = 'Diagram';
+        isStarred = d.isFavorite;
+        badgeClass = 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
+    } else if (type === 'note') {
+        const n = item as Omit<Note, 'content'>;
+        href = `/notes/${n.id}`;
+        icon = icon || '📝';
+        description = `Language // ${n.language}`;
+        badgeLabel = 'Note';
+        isStarred = n.starred;
+        badgeClass = 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300';
+    } else {
+        const c = item as Omit<Canvas, 'content'>;
+        href = `/canvas/${c.id}`;
+        icon = icon || '🎨';
+        description = 'Freeform Canvas';
+        badgeLabel = 'Canvas';
+        isStarred = c.isFavorite;
+        badgeClass = 'border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-900/20 dark:text-purple-300';
+    }
 
     return (
         <Card className="relative h-full overflow-hidden flex flex-col">
@@ -59,9 +97,7 @@ export function DashboardCard({
                                 <span
                                     className={cn(
                                         'shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
-                                        type === 'diagram'
-                                            ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300'
-                                            : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300'
+                                        badgeClass
                                     )}
                                 >
                                     {badgeLabel}
@@ -85,7 +121,7 @@ export function DashboardCard({
             </CardHeader>
             <CardContent className="p-3 pt-0 space-y-2 flex-1 relative z-10 pointer-events-none">
                 <p className="text-muted-foreground line-clamp-1 text-xs">
-                    {type === 'diagram' ? description || 'No description' : `Language // ${description}`}
+                    {description}
                 </p>
                 {item.tags && item.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 pointer-events-auto">
