@@ -96,6 +96,7 @@ export async function getDiagramPage({
   sort = 'recent',
   favoritesOnly = false,
   tagSlug,
+  metadataOnly = false,
 }: {
   limit?: number;
   offset?: number;
@@ -103,6 +104,7 @@ export async function getDiagramPage({
   sort?: import('./types').SortOption;
   favoritesOnly?: boolean;
   tagSlug?: string;
+  metadataOnly?: boolean;
 }): Promise<DiagramPage> {
   const normalizedLimit = normalizeLimit(limit);
   const normalizedOffset = normalizeOffset(offset);
@@ -141,12 +143,28 @@ export async function getDiagramPage({
       orderBy,
       skip: normalizedOffset,
       take: normalizedLimit,
-      select: diagramWithLatestSelect,
+      select: metadataOnly ? { id: true, updatedAt: true } : diagramWithLatestSelect,
     }),
     prisma.diagram.count({ where }),
   ]);
 
-  const items = diagrams.map(toDiagram);
+  const items = diagrams.map((d) => {
+    if (metadataOnly) {
+      return {
+        id: d.id,
+        updatedAt: d.updatedAt.toISOString(),
+        title: '',
+        description: '',
+        content: '',
+        emoji: '',
+        createdAt: new Date().toISOString(),
+        isFavorite: false,
+        totalVersions: 0,
+        tags: []
+      };
+    }
+    return toDiagram(d as DiagramWithLatest);
+  });
   const nextOffset = normalizedOffset + items.length;
   const hasMore = nextOffset < total;
 
@@ -161,6 +179,15 @@ export async function getDiagramById(id: string): Promise<Diagram | null> {
 
   if (!diagram) return null;
   return toDiagram(diagram as DiagramWithLatest);
+}
+
+export async function getDiagramUpdatedAt(id: string): Promise<{ updatedAt: string } | null> {
+  const diagram = await prisma.diagram.findUnique({
+    where: { id },
+    select: { updatedAt: true },
+  });
+  if (!diagram) return null;
+  return { updatedAt: diagram.updatedAt.toISOString() };
 }
 
 export async function getDiagrams(): Promise<Diagram[]> {

@@ -23,7 +23,17 @@ export async function GET(request: Request) {
 
         // Bypass cache if fresh=true, searching, or starred filter
         if (fresh || query || starredOnly) {
-            const page = await getNotePage({ limit: limitNumber, offset: offsetNumber, query, sort, starredOnly });
+            const select = url.searchParams.get('select');
+            const metadataOnly = select === 'id,updatedAt';
+
+            const page = await getNotePage({
+                limit: limitNumber,
+                offset: offsetNumber,
+                query,
+                sort,
+                starredOnly,
+                metadataOnly
+            });
             const status: CacheStatus = fresh ? 'BYPASS' : 'MISS';
             const response = withCacheHeader(NextResponse.json(page), status);
             // Add no-cache headers for fresh requests to prevent browser/proxy caching

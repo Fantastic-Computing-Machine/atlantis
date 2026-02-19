@@ -11,7 +11,7 @@ import {
 } from '@/lib/cache';
 import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { logApiError } from '@/lib/logger';
-import { deleteNoteById, getNoteById, updateNoteById } from '@/lib/notes-data';
+import { deleteNoteById, getNoteById, getNoteUpdatedAt, updateNoteById } from '@/lib/notes-data';
 import { noteUpdateSchema } from '@/lib/schemas';
 
 const PRIVATE_CONTENT_MESSAGE = 'Content policy in effect.';
@@ -37,8 +37,17 @@ export async function GET(request: Request, { params }: NoteRouteParams) {
     const { id } = await params;
     const url = new URL(request.url);
     const fresh = url.searchParams.get('fresh') === 'true';
+    const select = url.searchParams.get('select');
 
     if (fresh) {
+      if (select === 'updatedAt') {
+        const meta = await getNoteUpdatedAt(id);
+        if (!meta) {
+          return NextResponse.json({ error: 'Note not found' }, { status: 404 });
+        }
+        return withNoCacheHeaders(withCacheHeader(NextResponse.json(meta), 'BYPASS'));
+      }
+
       const note = await getNoteById(id);
       if (!note) {
         return NextResponse.json({ error: 'Note not found' }, { status: 404 });

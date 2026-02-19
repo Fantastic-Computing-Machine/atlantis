@@ -79,6 +79,7 @@ export async function getNotePage({
   sort = 'recent',
   starredOnly = false,
   tagSlug,
+  metadataOnly = false,
 }: {
   limit?: number;
   offset?: number;
@@ -86,6 +87,7 @@ export async function getNotePage({
   sort?: NoteSortOption;
   starredOnly?: boolean;
   tagSlug?: string;
+  metadataOnly?: boolean;
 }): Promise<NotePage> {
   const normalizedLimit = normalizeLimit(limit);
   const normalizedOffset = normalizeOffset(offset);
@@ -113,18 +115,42 @@ export async function getNotePage({
     }
   })();
 
+  const findManyArgs: Prisma.NoteFindManyArgs = {
+    where,
+    orderBy,
+    skip: normalizedOffset,
+    take: normalizedLimit,
+  };
+
+  if (metadataOnly) {
+    findManyArgs.select = { id: true, updatedAt: true };
+  } else {
+    findManyArgs.include = { tags: true };
+  }
+
   const [notes, total] = await Promise.all([
-    prisma.note.findMany({
-      where,
-      orderBy,
-      skip: normalizedOffset,
-      take: normalizedLimit,
-      include: { tags: true },
-    }),
+    prisma.note.findMany(findManyArgs),
     prisma.note.count({ where }),
   ]);
 
-  const items = notes.map(toNoteListItem);
+  const items = notes.map((n) => {
+    if (metadataOnly) {
+      // Return minimal object for sync comparison
+      return {
+        id: n.id,
+        updatedAt: n.updatedAt.toISOString(),
+        title: '',
+        language: '',
+        emoji: '',
+        starred: false,
+        private: false,
+        createdAt: new Date().toISOString(), // Dummy
+        tags: [],
+      };
+    }
+    return toNoteListItem(n as NoteRow);
+  });
+
   const nextOffset = normalizedOffset + items.length;
   const hasMore = nextOffset < total;
 
@@ -138,6 +164,15 @@ export async function getNoteById(id: string): Promise<Note | null> {
   });
   if (!note) return null;
   return toNote(note);
+}
+
+export async function getNoteUpdatedAt(id: string): Promise<{ updatedAt: string } | null> {
+  const note = await prisma.note.findUnique({
+    where: { id },
+    select: { updatedAt: true },
+  });
+  if (!note) return null;
+  return { updatedAt: note.updatedAt.toISOString() };
 }
 
 const TODO_REGEX = /^\s*[-*+]\s*\[\s\]/m;

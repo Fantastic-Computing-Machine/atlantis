@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 
-const DEFAULT_INTERVAL_MS = 5000;
+const DEFAULT_INTERVAL_MS = 30000;
 
 interface UseLiveSyncOptions<T> {
     /** API URL to poll for updates */
@@ -65,18 +65,33 @@ export function useLiveSync<T extends { updatedAt: string }>({
         try {
             // Append fresh=true to bypass server-side cache during polling
             const separator = resourceUrl.includes('?') ? '&' : '?';
-            const freshUrl = `${resourceUrl}${separator}fresh=true`;
-            const res = await fetch(freshUrl);
-            if (!res.ok) return;
 
-            const data = (await res.json()) as T;
+            // 1. Check for updates using lightweight query
+            const checkUrl = `${resourceUrl}${separator}fresh=true&select=updatedAt`;
+            const checkRes = await fetch(checkUrl);
+
+            if (!checkRes.ok) return;
+
+            const meta = (await checkRes.json()) as { updatedAt: string };
 
             if (!isMountedRef.current) return;
 
-            // Check if server has newer version
-            if (data.updatedAt !== currentUpdatedAtRef.current) {
-                onExternalChange?.();
-                onUpdate(data);
+            // 2. Only fetch full content if timestamp changed
+            if (meta.updatedAt !== currentUpdatedAtRef.current) {
+                const fullUrl = `${resourceUrl}${separator}fresh=true`;
+                const fullRes = await fetch(fullUrl);
+
+                if (!fullRes.ok) return;
+
+                const data = (await fullRes.json()) as T;
+
+                if (!isMountedRef.current) return;
+
+                // Check if server has newer version
+                if (data.updatedAt !== currentUpdatedAtRef.current) {
+                    onExternalChange?.();
+                    onUpdate(data);
+                }
             }
         } catch {
             // Silently ignore sync errors to avoid spamming the user

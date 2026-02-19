@@ -9,7 +9,7 @@ import {
   withNoCacheHeaders,
 } from '@/lib/cache';
 import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
-import { deleteDiagramById, getDiagramById, updateDiagramById } from '@/lib/data';
+import { deleteDiagramById, getDiagramById, getDiagramUpdatedAt, updateDiagramById } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { diagramSchema } from '@/lib/schemas';
 
@@ -22,8 +22,17 @@ export async function GET(request: Request, { params }: DiagramRouteParams) {
     const { id } = await params;
     const url = new URL(request.url);
     const fresh = url.searchParams.get('fresh') === 'true';
+    const select = url.searchParams.get('select');
 
     if (fresh) {
+      if (select === 'updatedAt') {
+        const meta = await getDiagramUpdatedAt(id);
+        if (!meta) {
+          return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });
+        }
+        return withNoCacheHeaders(withCacheHeader(NextResponse.json(meta), 'BYPASS'));
+      }
+
       const diagram = await getDiagramById(id);
       if (!diagram) {
         return NextResponse.json({ error: 'Diagram not found' }, { status: 404 });

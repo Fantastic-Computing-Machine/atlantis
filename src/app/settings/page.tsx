@@ -919,6 +919,8 @@ export default function SettingsPage() {
                 <option value={5000}>5 seconds</option>
                 <option value={10000}>10 seconds</option>
                 <option value={30000}>30 seconds</option>
+                <option value={60000}>1 minute</option>
+                <option value={300000}>5 minutes</option>
               </select>
             </div>
           </CardContent>

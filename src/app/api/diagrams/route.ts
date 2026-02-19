@@ -22,7 +22,10 @@ export async function GET(request: Request) {
 
     // Bypass cache if fresh=true or if searching
     if (fresh || query) {
-      const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query, sort });
+      const select = url.searchParams.get('select');
+      const metadataOnly = select === 'id,updatedAt';
+
+      const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query, sort, metadataOnly });
       const status: CacheStatus = fresh ? 'BYPASS' : 'MISS';
       const response = withCacheHeader(NextResponse.json(page), status);
       // Add no-cache headers for fresh requests to prevent browser/proxy caching

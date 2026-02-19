@@ -13,7 +13,7 @@ const DEFAULT_SETTINGS = {
   exportScale: 2 as const,
   snowMode: false,
   liveSync: true,
-  liveSyncInterval: 5000,
+  liveSyncInterval: 30000,
   kittyMode: false,
 };
 

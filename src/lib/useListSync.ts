@@ -67,15 +67,18 @@ export function useListSync<T extends ListItem>({
         try {
             // Append fresh=true to bypass server-side cache during polling
             const separator = listUrl.includes('?') ? '&' : '?';
-            const freshUrl = `${listUrl}${separator}fresh=true`;
-            const res = await fetch(freshUrl);
-            if (!res.ok) return;
+
+            // 1. Fetch metadata only (lightweight)
+            // We strip any existing sort/limit params for the check if possible, 
+            // but for simplicity we just append select=id,updatedAt
+            const checkUrl = `${listUrl}${separator}fresh=true&select=id,updatedAt`;
+            const checkRes = await fetch(checkUrl);
+            if (!checkRes.ok) return;
 
             if (!isMountedRef.current) return;
 
-            const data = await res.json();
-            const serverItems = (Array.isArray(data.items) ? data.items : []) as T[];
-            const serverTotal = typeof data.total === 'number' ? data.total : serverItems.length;
+            const checkData = await checkRes.json();
+            const serverItemsMeta = (Array.isArray(checkData.items) ? checkData.items : []) as ListItem[];
 
             // Build map of current items by id for quick lookup
             const currentMap = new Map<string, T>();
@@ -83,14 +86,13 @@ export function useListSync<T extends ListItem>({
                 currentMap.set(item.id, item);
             }
 
-            // Check for changes:
-            // 1. Different count = items added or removed
-            // 2. Any item has different updatedAt = property changed
-            let hasChanges = currentItemsRef.current.length !== serverItems.length;
+            // Check for changes using metadata
+            let hasChanges = currentItemsRef.current.length !== serverItemsMeta.length;
 
             if (!hasChanges) {
-                for (const serverItem of serverItems) {
+                for (const serverItem of serverItemsMeta) {
                     const localItem = currentMap.get(serverItem.id);
+                    // Check if item is new or has different timestamp
                     if (!localItem || localItem.updatedAt !== serverItem.updatedAt) {
                         hasChanges = true;
                         break;
@@ -98,9 +100,21 @@ export function useListSync<T extends ListItem>({
                 }
             }
 
-            if (hasChanges && isMountedRef.current) {
-                onListChanged?.();
-                onUpdate(serverItems, serverTotal);
+            // 2. If changes detected, fetch full data
+            if (hasChanges) {
+                const fullUrl = `${listUrl}${separator}fresh=true`;
+                const fullRes = await fetch(fullUrl);
+
+                if (!fullRes.ok) return;
+
+                const fullData = await fullRes.json();
+                const fullItems = (Array.isArray(fullData.items) ? fullData.items : []) as T[];
+                const fullTotal = typeof fullData.total === 'number' ? fullData.total : fullItems.length;
+
+                if (isMountedRef.current) {
+                    onListChanged?.();
+                    onUpdate(fullItems, fullTotal);
+                }
             }
         } catch {
             // Silently ignore sync errors
