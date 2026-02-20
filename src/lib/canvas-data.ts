@@ -1,7 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
-// buildSearchVector removed as it was unused
 import { prisma } from './prisma';
+import { buildSearchVector, stripStopWords } from './search';
 import type { Canvas, CanvasPage, NoteSortOption } from './types';
 import { generateShortId, getRandomEmoji } from './utils';
 
@@ -12,6 +12,7 @@ const TITLE_MAX = 200;
 
 type TagRow = { id: string; name: string; slug: string; color: string };
 type CanvasRow = Prisma.CanvasGetPayload<object> & { tags?: TagRow[] };
+type CanvasListRow = Omit<CanvasRow, 'content' | 'searchVector'>;
 
 const normalizeLimit = (limit?: number | null) => {
     if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
@@ -39,7 +40,19 @@ const toCanvas = (row: CanvasRow): Canvas => ({
     tags: row.tags,
 });
 
-const toCanvasListItem = (row: CanvasRow): Omit<Canvas, 'content'> => ({
+// Explicit select for list queries — excludes heavy content & searchVector columns
+const canvasListSelect = {
+    id: true,
+    title: true,
+    preview: true,
+    emoji: true,
+    isFavorite: true,
+    createdAt: true,
+    updatedAt: true,
+    tags: true,
+} satisfies Prisma.CanvasSelect;
+
+const toCanvasListItem = (row: CanvasListRow): Omit<Canvas, 'content'> => ({
     id: row.id,
     title: row.title,
     preview: row.preview,
@@ -89,7 +102,7 @@ export async function getCanvasPage({
 
     const where: Prisma.CanvasWhereInput = {};
     if (query?.trim()) {
-        where.title = { contains: query.trim() };
+        where.searchVector = { contains: stripStopWords(query.trim()) };
     }
     if (favoritesOnly) {
         where.isFavorite = true;
@@ -116,7 +129,7 @@ export async function getCanvasPage({
             orderBy,
             skip: normalizedOffset,
             take: normalizedLimit,
-            include: { tags: true },
+            select: canvasListSelect,
         }),
         prisma.canvas.count({ where }),
     ]);
@@ -161,6 +174,8 @@ export async function createCanvas({
     const nextTitle = title || 'Untitled Canvas';
     const nextContent = content || '{}';
 
+    const searchVector = buildSearchVector(nextTitle, '', '');
+
     const canvas = await prisma.$transaction(async (tx) => {
         const created = await tx.canvas.create({
             data: {
@@ -170,6 +185,7 @@ export async function createCanvas({
                 preview: preview,
                 emoji: emoji || getRandomEmoji(),
                 isFavorite: false,
+                searchVector,
                 createdAt: now,
                 updatedAt: now,
                 tags: tags ? { connect: mapTagIds(tags) } : undefined,
@@ -243,6 +259,7 @@ export async function updateCanvasById(
                 preview: updates.preview ?? existing.preview,
                 emoji: updates.emoji ?? existing.emoji,
                 isFavorite: typeof updates.isFavorite === 'boolean' ? updates.isFavorite : existing.isFavorite,
+                searchVector: buildSearchVector(nextTitle, '', ''),
                 updatedAt: now,
                 tags: updates.tags ? { set: mapTagIds(updates.tags) } : undefined,
             },

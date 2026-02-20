@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Star, Loader2, FileText, PenSquare } from 'lucide-react';
+import { Search, Star, Loader2, FileText, PenSquare, PenTool } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,11 +16,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, formatDate } from '@/lib/utils';
-import type { Diagram, Note } from '@/lib/types';
+import type { Canvas, Diagram, Note } from '@/lib/types';
 
 type SearchResult = {
   id: string;
-  type: 'diagram' | 'note';
+  type: 'diagram' | 'note' | 'canvas';
   title: string;
   emoji: string;
   updatedAt: string;
@@ -118,19 +118,21 @@ export function GlobalSearchDialog({
           params.set('query', normalized);
         }
 
-        // Fetch diagrams and notes in parallel
-        const [diagramsRes, notesRes] = await Promise.all([
+        // Fetch diagrams, notes, and canvases in parallel
+        const [diagramsRes, notesRes, canvasesRes] = await Promise.all([
           fetch(`/api/diagrams?${params.toString()}`, { signal: controller.signal }),
           fetch(`/api/notes?${params.toString()}`, { signal: controller.signal }),
+          fetch(`/api/canvases?${params.toString()}`, { signal: controller.signal }),
         ]);
 
-        if (!diagramsRes.ok || !notesRes.ok) {
+        if (!diagramsRes.ok || !notesRes.ok || !canvasesRes.ok) {
           throw new Error('Failed to fetch results');
         }
 
-        const [diagramsData, notesData] = await Promise.all([
+        const [diagramsData, notesData, canvasesData] = await Promise.all([
           diagramsRes.json(),
           notesRes.json(),
+          canvasesRes.json(),
         ]);
 
         const diagramItems: SearchResult[] = (diagramsData.items || []).map((d: Diagram) => ({
@@ -153,8 +155,17 @@ export function GlobalSearchDialog({
           language: n.language,
         }));
 
+        const canvasItems: SearchResult[] = (canvasesData.items || []).map((c: Omit<Canvas, 'content'>) => ({
+          id: c.id,
+          type: 'canvas' as const,
+          title: c.title,
+          emoji: c.emoji || '🎨',
+          updatedAt: c.updatedAt,
+          isFavorite: c.isFavorite,
+        }));
+
         // Combine and sort by favorite first, then by date
-        const combined = [...diagramItems, ...noteItems].sort((a, b) => {
+        const combined = [...diagramItems, ...noteItems, ...canvasItems].sort((a, b) => {
           if (a.isFavorite !== b.isFavorite) {
             return a.isFavorite ? -1 : 1;
           }
@@ -202,6 +213,8 @@ export function GlobalSearchDialog({
     } else {
       if (item.type === 'diagram') {
         router.push(`/diagram/${item.id}`);
+      } else if (item.type === 'canvas') {
+        router.push(`/canvas/${item.id}`);
       } else {
         router.push(`/notes/${item.id}`);
       }
@@ -320,22 +333,26 @@ export function GlobalSearchDialog({
                         <div className="flex items-center justify-between gap-2 w-full">
                           <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                             <span className="font-medium text-sm sm:text-base truncate text-foreground">
-                              {highlightText(item.title || (item.type === 'diagram' ? 'Untitled Diagram' : 'Untitled Note'))}
+                              {highlightText(item.title || (item.type === 'diagram' ? 'Untitled Diagram' : item.type === 'canvas' ? 'Untitled Canvas' : 'Untitled Note'))}
                             </span>
                             <span
                               className={cn(
                                 'shrink-0 inline-flex items-center gap-1 text-[10px] font-medium rounded-full px-1.5 py-0.5 border',
                                 item.type === 'diagram'
                                   ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-                                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                  : item.type === 'canvas'
+                                    ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+                                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                               )}
                             >
                               {item.type === 'diagram' ? (
                                 <PenSquare className="h-2.5 w-2.5" />
+                              ) : item.type === 'canvas' ? (
+                                <PenTool className="h-2.5 w-2.5" />
                               ) : (
                                 <FileText className="h-2.5 w-2.5" />
                               )}
-                              <span className="hidden sm:inline">{item.type === 'diagram' ? 'Diagram' : 'Note'}</span>
+                              <span className="hidden sm:inline">{item.type === 'diagram' ? 'Diagram' : item.type === 'canvas' ? 'Canvas' : 'Note'}</span>
                             </span>
                             {item.isFavorite && (
                               <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium rounded-full bg-amber-500/10 text-amber-600 px-1.5 py-0.5 dark:text-amber-400 border border-amber-500/20">

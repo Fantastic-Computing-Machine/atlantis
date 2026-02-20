@@ -48,3 +48,21 @@ export const backupDiagramSchema = z.object({
 });
 
 export const backupSchema = z.array(backupDiagramSchema);
+
+// Canvas API validation
+export const canvasCreateSchema = z.object({
+  title: z.string().max(200).optional(),
+  content: z.string().optional(),
+  preview: z.string().optional(),
+  emoji: z.string().max(10).optional(),
+  tags: z.array(z.string()).max(3).optional(),
+});
+
+export const canvasUpdateSchema = z.object({
+  title: z.string().max(200).optional(),
+  content: z.string().optional(),
+  preview: z.string().optional(),
+  emoji: z.string().max(10).optional(),
+  isFavorite: z.boolean().optional(),
+  tags: z.array(z.string()).max(3).optional(),
+});

@@ -32,6 +32,7 @@ import {
   Loader2,
   Moon,
   Monitor,
+  PenTool,
   RefreshCw,
   Sun,
   Trash2,
@@ -102,10 +103,11 @@ export default function SettingsPage() {
   const [stats, setStats] = useState<{
     totalNotes: number;
     totalDiagrams: number;
+    totalCanvases: number;
     totalTags: number;
-    activity: { date: string; notes: number; diagrams: number }[];
+    activity: { date: string; notes: number; diagrams: number; canvases: number }[];
     loading: boolean;
-  }>({ totalNotes: 0, totalDiagrams: 0, totalTags: 0, activity: [], loading: true });
+  }>({ totalNotes: 0, totalDiagrams: 0, totalCanvases: 0, totalTags: 0, activity: [], loading: true });
 
   // Track mounted state for hydration-safe rendering
   useEffect(() => {
@@ -169,6 +171,7 @@ export default function SettingsPage() {
           setStats({
             totalNotes: data.totalNotes ?? 0,
             totalDiagrams: data.totalDiagrams ?? 0,
+            totalCanvases: data.totalCanvases ?? 0,
             totalTags: data.totalTags ?? 0,
             activity: data.activity ?? [],
             loading: false,
@@ -560,7 +563,7 @@ export default function SettingsPage() {
               <BarChart3 className="text-primary h-5 w-5" />
               <CardTitle>Statistics</CardTitle>
             </div>
-            <CardDescription>Overview of your notes and diagrams.</CardDescription>
+            <CardDescription>Overview of your notes, diagrams, and canvases.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {stats.loading ? (
@@ -569,7 +572,7 @@ export default function SettingsPage() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="border-muted-foreground/30 bg-muted/30 rounded-lg border border-dashed p-4 text-center">
                     <div className="flex items-center justify-center gap-2">
                       <FileText className="text-primary h-5 w-5" />
@@ -584,6 +587,13 @@ export default function SettingsPage() {
                     </div>
                     <p className="mt-2 text-3xl font-bold">{stats.totalDiagrams}</p>
                   </div>
+                  <div className="border-muted-foreground/30 bg-muted/30 rounded-lg border border-dashed p-4 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <PenTool className="text-primary h-5 w-5" />
+                      <span className="text-muted-foreground text-sm font-medium">Canvases</span>
+                    </div>
+                    <p className="mt-2 text-3xl font-bold">{stats.totalCanvases}</p>
+                  </div>
                 </div>
 
                 {/* Activity Graph */}
@@ -594,7 +604,8 @@ export default function SettingsPage() {
                       (() => {
                         const maxNotes = Math.max(...stats.activity.map((d) => d.notes), 1);
                         const maxDiagrams = Math.max(...stats.activity.map((d) => d.diagrams), 1);
-                        const maxValue = Math.max(maxNotes, maxDiagrams, 1);
+                        const maxCanvases = Math.max(...stats.activity.map((d) => d.canvases), 1);
+                        const maxValue = Math.max(maxNotes, maxDiagrams, maxCanvases, 1);
                         const width = 100;
                         const height = 100;
                         const padding = 4;
@@ -658,6 +669,22 @@ export default function SettingsPage() {
                                 strokeLinejoin="round"
                                 vectorEffect="non-scaling-stroke"
                               />
+                              {/* Canvases line (purple) */}
+                              <path
+                                d={stats.activity
+                                  .map((day, i) => {
+                                    const x = padding + i * stepX;
+                                    const y = padding + graphHeight - (day.canvases / maxValue) * graphHeight;
+                                    return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
+                                  })
+                                  .join(' ')}
+                                fill="none"
+                                stroke="#a855f7"
+                                strokeWidth={2}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                vectorEffect="non-scaling-stroke"
+                              />
                               {/* Data points for notes */}
                               {stats.activity.map((day, i) => {
                                 const x = padding + i * stepX;
@@ -688,6 +715,21 @@ export default function SettingsPage() {
                                   />
                                 );
                               })}
+                              {/* Data points for canvases */}
+                              {stats.activity.map((day, i) => {
+                                const x = padding + i * stepX;
+                                const y = padding + graphHeight - (day.canvases / maxValue) * graphHeight;
+                                return (
+                                  <circle
+                                    key={`canvas-${day.date}`}
+                                    cx={x}
+                                    cy={y}
+                                    r={1.5}
+                                    fill="#a855f7"
+                                    vectorEffect="non-scaling-stroke"
+                                  />
+                                );
+                              })}
                             </svg>
                             {/* Legend */}
                             <div className="mt-2 flex items-center justify-center gap-4 text-xs">
@@ -698,6 +740,10 @@ export default function SettingsPage() {
                               <div className="flex items-center gap-1.5">
                                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                                 <span className="text-muted-foreground">Diagrams</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full bg-purple-500" />
+                                <span className="text-muted-foreground">Canvases</span>
                               </div>
                             </div>
                           </div>

@@ -305,77 +305,100 @@ export async function getStaleContent(daysThreshold = 30, limit = 3): Promise<St
  * Uses Fisher-Yates shuffle for unbiased random sampling.
  */
 export async function getRandomRediscovery(limit = 2): Promise<ActivityItem[]> {
-    // Fetch all IDs with minimal data for random sampling
-    const [diagrams, notes, canvases] = await Promise.all([
-        prisma.diagram.findMany({
-            select: { id: true, title: true, emoji: true, updatedAt: true },
-        }),
-        prisma.note.findMany({
-            select: { id: true, title: true, emoji: true, updatedAt: true },
-        }),
-        prisma.canvas.findMany({
-            select: { id: true, title: true, emoji: true, updatedAt: true },
-        }),
+    // Use count + random skip to avoid loading all records
+    const [diagramCount, noteCount, canvasCount] = await Promise.all([
+        prisma.diagram.count(),
+        prisma.note.count(),
+        prisma.canvas.count(),
     ]);
+    const total = diagramCount + noteCount + canvasCount;
+    if (total === 0) return [];
 
-    const items: ActivityItem[] = [
-        ...diagrams.map((d) => toActivityItem(d, 'diagram')),
-        ...notes.map((n) => toActivityItem(n, 'note')),
-        ...canvases.map((c) => toActivityItem(c, 'canvas')),
-    ];
+    const items: ActivityItem[] = [];
+    const pickedIndices = new Set<number>();
+    const attempts = Math.min(limit, total);
 
-    // Fisher-Yates shuffle for unbiased random ordering
-    for (let i = items.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [items[i], items[j]] = [items[j], items[i]];
+    for (let i = 0; i < attempts && items.length < limit; i++) {
+        let idx: number;
+        do {
+            idx = Math.floor(Math.random() * total);
+        } while (pickedIndices.has(idx) && pickedIndices.size < total);
+        pickedIndices.add(idx);
+
+        if (idx < diagramCount) {
+            const [item] = await prisma.diagram.findMany({
+                skip: idx, take: 1,
+                select: { id: true, title: true, emoji: true, updatedAt: true },
+            });
+            if (item) items.push(toActivityItem(item, 'diagram'));
+        } else if (idx < diagramCount + noteCount) {
+            const [item] = await prisma.note.findMany({
+                skip: idx - diagramCount, take: 1,
+                select: { id: true, title: true, emoji: true, updatedAt: true },
+            });
+            if (item) items.push(toActivityItem(item, 'note'));
+        } else {
+            const [item] = await prisma.canvas.findMany({
+                skip: idx - diagramCount - noteCount, take: 1,
+                select: { id: true, title: true, emoji: true, updatedAt: true },
+            });
+            if (item) items.push(toActivityItem(item, 'canvas'));
+        }
     }
 
-    return items.slice(0, limit);
+    return items;
 }
 
 /**
  * Get knowledge base stats (depth metrics).
  */
 export async function getKnowledgeStats(): Promise<KnowledgeStats> {
+    // Consolidated: 6 queries instead of 11 by combining count + min/max per model
     const [
         totalCheckpoints,
-        diagramStats,
-        oldestDiagram,
-        newestDiagram,
-        oldestNote,
-        newestNote,
-        oldestCanvas,
-        newestCanvas,
-        diagramCount,
-        noteCount,
-        canvasCount,
+        diagramAgg,
+        noteAgg,
+        canvasAgg,
     ] = await Promise.all([
         prisma.content.count(),
-        prisma.diagram.aggregate({ _avg: { totalVersions: true } }),
-        prisma.diagram.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
-        prisma.diagram.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
-        prisma.note.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
-        prisma.note.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
-        prisma.canvas.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
-        prisma.canvas.findFirst({ orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
-        prisma.diagram.count(),
-        prisma.note.count(),
-        prisma.canvas.count(),
+        prisma.diagram.aggregate({
+            _count: true,
+            _avg: { totalVersions: true },
+            _min: { createdAt: true },
+            _max: { createdAt: true },
+        }),
+        prisma.note.aggregate({
+            _count: true,
+            _min: { createdAt: true },
+            _max: { createdAt: true },
+        }),
+        prisma.canvas.aggregate({
+            _count: true,
+            _min: { createdAt: true },
+            _max: { createdAt: true },
+        }),
     ]);
 
-    // Find the true oldest and newest across both diagrams and notes
-    const oldestDates = [oldestDiagram?.createdAt, oldestNote?.createdAt, oldestCanvas?.createdAt].filter(Boolean) as Date[];
-    const newestDates = [newestDiagram?.createdAt, newestNote?.createdAt, newestCanvas?.createdAt].filter(Boolean) as Date[];
+    const oldestDates = [
+        diagramAgg._min.createdAt,
+        noteAgg._min.createdAt,
+        canvasAgg._min.createdAt,
+    ].filter(Boolean) as Date[];
+    const newestDates = [
+        diagramAgg._max.createdAt,
+        noteAgg._max.createdAt,
+        canvasAgg._max.createdAt,
+    ].filter(Boolean) as Date[];
 
     const oldest = oldestDates.length > 0 ? new Date(Math.min(...oldestDates.map(d => d.getTime()))) : null;
     const newest = newestDates.length > 0 ? new Date(Math.max(...newestDates.map(d => d.getTime()))) : null;
 
     return {
         totalCheckpoints,
-        avgVersionsPerDiagram: Math.round((diagramStats._avg.totalVersions || 0) * 10) / 10,
+        avgVersionsPerDiagram: Math.round((diagramAgg._avg.totalVersions || 0) * 10) / 10,
         oldestItemDate: oldest?.toISOString() || null,
         newestItemDate: newest?.toISOString() || null,
-        totalContentItems: diagramCount + noteCount + canvasCount,
+        totalContentItems: diagramAgg._count + noteAgg._count + canvasAgg._count,
     };
 }
 

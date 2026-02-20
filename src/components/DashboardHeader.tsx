@@ -70,7 +70,7 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
                 onClick={() => setPaletteOpen(true)}
                 aria-label="Keyboard shortcuts"
               >
-                <Keyboard className="lucide lucide-keyboard h-4 w-4 text-muted-foreground" />
+                <Keyboard className="h-4 w-4 text-muted-foreground" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
@@ -87,7 +87,7 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-1">
-                  Resources
+                  <span>Resources</span>
                   <Menu className="h-4 w-4 opacity-50" />
                 </Button>
               </DropdownMenuTrigger>

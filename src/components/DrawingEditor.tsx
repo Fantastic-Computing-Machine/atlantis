@@ -1,14 +1,11 @@
 'use client';
 
-import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Tldraw, useEditor } from 'tldraw';
+import { Tldraw, useEditor, Editor } from 'tldraw';
 import 'tldraw/tldraw.css';
 import { useDebounceCallback } from 'usehooks-ts';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Search, ArrowLeft } from 'lucide-react';
 import { ResponsiveTagPicker } from '@/components/responsive-tag-picker';
 import { Canvas, Tag } from '@/lib/types';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
@@ -25,10 +22,10 @@ function EditorController({
 }: {
     initialContent?: string;
     onSave?: (content: string, preview?: string) => Promise<void>;
-    onEditorMount?: (editor: any) => void;
+    onEditorMount?: (editor: Editor) => void;
 }) {
     const editor = useEditor();
-    const [isReady, setIsReady] = useState(false);
+    const isReadyRef = useRef(false);
 
     useEffect(() => {
         if (onEditorMount) {
@@ -38,19 +35,17 @@ function EditorController({
 
     // Load initial content
     useEffect(() => {
-        if (initialContent && !isReady) {
+        if (isReadyRef.current) return;
+        isReadyRef.current = true;
+        if (initialContent) {
             try {
                 const snapshot = JSON.parse(initialContent);
                 editor.loadSnapshot(snapshot);
-                setIsReady(true);
             } catch (e) {
                 console.error('Failed to load snapshot', e);
-                setIsReady(true);
             }
-        } else if (!isReady) {
-            setIsReady(true);
         }
-    }, [editor, initialContent, isReady]);
+    }, [editor, initialContent]);
 
     // Handle auto-save
     const handleSave = useDebounceCallback(async () => {
@@ -107,7 +102,6 @@ function EditorController({
 }
 
 export function DrawingEditor({ initialCanvas, onSave }: DrawingEditorProps) {
-    const { resolvedTheme } = useTheme();
     const [canvas, setCanvas] = useState<Canvas>(initialCanvas);
     const [tags, setTags] = useState<Tag[]>(initialCanvas.tags || []);
 
@@ -162,12 +156,6 @@ export function DrawingEditor({ initialCanvas, onSave }: DrawingEditorProps) {
     const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setTitle(e.target.value);
         debouncedSaveTitle(e.target.value);
-    };
-
-    const handleEmojiChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        // Simplified emoji input for now, could be a picker
-        setEmoji(e.target.value);
-        // Save on blur or debounce? Let's debounce for now
     };
 
     // Save tags immediately when changed

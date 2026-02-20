@@ -1,7 +1,9 @@
 import { createCanvas, getCanvasPage } from '@/lib/canvas-data';
+import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
+import { logApiError } from '@/lib/logger';
+import { canvasCreateSchema } from '@/lib/schemas';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-// In data.ts it was internal.
 
 const searchSchema = z.object({
     limit: z.coerce.number().min(1).max(100).optional(),
@@ -33,20 +35,25 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    if (!(await validateCsrfToken(req))) {
+        return csrfFailureResponse();
+    }
+
     try {
-        const body = await req.json();
-        const { title, content, tags } = body;
+        const json = await req.json();
+        const result = canvasCreateSchema.safeParse(json);
 
-        // Basic validation handled by createCanvas
-        const canvas = await createCanvas({
-            title,
-            content,
-            tags
-        });
+        if (!result.success) {
+            return NextResponse.json(
+                { error: 'Invalid input', details: result.error.flatten() },
+                { status: 400 }
+            );
+        }
 
+        const canvas = await createCanvas(result.data);
         return NextResponse.json(canvas, { status: 201 });
     } catch (error) {
-        console.error('Failed to create canvas', error);
+        logApiError('POST /api/canvases', error);
         return NextResponse.json({ error: 'Failed to create canvas' }, { status: 500 });
     }
 }

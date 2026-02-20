@@ -1,5 +1,8 @@
 
 import { deleteCanvasById, getCanvasById, updateCanvasById } from '@/lib/canvas-data';
+import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
+import { logApiError } from '@/lib/logger';
+import { canvasUpdateSchema } from '@/lib/schemas';
 import { NextRequest, NextResponse } from 'next/server';
 
 interface RouteContext {
@@ -7,23 +10,39 @@ interface RouteContext {
 }
 
 export async function GET(req: NextRequest, { params }: RouteContext) {
-    const { id } = await params;
-    const canvas = await getCanvasById(id);
+    try {
+        const { id } = await params;
+        const canvas = await getCanvasById(id);
 
-    if (!canvas) {
-        return NextResponse.json({ error: 'Canvas not found' }, { status: 404 });
+        if (!canvas) {
+            return NextResponse.json({ error: 'Canvas not found' }, { status: 404 });
+        }
+
+        return NextResponse.json(canvas);
+    } catch (error) {
+        logApiError('GET /api/canvases/[id]', error);
+        return NextResponse.json({ error: 'Failed to load canvas' }, { status: 500 });
     }
-
-    return NextResponse.json(canvas);
 }
 
 export async function PUT(req: NextRequest, { params }: RouteContext) {
-    const { id } = await params;
+    if (!(await validateCsrfToken(req))) {
+        return csrfFailureResponse();
+    }
 
     try {
-        const body = await req.json();
-        // Validate body if needed, but updateCanvasById handles partials
-        const updated = await updateCanvasById(id, body);
+        const { id } = await params;
+        const json = await req.json();
+        const result = canvasUpdateSchema.safeParse(json);
+
+        if (!result.success) {
+            return NextResponse.json(
+                { error: 'Invalid input', details: result.error.flatten() },
+                { status: 400 }
+            );
+        }
+
+        const updated = await updateCanvasById(id, result.data);
 
         if (!updated) {
             return NextResponse.json({ error: 'Canvas not found' }, { status: 404 });
@@ -31,15 +50,18 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 
         return NextResponse.json(updated);
     } catch (error) {
-        console.error('Failed to update canvas', error);
+        logApiError('PUT /api/canvases/[id]', error);
         return NextResponse.json({ error: 'Failed to update canvas' }, { status: 500 });
     }
 }
 
 export async function DELETE(req: NextRequest, { params }: RouteContext) {
-    const { id } = await params;
+    if (!(await validateCsrfToken(req))) {
+        return csrfFailureResponse();
+    }
 
     try {
+        const { id } = await params;
         const success = await deleteCanvasById(id);
 
         if (!success) {
@@ -48,7 +70,7 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
 
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Failed to delete canvas', error);
+        logApiError('DELETE /api/canvases/[id]', error);
         return NextResponse.json({ error: 'Failed to delete canvas' }, { status: 500 });
     }
 }

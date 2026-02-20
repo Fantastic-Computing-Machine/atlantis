@@ -81,17 +81,19 @@ model Note {
 }
 
 model Canvas {
-  id        String   @id
-  content   String // JSON string for tldraw state
-  preview   String? // SVG/PNG data URI for preview
-  title     String
-  emoji     String
-  isFavorite Boolean @default(false)
+  id           String   @id
+  content      String // JSON string for tldraw state
+  preview      String? // SVG/PNG data URI for preview
+  title        String
+  emoji        String
+  isFavorite   Boolean @default(false)
+  searchVector String  @default("")
   
   createdAt DateTime @default(now())
   updatedAt DateTime
   tags      Tag[]
 
   @@index([updatedAt], map: "canvas_updatedAt_idx")
+  @@index([searchVector], map: "canvas_searchVector_idx")
 }
 

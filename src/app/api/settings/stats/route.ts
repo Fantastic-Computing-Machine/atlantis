@@ -5,14 +5,16 @@ type ActivityDay = {
     date: string;
     notes: number;
     diagrams: number;
+    canvases: number;
 };
 
 export async function GET() {
     try {
         // Fetch total counts
-        const [totalNotes, totalDiagrams, totalTags] = await Promise.all([
+        const [totalNotes, totalDiagrams, totalCanvases, totalTags] = await Promise.all([
             prisma.note.count(),
             prisma.diagram.count(),
+            prisma.canvas.count(),
             prisma.tag.count(),
         ]);
 
@@ -22,8 +24,8 @@ export async function GET() {
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
         thirtyDaysAgo.setHours(0, 0, 0, 0);
 
-        // Fetch notes and diagrams updated in the last 30 days
-        const [recentNotes, recentDiagrams] = await Promise.all([
+        // Fetch notes, diagrams, and canvases updated in the last 30 days
+        const [recentNotes, recentDiagrams, recentCanvases] = await Promise.all([
             prisma.note.findMany({
                 where: { updatedAt: { gte: thirtyDaysAgo } },
                 select: { updatedAt: true },
@@ -32,17 +34,21 @@ export async function GET() {
                 where: { updatedAt: { gte: thirtyDaysAgo } },
                 select: { updatedAt: true },
             }),
+            prisma.canvas.findMany({
+                where: { updatedAt: { gte: thirtyDaysAgo } },
+                select: { updatedAt: true },
+            }),
         ]);
 
         // Build activity map for the last 30 days
-        const activityMap = new Map<string, { notes: number; diagrams: number }>();
+        const activityMap = new Map<string, { notes: number; diagrams: number; canvases: number }>();
 
         // Initialize all 30 days with zeros
         for (let i = 0; i < 30; i++) {
             const date = new Date(thirtyDaysAgo);
             date.setDate(date.getDate() + i);
             const dateStr = date.toISOString().split('T')[0];
-            activityMap.set(dateStr, { notes: 0, diagrams: 0 });
+            activityMap.set(dateStr, { notes: 0, diagrams: 0, canvases: 0 });
         }
 
         // Count notes per day
@@ -63,6 +69,15 @@ export async function GET() {
             }
         }
 
+        // Count canvases per day
+        for (const canvas of recentCanvases) {
+            const dateStr = canvas.updatedAt.toISOString().split('T')[0];
+            const existing = activityMap.get(dateStr);
+            if (existing) {
+                existing.canvases++;
+            }
+        }
+
         // Convert map to sorted array
         const activity: ActivityDay[] = Array.from(activityMap.entries())
             .sort(([a], [b]) => a.localeCompare(b))
@@ -71,6 +86,7 @@ export async function GET() {
         return NextResponse.json({
             totalNotes,
             totalDiagrams,
+            totalCanvases,
             totalTags,
             activity,
         });

@@ -38,6 +38,7 @@ import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate } from '@/lib/utils'; // Removed sanitizeFilename as we don't download here yet
 import { Eye, ListFilter, Loader2, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Trash2, PenTool } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -251,19 +252,29 @@ export function CanvasGrid({
         const canvas = canvases.find((d) => d.id === id);
         if (!canvas) return;
 
+        const newValue = !canvas.isFavorite;
         setCanvases((prev) =>
-            prev.map((d) => (d.id === id ? { ...d, isFavorite: !d.isFavorite } : d))
+            prev.map((d) => (d.id === id ? { ...d, isFavorite: newValue } : d))
         );
 
-        const csrfToken = await ensureCsrfToken();
-        await fetch(`/api/canvases/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                [CSRF_HEADER_NAME]: csrfToken,
-            },
-            body: JSON.stringify({ isFavorite: !canvas.isFavorite }),
-        });
+        try {
+            const csrfToken = await ensureCsrfToken();
+            const res = await fetch(`/api/canvases/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    [CSRF_HEADER_NAME]: csrfToken,
+                },
+                body: JSON.stringify({ isFavorite: newValue }),
+            });
+            if (!res.ok) throw new Error('Failed to update');
+        } catch {
+            // Revert on failure
+            setCanvases((prev) =>
+                prev.map((d) => (d.id === id ? { ...d, isFavorite: canvas.isFavorite } : d))
+            );
+            toast.error('Failed to update favorite');
+        }
     };
 
     const handleShare = async (e: React.MouseEvent, id: string) => {
@@ -378,8 +389,14 @@ export function CanvasGrid({
                                 ))}
                             </div>
                         )}
-                        <div className="bg-muted/50 rounded-md p-3 h-24 overflow-hidden flex items-center justify-center">
-                            <PenTool className="text-muted-foreground/20 h-10 w-10" />
+                        <div className="bg-muted/50 rounded-md h-24 overflow-hidden relative">
+                            {canvas.preview ? (
+                                <Image src={canvas.preview} alt={canvas.title} fill className="object-cover" unoptimized />
+                            ) : (
+                                <div className="flex h-full items-center justify-center">
+                                    <PenTool className="text-muted-foreground/20 h-10 w-10" />
+                                </div>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

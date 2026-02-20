@@ -50,6 +50,4 @@ if (process.env.NODE_ENV !== 'test' && typeof window === 'undefined') {
     .catch((err) => console.error('Failed to init search indexes:', err));
 }
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+globalForPrisma.prisma = prisma;
