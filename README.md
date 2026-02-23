@@ -24,19 +24,9 @@ Self-hosted platform for Mermaid.js diagrams, notes, and knowledge management. B
 - Local persistence via SQLite (data/atlantis.db) with optional PostgreSQL/MySQL through env vars.
 - Optional Redis cache; light/dark themes; backup/restore to JSON.
 
-## Screenshots
+## Walkthrough
 
-![Home Screen](screenshots/1.%20home.png)
-_Home Dashboard_
-
-![Diagram Editor](screenshots/2.%20diagram.png)
-_Diagram Editor_
-
-**More Screenshots:**
-
-- [Notes Interface](screenshots/3.%20notes.png)
-- [Settings - General](screenshots/4.1%20settings.png)
-- [Settings - Advanced](screenshots/4.2%20settings.png)
+![Walkthrough](docs/screenshots/walkthrough.gif)
 
 ## Quick Start (Docker)
 
@@ -80,12 +70,6 @@ Default storage: SQLite at `data/atlantis.db` (override with `PRISMA_PROVIDER` +
 - Backup: Settings → Backup downloads diagrams and notes as JSON.
 - Restore: Settings → Restore accepts validated backup JSON.
 - Checkpoints: Editor keeps up to 15 recent checkpoints per diagram.
-
-## Support
-
-If you find this project useful, you can support its development:
-
-<a href="https://www.buymeacoffee.com/strikead"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&slug=strikead&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" /></a>
 
 ## License
 
