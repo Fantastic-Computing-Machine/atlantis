@@ -43,7 +43,7 @@
     "codemirror-lang-mermaid": "^0.5.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.26.2",
-    "jspdf": "^4.0.0",
+    "jspdf": "^4.2.1",
     "katex": "^0.16.28",
     "lucide-react": "^0.562.0",
     "mermaid": "^11.12.2",
