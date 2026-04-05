@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
+import { useEffect } from 'react';
 
 export function ConsoleWelcome() {
   useEffect(() => {
@@ -15,7 +15,7 @@ export function ConsoleWelcome() {
   A'     VML  
 .AMA.   .AMMA.
 `,
-      "font-family: monospace; color: #3b82f6; font-weight: bold;"
+      'font-family: monospace; color: #3b82f6; font-weight: bold;'
     );
   }, []);
 

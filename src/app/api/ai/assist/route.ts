@@ -13,7 +13,6 @@ type DomPurifyLike = {
 type GlobalWithDomPurify = typeof globalThis & { DOMPurify?: DomPurifyLike };
 
 async function ensureDomPurifyStub() {
-
   const g = globalThis as GlobalWithDomPurify;
 
   try {
@@ -22,10 +21,10 @@ async function ensureDomPurifyStub() {
 
     if (dompurifyDefault) {
       if (typeof dompurifyDefault.addHook !== 'function') {
-        dompurifyDefault.addHook = () => { };
+        dompurifyDefault.addHook = () => {};
       }
       if (typeof dompurifyDefault.removeHook !== 'function') {
-        dompurifyDefault.removeHook = () => { };
+        dompurifyDefault.removeHook = () => {};
       }
       if (typeof dompurifyDefault.sanitize !== 'function') {
         dompurifyDefault.sanitize = (input: unknown) => input;
@@ -38,14 +37,13 @@ async function ensureDomPurifyStub() {
   } catch {
     if (!g.DOMPurify || typeof g.DOMPurify.addHook !== 'function') {
       g.DOMPurify = {
-        addHook: () => { },
-        removeHook: () => { },
+        addHook: () => {},
+        removeHook: () => {},
         sanitize: (input: unknown) => input,
       };
     }
   }
 }
-
 
 type MermaidInstance = {
   parse: (content: string) => void;
@@ -57,9 +55,14 @@ let mermaidInstance: MermaidInstance | null = null;
 async function getMermaid(): Promise<MermaidInstance> {
   if (mermaidInstance) return mermaidInstance;
   await ensureDomPurifyStub();
-  const imported = (await import('mermaid')).default as { mermaid?: MermaidInstance } | MermaidInstance;
+  const imported = (await import('mermaid')).default as
+    | { mermaid?: MermaidInstance }
+    | MermaidInstance;
   const candidate = imported as MermaidInstance;
-  const m = typeof candidate.parse === 'function' ? candidate : (imported as { mermaid?: MermaidInstance }).mermaid;
+  const m =
+    typeof candidate.parse === 'function'
+      ? candidate
+      : (imported as { mermaid?: MermaidInstance }).mermaid;
   if (!m) {
     throw new Error('Mermaid import failed');
   }
@@ -71,8 +74,6 @@ async function getMermaid(): Promise<MermaidInstance> {
   mermaidInstance = m;
   return mermaidInstance;
 }
-
-
 
 const MAX_SELF_HEAL_ATTEMPTS = 2;
 
@@ -150,7 +151,12 @@ function resolveProvider(apiKey: string, storedProvider: Provider | 'auto'): Pro
   return 'openai';
 }
 
-async function callProvider(apiKey: string, prompt: string, content: string, preferred: Provider | 'auto'): Promise<string> {
+async function callProvider(
+  apiKey: string,
+  prompt: string,
+  content: string,
+  preferred: Provider | 'auto'
+): Promise<string> {
   const provider = resolveProvider(apiKey, preferred);
   if (provider === 'gemini') {
     return callGemini(apiKey, prompt, content);
@@ -309,7 +315,14 @@ export async function POST(request: Request) {
         error instanceof Error && error.message ? error.message : 'Mermaid validation failed';
 
       for (let attempt = 0; attempt < MAX_SELF_HEAL_ATTEMPTS; attempt += 1) {
-        const healed = await attemptSelfHeal(apiKey, storedProvider, prompt, content, sanitized, message);
+        const healed = await attemptSelfHeal(
+          apiKey,
+          storedProvider,
+          prompt,
+          content,
+          sanitized,
+          message
+        );
         if (healed) {
           sanitized = healed;
           break;
@@ -320,7 +333,9 @@ export async function POST(request: Request) {
         await validateMermaid(sanitized);
       } catch (finalError) {
         const finalMessage =
-          finalError instanceof Error && finalError.message ? finalError.message : 'Mermaid validation failed';
+          finalError instanceof Error && finalError.message
+            ? finalError.message
+            : 'Mermaid validation failed';
         return NextResponse.json(
           { error: 'Mermaid validation failed', details: finalMessage },
           { status: 422 }

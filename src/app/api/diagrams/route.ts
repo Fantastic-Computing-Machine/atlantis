@@ -3,7 +3,15 @@ import { createDiagram, getDiagramPage } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { publishSyncEvent } from '@/lib/pubsub';
 import { diagramSchema } from '@/lib/schemas';
-import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS, withCacheHeader, withNoCacheHeaders, type CacheStatus } from '@/lib/cache';
+import {
+  getCache,
+  CacheKeys,
+  CachePrefixes,
+  DEFAULT_TTL_MS,
+  withCacheHeader,
+  withNoCacheHeaders,
+  type CacheStatus,
+} from '@/lib/cache';
 import { NextResponse } from 'next/server';
 
 const DEFAULT_LIMIT = 24;
@@ -65,7 +73,10 @@ export async function POST(request: Request) {
     const cache = getCache();
     await cache.deletePrefix(CachePrefixes.diagramsList);
 
-    await publishSyncEvent({ topic: 'list:diagrams', payload: { id: newDiagram.id, created: true } });
+    await publishSyncEvent({
+      topic: 'list:diagrams',
+      payload: { id: newDiagram.id, created: true },
+    });
 
     return NextResponse.json(newDiagram);
   } catch (error) {

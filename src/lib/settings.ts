@@ -154,4 +154,3 @@ export async function getAdvancedSettings() {
     exportScale: await getExportScale(),
   };
 }
-

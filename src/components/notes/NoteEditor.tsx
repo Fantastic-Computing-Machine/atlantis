@@ -160,7 +160,7 @@ export function NoteEditor({
         <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
           {language || 'txt'}
         </span>
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-full">
+        <div className="no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -216,7 +216,13 @@ export function NoteEditor({
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Copy code" onClick={handleCopy}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                aria-label="Copy code"
+                onClick={handleCopy}
+              >
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -242,7 +248,12 @@ export function NoteEditor({
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label="Editor settings">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    aria-label="Editor settings"
+                  >
                     <Settings2 className="h-3.5 w-3.5" />
                   </Button>
                 </DropdownMenuTrigger>

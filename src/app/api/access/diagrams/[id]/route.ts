@@ -5,10 +5,7 @@ import { NextResponse } from 'next/server';
 
 const apiAccessEnabled = process.env.ENABLE_API_ACCESS?.trim().toLowerCase() === 'true';
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!apiAccessEnabled) {
     return new NextResponse('API Access Disabled', { status: 403 });
   }

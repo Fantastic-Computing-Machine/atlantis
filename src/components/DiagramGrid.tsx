@@ -142,7 +142,7 @@ export function DiagramGrid({
       const incoming: Diagram[] = Array.isArray(data.items) ? data.items : [];
       setDiagrams((prev) => {
         const existingIds = new Set(prev.map((d) => d.id));
-        return [...prev, ...incoming.filter(item => !existingIds.has(item.id))];
+        return [...prev, ...incoming.filter((item) => !existingIds.has(item.id))];
       });
       setHasMore(Boolean(data.hasMore));
       setNextOffset(data.nextOffset ?? nextOffset + (data.items?.length || 0));

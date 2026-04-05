@@ -48,7 +48,7 @@ export default async function Page() {
                   <Greeting />
                 </div>
                 {/* Quick Actions - always visible */}
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex shrink-0 items-center gap-2">
                   <Button size="icon" className="h-8 w-8" asChild>
                     <Link href="/diagram/new" aria-label="New Diagram">
                       <PenSquare className="h-4 w-4" />
@@ -73,14 +73,14 @@ export default async function Page() {
             {/* Starred Strip */}
             {hasStarred && (
               <section className="space-y-2">
-                <h3 className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <h3 className="text-muted-foreground flex items-center gap-2 text-xs font-medium">
                   <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
                   Starred <span className="opacity-50">{'//'}</span>{' '}
                   <span className="text-foreground">
                     {data.starredDiagrams.items.length + starredNotes.items.length}
                   </span>
                 </h3>
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                <div className="scrollbar-thin flex gap-2 overflow-x-auto pb-1">
                   {data.starredDiagrams.items.map((d) => (
                     <CompactCard key={`d-${d.id}`} type="diagram" item={d} />
                   ))}
@@ -94,7 +94,7 @@ export default async function Page() {
             {/* Main Grid */}
             <div className="grid gap-6 lg:grid-cols-3">
               {/* Left: Recent Items */}
-              <div className="lg:col-span-2 space-y-6">
+              <div className="space-y-6 lg:col-span-2">
                 {/* Diagrams */}
                 <DashboardSection
                   title="Diagrams"
@@ -128,15 +128,15 @@ export default async function Page() {
                 />
 
                 {/* Keyboard Shortcuts */}
-                <div className="pt-4 border-t hidden sm:block">
+                <div className="hidden border-t pt-4 sm:block">
                   <KeyboardShortcuts />
                 </div>
               </div>
 
               {/* Right: Insights Panel */}
               <aside>
-                <div className="rounded-lg border bg-card p-4 sticky top-20">
-                  <h3 className="text-xs font-medium mb-4">
+                <div className="bg-card sticky top-20 rounded-lg border p-4">
+                  <h3 className="mb-4 text-xs font-medium">
                     Brain <span className="text-muted-foreground opacity-50">{'//'}</span>{' '}
                     <span className="text-muted-foreground">Insights</span>
                   </h3>
@@ -158,4 +158,3 @@ export default async function Page() {
     </div>
   );
 }
-

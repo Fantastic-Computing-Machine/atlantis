@@ -2,10 +2,10 @@ services:
   atlantis:
     image: strikead/atlantis:latest
     container_name: atlantis
-    user: "1001:1001"
+    user: '1001:1001'
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - '${PORT:-3000}:3000'
     volumes:
       # Persist diagram data - map to your preferred location
       # Default: uses Docker named volume
@@ -31,7 +31,13 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: [ "CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -42,14 +48,14 @@ services:
     container_name: atlantis-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - atlantis_redis_data:/data
     command: redis-server --appendonly yes
     networks:
       - atlantis-network
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 3

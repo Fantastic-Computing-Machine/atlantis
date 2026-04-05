@@ -128,10 +128,7 @@ export function GlobalSearchDialog({
           throw new Error('Failed to fetch results');
         }
 
-        const [diagramsData, notesData] = await Promise.all([
-          diagramsRes.json(),
-          notesRes.json(),
-        ]);
+        const [diagramsData, notesData] = await Promise.all([diagramsRes.json(), notesRes.json()]);
 
         const diagramItems: SearchResult[] = (diagramsData.items || []).map((d: Diagram) => ({
           id: d.id,
@@ -143,15 +140,17 @@ export function GlobalSearchDialog({
           content: d.content,
         }));
 
-        const noteItems: SearchResult[] = (notesData.items || []).map((n: Omit<Note, 'content'>) => ({
-          id: n.id,
-          type: 'note' as const,
-          title: n.title,
-          emoji: n.emoji || '📝',
-          updatedAt: n.updatedAt,
-          isFavorite: n.starred,
-          language: n.language,
-        }));
+        const noteItems: SearchResult[] = (notesData.items || []).map(
+          (n: Omit<Note, 'content'>) => ({
+            id: n.id,
+            type: 'note' as const,
+            title: n.title,
+            emoji: n.emoji || '📝',
+            updatedAt: n.updatedAt,
+            isFavorite: n.starred,
+            language: n.language,
+          })
+        );
 
         // Combine and sort by favorite first, then by date
         const combined = [...diagramItems, ...noteItems].sort((a, b) => {
@@ -246,58 +245,63 @@ export function GlobalSearchDialog({
       {!hideTrigger && (
         <Button
           variant="outline"
-          className="gap-2 w-full max-w-xs justify-start text-muted-foreground px-2 sm:px-4"
+          className="text-muted-foreground w-full max-w-xs justify-start gap-2 px-2 sm:px-4"
           onClick={() => setOpen(true)}
         >
           <Search className="h-4 w-4" />
           <span className="hidden sm:inline">Search...</span>
           <span className="inline sm:hidden">Search</span>
-          <kbd className="ml-auto hidden lg:inline-flex h-5 select-none items-center gap-0.5 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+          <kbd className="bg-muted text-muted-foreground ml-auto hidden h-5 items-center gap-0.5 rounded border px-1.5 font-mono text-[10px] font-medium select-none lg:inline-flex">
             {shortcutSymbol} + K
           </kbd>
         </Button>
       )}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="p-0 gap-0 w-[94vw] max-w-[700px] sm:w-full overflow-hidden border bg-background/95 backdrop-blur-xl shadow-2xl rounded-xl sm:rounded-2xl">
-          <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3">
-            <DialogTitle className="flex items-center gap-2.5 text-base sm:text-lg font-semibold">
+        <DialogContent className="bg-background/95 w-[94vw] max-w-[700px] gap-0 overflow-hidden rounded-xl border p-0 shadow-2xl backdrop-blur-xl sm:w-full sm:rounded-2xl">
+          <DialogHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-5">
+            <DialogTitle className="flex items-center gap-2.5 text-base font-semibold sm:text-lg">
               <Search className="h-4 w-4 sm:h-5 sm:w-5" />
               Search
             </DialogTitle>
-            <DialogDescription className="flex items-center gap-2 text-xs text-muted-foreground">
+            <DialogDescription className="text-muted-foreground flex items-center gap-2 text-xs">
               Search diagrams and notes · Favorites appear first
             </DialogDescription>
           </DialogHeader>
 
-          <div className="px-4 sm:px-6 pb-4">
-            <div className="relative group">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/70 group-focus-within:text-primary transition-colors" />
+          <div className="px-4 pb-4 sm:px-6">
+            <div className="group relative">
+              <Search className="text-muted-foreground/70 group-focus-within:text-primary absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 transition-colors" />
               <Input
                 ref={inputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Search by title or content..."
-                className="pl-10 pr-24 h-12 rounded-xl bg-muted/40 border-border/60 hover:border-border focus:border-primary/50 text-base shadow-sm transition-all"
+                className="bg-muted/40 border-border/60 hover:border-border focus:border-primary/50 h-12 rounded-xl pr-24 pl-10 text-base shadow-sm transition-all"
                 aria-label="Search"
               />
-              <kbd className="hidden sm:inline-flex absolute right-3 top-1/2 -translate-y-1/2 h-6 select-none items-center gap-1 rounded border bg-muted/50 px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+              <kbd className="bg-muted/50 text-muted-foreground absolute top-1/2 right-3 hidden h-6 -translate-y-1/2 items-center gap-1 rounded border px-1.5 font-mono text-[10px] font-medium opacity-100 select-none sm:inline-flex">
                 <span className="text-xs">{shortcutSymbol} + K</span>
               </kbd>
             </div>
           </div>
 
-          <div className="border-t border-border/50 bg-muted/5 overflow-hidden" style={{ maxHeight: '60vh' }}>
+          <div
+            className="border-border/50 bg-muted/5 overflow-hidden border-t"
+            style={{ maxHeight: '60vh' }}
+          >
             <ScrollArea className="h-full w-full">
               {error ? (
-                <div className="p-6 text-sm text-destructive text-center">{error}</div>
+                <div className="text-destructive p-6 text-center text-sm">{error}</div>
               ) : !results.length && !isLoading ? (
-                <div className="p-12 text-center space-y-2">
-                  <p className="text-sm font-medium text-foreground">No results found</p>
-                  <p className="text-xs text-muted-foreground">Try searching for a different term</p>
+                <div className="space-y-2 p-12 text-center">
+                  <p className="text-foreground text-sm font-medium">No results found</p>
+                  <p className="text-muted-foreground text-xs">
+                    Try searching for a different term
+                  </p>
                 </div>
               ) : (
-                <div className="p-2 space-y-1">
+                <div className="space-y-1 p-2">
                   {results.map((item, index) => (
                     <button
                       key={`${item.type}-${item.id}`}
@@ -307,27 +311,30 @@ export function GlobalSearchDialog({
                       type="button"
                       onClick={() => handleSelect(item)}
                       className={cn(
-                        'w-full text-left px-3 py-3 rounded-lg transition-all flex items-start gap-3.5 focus:outline-none group',
+                        'group flex w-full items-start gap-3.5 rounded-lg px-3 py-3 text-left transition-all focus:outline-none',
                         index === activeIndex
-                          ? 'bg-primary/10 ring-1 ring-primary/20'
+                          ? 'bg-primary/10 ring-primary/20 ring-1'
                           : 'hover:bg-muted/80'
                       )}
                     >
-                      <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-background border border-border/50 text-lg shrink-0 shadow-sm group-hover:border-border/80 transition-colors">
+                      <div className="bg-background border-border/50 group-hover:border-border/80 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-lg shadow-sm transition-colors">
                         {item.emoji}
                       </div>
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <div className="flex items-center justify-between gap-2 w-full">
-                          <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-                            <span className="font-medium text-sm sm:text-base truncate text-foreground">
-                              {highlightText(item.title || (item.type === 'diagram' ? 'Untitled Diagram' : 'Untitled Note'))}
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex w-full items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+                            <span className="text-foreground truncate text-sm font-medium sm:text-base">
+                              {highlightText(
+                                item.title ||
+                                  (item.type === 'diagram' ? 'Untitled Diagram' : 'Untitled Note')
+                              )}
                             </span>
                             <span
                               className={cn(
-                                'shrink-0 inline-flex items-center gap-1 text-[10px] font-medium rounded-full px-1.5 py-0.5 border',
+                                'inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
                                 item.type === 'diagram'
-                                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-                                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                  ? 'border-blue-500/20 bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                                  : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                               )}
                             >
                               {item.type === 'diagram' ? (
@@ -335,34 +342,34 @@ export function GlobalSearchDialog({
                               ) : (
                                 <FileText className="h-2.5 w-2.5" />
                               )}
-                              <span className="hidden sm:inline">{item.type === 'diagram' ? 'Diagram' : 'Note'}</span>
+                              <span className="hidden sm:inline">
+                                {item.type === 'diagram' ? 'Diagram' : 'Note'}
+                              </span>
                             </span>
                             {item.isFavorite && (
-                              <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium rounded-full bg-amber-500/10 text-amber-600 px-1.5 py-0.5 dark:text-amber-400 border border-amber-500/20">
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
                                 <Star className="h-2 w-2 fill-current" />
                               </span>
                             )}
                           </div>
-                          <span className="text-[10px] sm:text-xs text-muted-foreground font-mono shrink-0 whitespace-nowrap">
+                          <span className="text-muted-foreground shrink-0 font-mono text-[10px] whitespace-nowrap sm:text-xs">
                             {formatDate(item.updatedAt)}
                           </span>
                         </div>
                         {item.content && (
-                          <p className="text-xs text-muted-foreground line-clamp-1 font-mono opacity-80 break-all">
+                          <p className="text-muted-foreground line-clamp-1 font-mono text-xs break-all opacity-80">
                             {highlightText(item.content)}
                           </p>
                         )}
                         {item.language && (
-                          <p className="text-xs text-muted-foreground">
-                            Language: {item.language}
-                          </p>
+                          <p className="text-muted-foreground text-xs">Language: {item.language}</p>
                         )}
                       </div>
                     </button>
                   ))}
                   {isLoading && (
-                    <div className="p-4 flex items-center justify-center gap-2 text-muted-foreground text-sm">
-                      <Loader2 className="h-4 w-4 animate-spin text-primary/60" />
+                    <div className="text-muted-foreground flex items-center justify-center gap-2 p-4 text-sm">
+                      <Loader2 className="text-primary/60 h-4 w-4 animate-spin" />
                       <span>Loading…</span>
                     </div>
                   )}
@@ -372,7 +379,7 @@ export function GlobalSearchDialog({
           </div>
 
           {!results.length && !isLoading && !error && (
-            <div className="p-4 bg-muted/30 border-t border-border/50 flex gap-2">
+            <div className="bg-muted/30 border-border/50 flex gap-2 border-t p-4">
               <Button
                 variant="outline"
                 className="flex-1 gap-2 shadow-sm"
@@ -400,4 +407,3 @@ export function GlobalSearchDialog({
     </>
   );
 }
-

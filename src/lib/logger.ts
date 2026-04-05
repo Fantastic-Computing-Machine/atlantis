@@ -40,5 +40,8 @@ function extractErrorMetadata(error: unknown): Record<string, unknown> {
 }
 
 export function logApiError(context: string, error: unknown): void {
-  logger.error({ err: extractErrorMetadata(error), context }, `[api] ${context}: ${extractErrorMessage(error)}`);
+  logger.error(
+    { err: extractErrorMetadata(error), context },
+    `[api] ${context}: ${extractErrorMessage(error)}`
+  );
 }

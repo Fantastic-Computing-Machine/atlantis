@@ -1,12 +1,19 @@
 import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
-import { getAiApiKey, getAiProvider, setAiApiKey, setAiProvider, isAiApiKeyFromEnv } from '@/lib/settings';
+import {
+  getAiApiKey,
+  getAiProvider,
+  setAiApiKey,
+  setAiProvider,
+  isAiApiKeyFromEnv,
+} from '@/lib/settings';
 import { logApiError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 import { OPENAI_MODEL, GEMINI_MODEL } from '@/lib/ai/config';
 
-
-
-function resolveModel(apiKey: string | null, provider: 'openai' | 'gemini' | 'auto'): string | null {
+function resolveModel(
+  apiKey: string | null,
+  provider: 'openai' | 'gemini' | 'auto'
+): string | null {
   if (!apiKey) return null;
   if (provider === 'gemini') return GEMINI_MODEL;
   if (provider === 'openai') return OPENAI_MODEL;
@@ -27,7 +34,7 @@ export async function GET() {
       hasKey: Boolean(value),
       provider,
       aiModel,
-      fromEnv,  // Indicates key is from environment variable (read-only)
+      fromEnv, // Indicates key is from environment variable (read-only)
     });
   } catch (error) {
     logApiError('GET /api/settings/ai-key', error);
@@ -65,7 +72,12 @@ export async function PUT(request: Request) {
       await setAiProvider(provider);
     }
     const resolvedProvider = provider ?? (await getAiProvider());
-    return NextResponse.json({ success: true, hasKey: Boolean(apiKey), provider: resolvedProvider, fromEnv: false });
+    return NextResponse.json({
+      success: true,
+      hasKey: Boolean(apiKey),
+      provider: resolvedProvider,
+      fromEnv: false,
+    });
   } catch (error) {
     logApiError('PUT /api/settings/ai-key', error);
     return NextResponse.json({ error: 'Failed to save AI key' }, { status: 500 });

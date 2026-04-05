@@ -9,16 +9,19 @@ export const metadata: Metadata = {
 
 export default function DocsPage() {
   return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="bg-background min-h-screen p-8">
+      <div className="mx-auto max-w-7xl space-y-8">
         <div>
-          <Link href="/" className="text-sm text-muted-foreground hover:text-primary mb-4 inline-block">
+          <Link
+            href="/"
+            className="text-muted-foreground hover:text-primary mb-4 inline-block text-sm"
+          >
             &larr; Back to Home
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">API Documentation</h1>
           <p className="text-muted-foreground mt-2">
-            Explore and test the atlantis API endpoints.
-            Ensure <code>ENABLE_API_ACCESS=true</code> is set in your environment.
+            Explore and test the atlantis API endpoints. Ensure <code>ENABLE_API_ACCESS=true</code>{' '}
+            is set in your environment.
           </p>
         </div>
         <ApiDoc />

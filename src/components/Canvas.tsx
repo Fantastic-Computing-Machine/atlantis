@@ -90,7 +90,12 @@ const isNodeElement = (element: Element): boolean => {
   if (classList.includes('node') || classList.includes('cluster')) return true;
   if (classList.some((cls) => cls.endsWith('node') || cls.includes('node'))) return true;
   const id = element.getAttribute('id') ?? '';
-  if (/^(flowchart|graph|classDiagram|stateDiagram|erDiagram|gitGraph|mindmap|timeline|quadrantChart|requirementDiagram|c4|sankey|xyChart|block|packet|kanban|pie|gantt|sequence|journey|treemap|architecture)-/i.test(id)) return true;
+  if (
+    /^(flowchart|graph|classDiagram|stateDiagram|erDiagram|gitGraph|mindmap|timeline|quadrantChart|requirementDiagram|c4|sankey|xyChart|block|packet|kanban|pie|gantt|sequence|journey|treemap|architecture)-/i.test(
+      id
+    )
+  )
+    return true;
   return !!element.querySelector('title');
 };
 
@@ -161,8 +166,8 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
             typeof err === 'string'
               ? err
               : (err as { str?: string; message?: string }).str ||
-              (err as { str?: string; message?: string }).message ||
-              'Mermaid parse error';
+                (err as { str?: string; message?: string }).message ||
+                'Mermaid parse error';
           throw new Error(message);
         },
       });
@@ -615,7 +620,12 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label="Center diagram" onClick={handleRecenter}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Center diagram"
+                      onClick={handleRecenter}
+                    >
                       <Focus className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
@@ -666,7 +676,12 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label="Export diagram" disabled={!svg}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Export diagram"
+                          disabled={!svg}
+                        >
                           <Download className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -743,7 +758,12 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={toggleFullscreen}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                      onClick={toggleFullscreen}
+                    >
                       {isFullscreen ? (
                         <Minimize className="h-4 w-4" />
                       ) : (
