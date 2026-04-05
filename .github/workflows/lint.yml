@@ -1,4 +1,6 @@
 name: Lint and Formatting
+permissions:
+  contents: read
 on:
   push:
     branches: [ "main", "master" ]
