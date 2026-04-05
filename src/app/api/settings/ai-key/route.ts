@@ -2,9 +2,9 @@ import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { getAiApiKey, getAiProvider, setAiApiKey, setAiProvider, isAiApiKeyFromEnv } from '@/lib/settings';
 import { logApiError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
+import { OPENAI_MODEL, GEMINI_MODEL } from '@/lib/ai/config';
 
-const OPENAI_MODEL = 'gpt-4o-mini';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
 
 function resolveModel(apiKey: string | null, provider: 'openai' | 'gemini' | 'auto'): string | null {
   if (!apiKey) return null;

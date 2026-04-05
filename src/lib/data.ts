@@ -109,7 +109,22 @@ export async function getDiagramPage({
 
   const where: Prisma.DiagramWhereInput = {};
   if (query?.trim()) {
-    where.searchVector = { contains: stripStopWords(query.trim()) };
+    const cleanQuery = stripStopWords(query.trim());
+    const isPostgres =
+      process.env.PRISMA_PROVIDER === 'postgresql' ||
+      process.env.DATABASE_URL?.startsWith('postgres');
+
+    if (isPostgres) {
+      // Create a valid Postgres tsquery string connecting words with &
+      const tsQuery = cleanQuery.split(/\s+/).filter(Boolean).join(' & ');
+      if (tsQuery) {
+        where.searchVector = { search: tsQuery } as Prisma.StringFilter;
+      } else {
+        where.searchVector = { contains: cleanQuery };
+      }
+    } else {
+      where.searchVector = { contains: cleanQuery };
+    }
   }
   if (favoritesOnly) {
     where.isFavorite = true;

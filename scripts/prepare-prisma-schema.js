@@ -3,10 +3,13 @@ const fs = require('fs');
 const path = require('path');
 
 function resolveProvider() {
-  const raw = (process.env.DATABASE_URL || process.env.DB_CONNECTION || process.env.PRISMA_PROVIDER || '').toLowerCase();
+  const envVar =
+    process.env.DATABASE_URL || process.env.DB_CONNECTION || process.env.PRISMA_PROVIDER || '';
+  const raw = envVar.toLowerCase();
+
   if (raw.includes('postgres')) return 'postgresql';
   if (raw.includes('mysql')) return 'mysql';
-  if (raw.includes('sqlite') || raw.startsWith('file:')) return 'sqlite';
+
   return 'sqlite';
 }
 
@@ -17,17 +20,15 @@ function main() {
 
   const template = fs.readFileSync(templatePath, 'utf-8');
 
-  let noteIndex = '@@index([searchVector], map: "note_searchVector_idx")';
-  let diagramIndex = '@@index([searchVector], map: "diagram_searchVector_idx")';
-
-  if (provider === 'postgresql') {
-    // We use GIN indexes for Postgres, managed manually
-    noteIndex = '';
-    diagramIndex = '';
-  }
+  // GIN indexes for Postgres are managed manually
+  const isPostgres = provider === 'postgresql';
+  const noteIndex = isPostgres ? '' : '@@index([searchVector], map: "note_searchVector_idx")';
+  const diagramIndex = isPostgres ? '' : '@@index([searchVector], map: "diagram_searchVector_idx")';
+  const previewFeatures = isPostgres ? 'previewFeatures = ["fullTextSearchPostgres"]' : '';
 
   const nextSchema = template
     .replace(/@@PROVIDER@@/g, provider)
+    .replace(/@@PREVIEW_FEATURES@@/g, previewFeatures)
     .replace(/@@NOTE_INDEX@@/g, noteIndex)
     .replace(/@@DIAGRAM_INDEX@@/g, diagramIndex);
 
@@ -36,5 +37,3 @@ function main() {
 }
 
 main();
-
-

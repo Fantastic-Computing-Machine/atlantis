@@ -4,6 +4,7 @@ const { spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { buildSearchVector } = require('./searchVector');
+const { resolveDatabaseUrl, sqlitePathFromUrl } = require('./database-url');
 
 // Try to load .env if present
 try {
@@ -19,9 +20,6 @@ const lifecycle = process.env.npm_lifecycle_event;
 const isProd = process.env.NODE_ENV === 'production';
 const isCI = process.env.CI === 'true';
 const isDevScript = lifecycle === 'dev';
-if (!process.env.DATABASE_URL && process.env.DB_CONNECTION) {
-  process.env.DATABASE_URL = process.env.DB_CONNECTION;
-}
 const autoApplyEnv = process.env.PRISMA_AUTO_APPLY;
 const skipAutoPush = process.env.PRISMA_SKIP_AUTOPUSH === 'true';
 const forceGenerate = process.env.PRISMA_FORCE_GENERATE === 'true';
@@ -41,10 +39,9 @@ function run(cmd, args, options = {}) {
   }
 }
 
-function ensureDataDir() {
-  const url = process.env.DATABASE_URL || process.env.DB_CONNECTION;
+function ensureDataDir(url) {
   if (!url || !url.startsWith('file:')) return;
-  const filePath = toSqlitePath(url);
+  const filePath = sqlitePathFromUrl(url);
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -53,7 +50,7 @@ function ensureDataDir() {
 
 function createAdapter(url) {
   if (url.startsWith('file:')) {
-    ensureDataDir();
+    ensureDataDir(url);
     try {
       // Optional dependency in some builds
       const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
@@ -110,7 +107,9 @@ async function backfillSearchVectors(url) {
 }
 
 async function main() {
-  ensureDataDir();
+  const url = ensureDatabaseUrl();
+  const isSqlite = url.startsWith('file:');
+  const sqliteNeedsPush = isSqlite && needsSqliteDbPush(url);
 
   // Step 1: ensure provider-substituted schema
   run('node', ['scripts/prepare-prisma-schema.js']);
@@ -123,10 +122,6 @@ async function main() {
   // Step 3: apply schema to DB
   // Always push for SQLite if database file is missing or empty (ensures tables exist)
   // Also push in dev mode or when explicitly enabled
-  const url = ensureDatabaseUrl();
-  const isSqlite = url.startsWith('file:');
-  const sqliteNeedsPush = isSqlite && needsSqliteDbPush(url);
-
   if (!skipAutoPush && (shouldAutoApply || sqliteNeedsPush)) {
     run('npx', ['prisma', 'db', 'push']);
   }
@@ -145,7 +140,7 @@ async function main() {
  * Check if SQLite database needs a push (missing or very small file = no tables)
  */
 function needsSqliteDbPush(url) {
-  const filePath = toSqlitePath(url);
+  const filePath = sqlitePathFromUrl(url);
   try {
     const stats = fs.statSync(filePath);
     // SQLite header is 100 bytes; an empty schema db is typically ~12KB+
@@ -157,19 +152,10 @@ function needsSqliteDbPush(url) {
   }
 }
 
-function toSqlitePath(url) {
-  const withoutPrefix = url.replace(/^file:/, '');
-  const withoutQuery = withoutPrefix.split('?')[0].split('#')[0];
-  return path.resolve(root, withoutQuery);
-}
-
 function ensureDatabaseUrl() {
-  const existing = process.env.DATABASE_URL || process.env.DB_CONNECTION;
-  if (existing) return existing;
-  const fallback = 'file:./data/atlantis.db';
-  process.env.DATABASE_URL = fallback;
-  ensureDataDir();
-  return fallback;
+  const url = resolveDatabaseUrl();
+  ensureDataDir(url);
+  return url;
 }
 
 main().catch((err) => {

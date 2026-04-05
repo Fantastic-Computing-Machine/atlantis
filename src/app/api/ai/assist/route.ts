@@ -2,6 +2,7 @@ import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { logApiError } from '@/lib/logger';
 import { getAiApiKey, getAiProvider } from '@/lib/settings';
 import { NextResponse } from 'next/server';
+import { OPENAI_MODEL, GEMINI_MODEL, GEMINI_API_VERSION } from '@/lib/ai/config';
 
 type DomPurifyLike = {
   addHook: (hook: string, fn: () => void) => void;
@@ -21,10 +22,10 @@ async function ensureDomPurifyStub() {
 
     if (dompurifyDefault) {
       if (typeof dompurifyDefault.addHook !== 'function') {
-        dompurifyDefault.addHook = () => {};
+        dompurifyDefault.addHook = () => { };
       }
       if (typeof dompurifyDefault.removeHook !== 'function') {
-        dompurifyDefault.removeHook = () => {};
+        dompurifyDefault.removeHook = () => { };
       }
       if (typeof dompurifyDefault.sanitize !== 'function') {
         dompurifyDefault.sanitize = (input: unknown) => input;
@@ -37,8 +38,8 @@ async function ensureDomPurifyStub() {
   } catch {
     if (!g.DOMPurify || typeof g.DOMPurify.addHook !== 'function') {
       g.DOMPurify = {
-        addHook: () => {},
-        removeHook: () => {},
+        addHook: () => { },
+        removeHook: () => { },
         sanitize: (input: unknown) => input,
       };
     }
@@ -71,8 +72,7 @@ async function getMermaid(): Promise<MermaidInstance> {
   return mermaidInstance;
 }
 
-const OPENAI_MODEL = 'gpt-4o-mini';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
 
 const MAX_SELF_HEAL_ATTEMPTS = 2;
 
@@ -200,7 +200,7 @@ async function callOpenAI(apiKey: string, prompt: string, content: string): Prom
 async function callGemini(apiKey: string, prompt: string, content: string): Promise<string> {
   const userPrompt = buildUserPrompt(content, prompt);
   const attempt = async (model: string) => {
-    const endpoint = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const endpoint = `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

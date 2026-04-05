@@ -15,11 +15,19 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { GeminiSpark } from '@/components/icons/GeminiSpark';
+import { LIVE_SYNC_CONFIG } from '@/lib/live-sync-config';
 import { useDiagramStore } from '@/lib/store';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { CartesianGrid, Line, LineChart, XAxis } from 'recharts';
 import { toast } from 'sonner';
 import {
   AlertTriangle,
@@ -45,23 +53,26 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+const activityChartConfig = {
+  notes: {
+    label: 'Notes',
+    color: 'var(--chart-1)',
+  },
+  diagrams: {
+    label: 'Diagrams',
+    color: 'var(--chart-2)',
+  },
+} satisfies ChartConfig;
+
+const formatActivityDate = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
 export default function SettingsPage() {
   const { setTheme, theme } = useTheme();
-  const {
-    settings,
-    setAutoSave,
-    setHasAiApiKey,
-    setAiProvider,
-    setAiModel,
-    setMaxCheckpoints,
-    setAutoSaveDelay,
-    setDefaultExportFormat,
-    setExportScale,
-    setSnowMode,
-    setLiveSync,
-    setLiveSyncInterval,
-    setKittyMode,
-  } = useDiagramStore();
+  const { settings, updateSettings } = useDiagramStore();
 
   // AI Settings state
   const [apiKey, setApiKey] = useState('');
@@ -211,16 +222,16 @@ export default function SettingsPage() {
         const res = await fetch('/api/settings/ai-key');
         const data = await res.json();
         if (typeof data.hasKey === 'boolean') {
-          setHasAiApiKey(data.hasKey);
+          updateSettings({ hasAiApiKey: data.hasKey });
           setHasExistingKey(data.hasKey);
         }
         if (typeof data.provider === 'string') {
           setProvider(data.provider);
-          setAiProvider(data.provider);
+          updateSettings({ aiProvider: data.provider });
         }
         if (typeof data.aiModel === 'string') {
           setAiModelLocal(data.aiModel);
-          setAiModel(data.aiModel);
+          updateSettings({ aiModel: data.aiModel });
         }
         if (typeof data.fromEnv === 'boolean') {
           setIsKeyFromEnv(data.fromEnv);
@@ -230,7 +241,7 @@ export default function SettingsPage() {
       }
     };
     loadAiKey();
-  }, [setHasAiApiKey, setAiProvider, setAiModel]);
+  }, [updateSettings]);
 
   // Load advanced settings on mount
   useEffect(() => {
@@ -240,26 +251,26 @@ export default function SettingsPage() {
         const data = await res.json();
         if (typeof data.maxCheckpoints === 'number') {
           setLocalMaxCheckpoints(data.maxCheckpoints);
-          setMaxCheckpoints(data.maxCheckpoints);
+          updateSettings({ maxCheckpoints: data.maxCheckpoints });
         }
         if (typeof data.autoSaveDelay === 'number') {
           setLocalAutoSaveDelay(data.autoSaveDelay);
-          setAutoSaveDelay(data.autoSaveDelay);
+          updateSettings({ autoSaveDelay: data.autoSaveDelay });
         }
         if (data.defaultExportFormat) {
           setLocalExportFormat(data.defaultExportFormat);
-          setDefaultExportFormat(data.defaultExportFormat);
+          updateSettings({ defaultExportFormat: data.defaultExportFormat });
         }
         if (typeof data.exportScale === 'number') {
           setLocalExportScale(data.exportScale);
-          setExportScale(data.exportScale);
+          updateSettings({ exportScale: data.exportScale });
         }
       } catch {
         // ignore
       }
     };
     loadAdvanced();
-  }, [setMaxCheckpoints, setAutoSaveDelay, setDefaultExportFormat, setExportScale]);
+  }, [updateSettings]);
 
   const handleSaveAiKey = async () => {
     setIsSubmitting(true);
@@ -281,9 +292,9 @@ export default function SettingsPage() {
       }
 
       const data = await res.json();
-      setHasAiApiKey(Boolean(data.hasKey));
+      updateSettings({ hasAiApiKey: Boolean(data.hasKey) });
       if (typeof data.provider === 'string') {
-        setAiProvider(data.provider);
+        updateSettings({ aiProvider: data.provider });
       }
       setHasExistingKey(Boolean(data.hasKey));
       toast.success(data.hasKey ? 'AI key saved' : 'AI key removed');
@@ -313,7 +324,7 @@ export default function SettingsPage() {
         const message = typeof data.error === 'string' ? data.error : 'Failed to remove key';
         throw new Error(message);
       }
-      setHasAiApiKey(false);
+      updateSettings({ hasAiApiKey: false });
       setHasExistingKey(false);
       toast.success('AI key removed');
       setApiKey('');
@@ -421,7 +432,7 @@ export default function SettingsPage() {
             </Link>
           </Button>
           <div className="flex items-center gap-2">
-            <Link href="/" className="hover:opacity-80 transition-opacity">
+            <Link href="/" className="transition-opacity hover:opacity-80">
               <span className="text-2xl" role="img" aria-label="atlantis logo">
                 🔱
               </span>
@@ -460,12 +471,21 @@ export default function SettingsPage() {
                       : 'border-red-200 bg-red-500/10 text-red-600 dark:border-red-800 dark:text-red-300'
                 )}
               >
-                {dbStatus.status === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
-                {dbStatus.status === 'ok' && <CheckCircle2 className="h-4 w-4" />}
-                {dbStatus.status === 'error' && <XCircle className="h-4 w-4" />}
-                {dbStatus.status === 'ok' && 'Connected'}
-                {dbStatus.status === 'loading' && 'Checking...'}
-                {dbStatus.status === 'error' && 'Error'}
+                {dbStatus.status === 'loading' && (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Checking...
+                  </>
+                )}
+                {dbStatus.status === 'ok' && (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" /> Connected
+                  </>
+                )}
+                {dbStatus.status === 'error' && (
+                  <>
+                    <XCircle className="h-4 w-4" /> Error
+                  </>
+                )}
               </span>
             </div>
             <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
@@ -540,12 +560,14 @@ export default function SettingsPage() {
                 <p className="font-medium">{cacheStatus.enabled ? 'Yes' : 'No'}</p>
               </div>
             </div>
+            {cacheStatus.backend !== 'redis' && (
+              <div className="rounded-md border border-amber-200 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:text-amber-300">
+                Redis is not configured. Live sync still works, but collaboration may fall back to
+                polling and increase database traffic.
+              </div>
+            )}
             <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadCacheStatus}
-              >
+              <Button variant="outline" size="sm" onClick={loadCacheStatus}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Re-check
               </Button>
@@ -591,133 +613,68 @@ export default function SettingsPage() {
                   <p className="text-sm font-medium">Activity (Last 30 Days)</p>
                   <div className="border-muted-foreground/30 bg-muted/30 rounded-lg border border-dashed p-4">
                     {stats.activity.length > 0 ? (
-                      (() => {
-                        const maxNotes = Math.max(...stats.activity.map((d) => d.notes), 1);
-                        const maxDiagrams = Math.max(...stats.activity.map((d) => d.diagrams), 1);
-                        const maxValue = Math.max(maxNotes, maxDiagrams, 1);
-                        const width = 100;
-                        const height = 100;
-                        const padding = 4;
-                        const graphWidth = width - padding * 2;
-                        const graphHeight = height - padding * 2;
-                        const stepX = graphWidth / (stats.activity.length - 1 || 1);
-
-                        const notesPath = stats.activity
-                          .map((day, i) => {
-                            const x = padding + i * stepX;
-                            const y = padding + graphHeight - (day.notes / maxValue) * graphHeight;
-                            return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-                          })
-                          .join(' ');
-
-                        const diagramsPath = stats.activity
-                          .map((day, i) => {
-                            const x = padding + i * stepX;
-                            const y = padding + graphHeight - (day.diagrams / maxValue) * graphHeight;
-                            return `${i === 0 ? 'M' : 'L'} ${x} ${y}`;
-                          })
-                          .join(' ');
-
-                        return (
-                          <div className="relative">
-                            <svg
-                              viewBox={`0 0 ${width} ${height}`}
-                              className="h-28 w-full"
-                              preserveAspectRatio="none"
-                            >
-                              {/* Grid lines */}
-                              {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
-                                <line
-                                  key={ratio}
-                                  x1={padding}
-                                  y1={padding + graphHeight * (1 - ratio)}
-                                  x2={width - padding}
-                                  y2={padding + graphHeight * (1 - ratio)}
-                                  stroke="currentColor"
-                                  strokeOpacity={0.1}
-                                  strokeWidth={0.5}
-                                />
-                              ))}
-                              {/* Notes line (blue) */}
-                              <path
-                                d={notesPath}
-                                fill="none"
-                                stroke="#3b82f6"
-                                strokeWidth={2}
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                vectorEffect="non-scaling-stroke"
-                              />
-                              {/* Diagrams line (emerald) */}
-                              <path
-                                d={diagramsPath}
-                                fill="none"
-                                stroke="#10b981"
-                                strokeWidth={2}
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                vectorEffect="non-scaling-stroke"
-                              />
-                              {/* Data points for notes */}
-                              {stats.activity.map((day, i) => {
-                                const x = padding + i * stepX;
-                                const y = padding + graphHeight - (day.notes / maxValue) * graphHeight;
-                                return (
-                                  <circle
-                                    key={`note-${day.date}`}
-                                    cx={x}
-                                    cy={y}
-                                    r={1.5}
-                                    fill="#3b82f6"
-                                    vectorEffect="non-scaling-stroke"
-                                  />
-                                );
-                              })}
-                              {/* Data points for diagrams */}
-                              {stats.activity.map((day, i) => {
-                                const x = padding + i * stepX;
-                                const y = padding + graphHeight - (day.diagrams / maxValue) * graphHeight;
-                                return (
-                                  <circle
-                                    key={`diagram-${day.date}`}
-                                    cx={x}
-                                    cy={y}
-                                    r={1.5}
-                                    fill="#10b981"
-                                    vectorEffect="non-scaling-stroke"
-                                  />
-                                );
-                              })}
-                            </svg>
-                            {/* Legend */}
-                            <div className="mt-2 flex items-center justify-center gap-4 text-xs">
-                              <div className="flex items-center gap-1.5">
-                                <span className="h-2 w-2 rounded-full bg-blue-500" />
-                                <span className="text-muted-foreground">Notes</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                                <span className="text-muted-foreground">Diagrams</span>
-                              </div>
+                      <>
+                        <ChartContainer
+                          config={activityChartConfig}
+                          className="min-h-[220px] w-full"
+                        >
+                          <LineChart
+                            accessibilityLayer
+                            data={stats.activity}
+                            margin={{
+                              left: 12,
+                              right: 12,
+                            }}
+                          >
+                            <CartesianGrid vertical={false} />
+                            <XAxis
+                              dataKey="date"
+                              tickLine={false}
+                              axisLine={false}
+                              tickMargin={8}
+                              minTickGap={24}
+                              tickFormatter={(value) => formatActivityDate(String(value))}
+                            />
+                            <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                            <Line
+                              dataKey="notes"
+                              type="monotone"
+                              stroke="var(--color-notes)"
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                            <Line
+                              dataKey="diagrams"
+                              type="monotone"
+                              stroke="var(--color-diagrams)"
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                          </LineChart>
+                        </ChartContainer>
+                        <div className="text-muted-foreground mt-3 flex items-center justify-between text-xs">
+                          <div className="flex gap-3">
+                            <div className="flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-[var(--chart-1)]" />
+                              <span>Notes</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full bg-[var(--chart-2)]" />
+                              <span>Diagrams</span>
                             </div>
                           </div>
-                        );
-                      })()
+                          <span>{stats.activity.length} days</span>
+                        </div>
+                      </>
                     ) : (
                       <p className="text-muted-foreground text-center text-sm">No activity data</p>
                     )}
-                    <div className="text-muted-foreground mt-2 flex justify-between text-xs">
-                      <span>30 days ago</span>
-                      <span>Today</span>
-                    </div>
                   </div>
                 </div>
               </>
             )}
           </CardContent>
         </Card>
-
-
 
         {/* Tags Settings */}
         <Card>
@@ -727,11 +684,9 @@ export default function SettingsPage() {
               <CardTitle>Tags</CardTitle>
             </div>
             <CardDescription>
-              {stats.loading ? (
-                'Loading...'
-              ) : (
-                `Organize your content with tags. (${stats.totalTags} of 25 created)`
-              )}
+              {stats.loading
+                ? 'Loading...'
+                : `Organize your content with tags. (${stats.totalTags} of 25 created)`}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -760,39 +715,24 @@ export default function SettingsPage() {
                 <p className="text-muted-foreground text-sm">Choose your preferred theme.</p>
               </div>
               <div className="flex gap-2">
-                <Button
-                  variant={mounted && theme === 'light' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => {
-                    setTheme('light');
-                    toast.success('Theme set to Light');
-                  }}
-                >
-                  <Sun className="mr-1 h-4 w-4" />
-                  Light
-                </Button>
-                <Button
-                  variant={mounted && theme === 'dark' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => {
-                    setTheme('dark');
-                    toast.success('Theme set to Dark');
-                  }}
-                >
-                  <Moon className="mr-1 h-4 w-4" />
-                  Dark
-                </Button>
-                <Button
-                  variant={mounted && theme === 'system' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => {
-                    setTheme('system');
-                    toast.success('Theme set to System');
-                  }}
-                >
-                  <Monitor className="mr-1 h-4 w-4" />
-                  System
-                </Button>
+                {[
+                  { id: 'light', icon: Sun, label: 'Light' },
+                  { id: 'dark', icon: Moon, label: 'Dark' },
+                  { id: 'system', icon: Monitor, label: 'System' },
+                ].map(({ id, icon: Icon, label }) => (
+                  <Button
+                    key={id}
+                    variant={mounted && theme === id ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setTheme(id);
+                      toast.success(`Theme set to ${label}`);
+                    }}
+                  >
+                    <Icon className="mr-1 h-4 w-4" />
+                    {label}
+                  </Button>
+                ))}
               </div>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -806,22 +746,22 @@ export default function SettingsPage() {
               <Switch
                 checked={settings.snowMode ?? false}
                 onCheckedChange={(checked) => {
-                  setSnowMode(checked);
+                  updateSettings({ snowMode: checked });
                   toast.success(checked ? 'Let it snow! ❄️' : 'Snow stopped');
                 }}
               />
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="flex items-center gap-2 font-medium">
-                  🐱 Kitty Mode
+                <p className="flex items-center gap-2 font-medium">🐱 Kitty Mode</p>
+                <p className="text-muted-foreground text-sm">
+                  A playful kitty wanders across your screen!
                 </p>
-                <p className="text-muted-foreground text-sm">A playful kitty wanders across your screen!</p>
               </div>
               <Switch
                 checked={settings.kittyMode ?? false}
                 onCheckedChange={(checked) => {
-                  setKittyMode(checked);
+                  updateSettings({ kittyMode: checked });
                   toast.success(checked ? 'Meow! 🐱' : 'Kitty went to sleep');
                 }}
               />
@@ -846,7 +786,7 @@ export default function SettingsPage() {
               <Switch
                 checked={settings.autoSave}
                 onCheckedChange={(checked) => {
-                  setAutoSave(checked);
+                  updateSettings({ autoSave: checked });
                   toast.success(checked ? 'Auto-save enabled' : 'Auto-save disabled');
                 }}
               />
@@ -864,7 +804,7 @@ export default function SettingsPage() {
                 onChange={async (e) => {
                   const val = Number(e.target.value);
                   setLocalAutoSaveDelay(val);
-                  setAutoSaveDelay(val);
+                  updateSettings({ autoSaveDelay: val });
                   try {
                     const csrf = await ensureCsrfToken();
                     await fetch('/api/settings/advanced', {
@@ -888,39 +828,37 @@ export default function SettingsPage() {
               <div>
                 <p className="font-medium">Live Sync</p>
                 <p className="text-muted-foreground text-sm">
-                  Automatically sync changes from other users.
+                  Always enabled for realtime updates across sessions.
                 </p>
               </div>
-              <Switch
-                checked={settings.liveSync ?? true}
-                onCheckedChange={(checked) => {
-                  setLiveSync(checked);
-                  toast.success(checked ? 'Live sync enabled' : 'Live sync disabled');
-                }}
-              />
+              <span className="text-muted-foreground text-sm font-medium">Always On</span>
             </div>
+
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="font-medium">Sync Interval</p>
+                <p className="font-medium">Sync Transport</p>
                 <p className="text-muted-foreground text-sm">
-                  How often to check for updates from others.
+                  Controlled via environment variable.
                 </p>
               </div>
-              <select
-                className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm sm:w-32"
-                value={settings.liveSyncInterval ?? 5000}
-                onChange={(e) => {
-                  const val = Number(e.target.value);
-                  setLiveSyncInterval(val);
-                  toast.success('Sync interval updated');
-                }}
-              >
-                <option value={3000}>3 seconds</option>
-                <option value={5000}>5 seconds</option>
-                <option value={10000}>10 seconds</option>
-                <option value={30000}>30 seconds</option>
-              </select>
+              <span className="text-muted-foreground text-sm font-medium uppercase">
+                {LIVE_SYNC_CONFIG.method}
+              </span>
             </div>
+
+            {LIVE_SYNC_CONFIG.isPolling && (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-medium">Sync Interval</p>
+                  <p className="text-muted-foreground text-sm">
+                    Used only when polling transport is enabled.
+                  </p>
+                </div>
+                <span className="text-muted-foreground text-sm font-medium">
+                  {LIVE_SYNC_CONFIG.pollIntervalMs / 1000} seconds
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1138,10 +1076,12 @@ export default function SettingsPage() {
                       exportScale: localExportScale,
                     }),
                   });
-                  setMaxCheckpoints(localMaxCheckpoints);
-                  setAutoSaveDelay(localAutoSaveDelay);
-                  setDefaultExportFormat(localExportFormat);
-                  setExportScale(localExportScale);
+                  updateSettings({
+                    maxCheckpoints: localMaxCheckpoints,
+                    autoSaveDelay: localAutoSaveDelay,
+                    defaultExportFormat: localExportFormat,
+                    exportScale: localExportScale,
+                  });
                   toast.success('Advanced settings saved');
                 } catch {
                   toast.error('Failed to save settings');
@@ -1173,17 +1113,21 @@ export default function SettingsPage() {
                   Permanently delete all diagrams, notes, and settings.
                 </p>
               </div>
-              <Button variant="destructive" className="w-full sm:w-auto" onClick={() => setIsWipeDialogOpen(true)}>
+              <Button
+                variant="destructive"
+                className="w-full sm:w-auto"
+                onClick={() => setIsWipeDialogOpen(true)}
+              >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Wipe Database
               </Button>
             </div>
           </CardContent>
         </Card>
-      </main >
+      </main>
 
       {/* Wipe Confirmation Dialog */}
-      < AlertDialog open={isWipeDialogOpen} onOpenChange={handleWipeDialogClose} >
+      <AlertDialog open={isWipeDialogOpen} onOpenChange={handleWipeDialogClose}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-destructive flex items-center gap-2">
@@ -1245,10 +1189,10 @@ export default function SettingsPage() {
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog >
+      </AlertDialog>
 
       {/* Footer */}
-      < footer className="container mx-auto max-w-2xl px-4 py-8 text-center" >
+      <footer className="container mx-auto max-w-2xl px-4 py-8 text-center">
         <p className="text-muted-foreground text-sm">
           Made with <span className="text-red-500">❤️</span> by Terrestrian 🌏
         </p>
@@ -1264,7 +1208,7 @@ export default function SettingsPage() {
             <span>Fantastic-Computing-Machine/atlantis</span>
           </a>
         </div>
-      </footer >
-    </div >
+      </footer>
+    </div>
   );
 }

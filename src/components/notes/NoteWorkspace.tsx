@@ -26,9 +26,10 @@ import {
 
 import type { Note, Tag } from '@/lib/types';
 import { ensureCsrfToken, withCsrfHeader } from '@/lib/csrf-client';
+import { LIVE_SYNC_CONFIG } from '@/lib/live-sync-config';
 import { cn } from '@/lib/utils';
 import { useDiagramStore } from '@/lib/store';
-import { useLiveSync } from '@/lib/useLiveSync';
+import { getLiveSyncClientId, useLiveSync } from '@/lib/useLiveSync';
 import { useNotes } from '@/components/notes/NotesContext';
 import {
   Star,
@@ -44,7 +45,7 @@ import {
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface NoteWorkspaceProps {
@@ -64,6 +65,13 @@ const SUPPORTED_LANGUAGES = [
   { value: 'todo', label: 'Todo List' },
 ];
 
+const nextIsoAfter = (currentIso: string): string => {
+  const currentMs = Date.parse(currentIso);
+  const nowMs = Date.now();
+  const nextMs = Number.isFinite(currentMs) ? Math.max(nowMs, currentMs + 1) : nowMs;
+  return new Date(nextMs).toISOString();
+};
+
 export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
   const router = useRouter();
   const { settings } = useDiagramStore();
@@ -76,41 +84,100 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
   const [tags, setTags] = useState<Tag[]>(initialNote.tags || []);
   const [isPrivate, setIsPrivate] = useState(initialNote.private);
   const [starred, setStarred] = useState(initialNote.starred);
+  const [liveUpdatedAt, setLiveUpdatedAt] = useState(initialNote.updatedAt);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [mounted, setMounted] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const draftPublishTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const draftSeqRef = useRef(0);
+  const clientId = useMemo(() => getLiveSyncClientId(), []);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Live sync: poll for external changes from other users
-  const { refresh: syncFromServer } = useLiveSync<Note>({
+  const publishDraftUpdate = useCallback(
+    async (next: Note) => {
+      if (!mounted || next.private) return;
+
+      try {
+        await ensureCsrfToken();
+        const seq = ++draftSeqRef.current;
+        await fetch(
+          '/api/sync/publish',
+          withCsrfHeader({
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-client-id': clientId,
+            },
+            body: JSON.stringify({
+              topic: `draft:note:${next.id}`,
+              source: clientId,
+              payload: {
+                ...next,
+                seq,
+              },
+            }),
+          })
+        );
+      } catch {
+        // ignore draft sync errors; autosave remains source of truth
+      }
+    },
+    [clientId, mounted]
+  );
+
+  const queueDraftUpdate = useCallback(
+    (next: Note) => {
+      if (!mounted || next.private) return;
+
+      if (draftPublishTimerRef.current) {
+        clearTimeout(draftPublishTimerRef.current);
+      }
+
+      draftPublishTimerRef.current = setTimeout(() => {
+        draftPublishTimerRef.current = null;
+        void publishDraftUpdate(next);
+      }, 180);
+    },
+    [mounted, publishDraftUpdate]
+  );
+
+  useLiveSync<Note>({
     resourceUrl: `/api/notes/${note.id}`,
-    currentUpdatedAt: note.updatedAt,
+    currentUpdatedAt: liveUpdatedAt,
     hasLocalChanges: hasChanges,
-    enabled: Boolean(settings.liveSync) && mounted && !note.private,
-    intervalMs: settings.liveSyncInterval ?? 5000,
+    enabled: LIVE_SYNC_CONFIG.enabled && mounted && !isPrivate,
+    intervalMs: LIVE_SYNC_CONFIG.pollIntervalMs,
+    liveSyncMethod: LIVE_SYNC_CONFIG.method,
+    eventTopics: [`doc:note:${note.id}`, `draft:note:${note.id}`],
+    allowWhileDirty: true,
+    isInstantPayload: (payload): payload is Note => {
+      if (!payload || typeof payload !== 'object') return false;
+      const candidate = payload as Partial<Note>;
+      return (
+        typeof candidate.id === 'string' &&
+        typeof candidate.title === 'string' &&
+        typeof candidate.content === 'string' &&
+        typeof candidate.language === 'string' &&
+        typeof candidate.updatedAt === 'string'
+      );
+    },
     onUpdate: (remoteNote) => {
       setNote(remoteNote);
+      setLiveUpdatedAt(remoteNote.updatedAt);
       setTitle(remoteNote.title);
       setContent(remoteNote.content);
       setLanguage(remoteNote.language);
       setTags(remoteNote.tags || []);
       setIsPrivate(remoteNote.private);
       setStarred(remoteNote.starred);
+      setStarred(remoteNote.starred);
       setHasChanges(false);
-      updateNote(note.id, {
-        title: remoteNote.title,
-        language: remoteNote.language,
-        starred: remoteNote.starred,
-        private: remoteNote.private,
-        tags: remoteNote.tags || [],
-        emoji: remoteNote.emoji,
-        updatedAt: remoteNote.updatedAt,
-      });
+      updateNote(note.id, remoteNote);
     },
     onExternalChange: () => {
       toast.info('Note updated by another user');
@@ -121,11 +188,90 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
   useEffect(() => {
     const changed =
       title !== note.title ||
-      content !== note.content;
+      content !== note.content ||
+      language !== note.language ||
+      isPrivate !== note.private ||
+      JSON.stringify(tags) !== JSON.stringify(note.tags || []);
     setHasChanges(changed);
-  }, [title, content, note]);
+  }, [title, content, language, isPrivate, tags, note]);
 
+  useEffect(() => {
+    return () => {
+      if (draftPublishTimerRef.current) {
+        clearTimeout(draftPublishTimerRef.current);
+      }
+    };
+  }, []);
 
+  const emitDraft = useCallback(
+    (patch: Partial<Note>) => {
+      if (!mounted) return;
+
+      const nextDraft: Note = {
+        ...note,
+        title,
+        content,
+        language,
+        starred,
+        private: isPrivate,
+        tags,
+        updatedAt: nextIsoAfter(liveUpdatedAt),
+        ...patch,
+      };
+
+      if (nextDraft.private) {
+        return;
+      }
+
+      setLiveUpdatedAt(nextDraft.updatedAt);
+      queueDraftUpdate(nextDraft);
+    },
+    [
+      mounted,
+      note,
+      title,
+      content,
+      language,
+      starred,
+      isPrivate,
+      tags,
+      liveUpdatedAt,
+      queueDraftUpdate,
+    ]
+  );
+
+  const handleTitleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const nextTitle = e.target.value;
+      setTitle(nextTitle);
+      emitDraft({ title: nextTitle });
+    },
+    [emitDraft]
+  );
+
+  const handleContentChange = useCallback(
+    (nextContent: string) => {
+      setContent(nextContent);
+      emitDraft({ content: nextContent });
+    },
+    [emitDraft]
+  );
+
+  const handleLanguageChange = useCallback(
+    (nextLanguage: string) => {
+      setLanguage(nextLanguage);
+      emitDraft({ language: nextLanguage });
+    },
+    [emitDraft]
+  );
+
+  const handleTagsChange = useCallback(
+    (nextTags: Tag[]) => {
+      setTags(nextTags);
+      emitDraft({ tags: nextTags });
+    },
+    [emitDraft]
+  );
 
   const handleSave = useCallback(async () => {
     if (isSaving) return;
@@ -144,7 +290,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         `/api/notes/${note.id}`,
         withCsrfHeader({
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-client-id': clientId },
           body: JSON.stringify({
             title,
             content,
@@ -162,53 +308,23 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
 
       const updatedNote = await res.json();
       setNote(updatedNote);
+      setLiveUpdatedAt(updatedNote.updatedAt);
       setTags(updatedNote.tags || []);
       setHasChanges(false);
 
       // Update sidebar in real-time
-      updateNote(note.id, {
-        title: updatedNote.title,
-        language: updatedNote.language,
-        starred: updatedNote.starred,
-        private: updatedNote.private,
-        tags: updatedNote.tags || [],
-        emoji: updatedNote.emoji,
-        updatedAt: updatedNote.updatedAt,
-      });
-      // Sync from server after save to pull any concurrent changes
-      syncFromServer();
+      updateNote(note.id, updatedNote);
     } catch {
       toast.error('Failed to save note');
     } finally {
       setIsSaving(false);
     }
-  }, [
-    note.id,
-    title,
-    content,
-    language,
-    isPrivate,
-    starred,
-    isSaving,
-    updateNote,
-    syncFromServer,
-    tags,
-  ]);
-
-  // Immediate save for settings/meta (tags, language, private)
-  useEffect(() => {
-    const tagsChanged = JSON.stringify(tags) !== JSON.stringify(note.tags || []);
-    const languageChanged = language !== note.language;
-    const privateChanged = isPrivate !== note.private;
-
-    if (tagsChanged || languageChanged || privateChanged) {
-      handleSave();
-    }
-  }, [tags, language, isPrivate, note, handleSave]);
+  }, [note.id, title, content, language, isPrivate, starred, isSaving, updateNote, tags, clientId]);
 
   // Auto-save debounced (only if autoSave is enabled)
   useEffect(() => {
     if (!hasChanges || !settings.autoSave) return;
+    const autoSaveDelay = settings.autoSaveDelay ?? 2000;
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -216,14 +332,14 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
 
     saveTimeoutRef.current = setTimeout(() => {
       handleSave();
-    }, 2000);
+    }, autoSaveDelay);
 
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [hasChanges, settings.autoSave, handleSave]);
+  }, [hasChanges, settings.autoSave, settings.autoSaveDelay, handleSave]);
 
   // Ctrl+S to save
   useEffect(() => {
@@ -244,6 +360,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         `/api/notes/${note.id}`,
         withCsrfHeader({
           method: 'DELETE',
+          headers: { 'x-client-id': clientId },
         })
       );
 
@@ -258,11 +375,12 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     } catch {
       toast.error('Failed to delete note');
     }
-  }, [note.id, router, removeNote]);
+  }, [note.id, router, removeNote, clientId]);
 
   const toggleStarred = useCallback(async () => {
     const newStarred = !starred;
     setStarred(newStarred);
+    emitDraft({ starred: newStarred });
 
     // Immediately persist starred state to server
     try {
@@ -271,7 +389,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         `/api/notes/${note.id}`,
         withCsrfHeader({
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-client-id': clientId },
           body: JSON.stringify({ starred: newStarred }),
         })
       );
@@ -289,6 +407,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         starred: updatedNote.starred,
         updatedAt: updatedNote.updatedAt,
       }));
+      setLiveUpdatedAt(updatedNote.updatedAt);
 
       // Update sidebar in real-time
       updateNote(note.id, {
@@ -298,11 +417,15 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     } catch {
       toast.error('Failed to update starred status');
     }
-  }, [starred, note.id, updateNote]);
+  }, [starred, note.id, updateNote, clientId, emitDraft]);
 
   const togglePrivate = useCallback(() => {
-    setIsPrivate((prev) => !prev);
-  }, []);
+    setIsPrivate((prev) => {
+      const nextPrivate = !prev;
+      emitDraft({ private: nextPrivate });
+      return nextPrivate;
+    });
+  }, [emitDraft]);
 
   const handleDownload = useCallback(() => {
     const extensionMap: Record<string, string> = {
@@ -332,7 +455,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
         '/api/notes',
         withCsrfHeader({
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-client-id': clientId },
           body: JSON.stringify({ title: 'Untitled Note' }),
         })
       );
@@ -349,7 +472,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     } catch {
       toast.error('Failed to create note');
     }
-  }, [router, addNote]);
+  }, [router, addNote, clientId]);
 
   return (
     <div className="flex h-full flex-col">
@@ -370,7 +493,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
           <div className="flex max-w-xl min-w-0 flex-1 items-center gap-2">
             <input
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={handleTitleInputChange}
               onBlur={handleSave}
               className="placeholder:text-muted-foreground/50 text-foreground min-w-[60px] flex-1 truncate border-none bg-transparent px-0 text-sm font-medium focus:ring-0 focus:outline-none sm:text-base"
               placeholder="Note title..."
@@ -378,7 +501,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
             <div className="shrink-0">
               <ResponsiveTagPicker
                 selectedTags={tags}
-                onTagsChange={setTags}
+                onTagsChange={handleTagsChange}
                 maxTags={3}
                 align="start"
               />
@@ -410,7 +533,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
               {SUPPORTED_LANGUAGES.map((lang) => (
                 <DropdownMenuItem
                   key={lang.value}
-                  onClick={() => setLanguage(lang.value)}
+                  onClick={() => handleLanguageChange(lang.value)}
                   className={language === lang.value ? 'bg-muted' : ''}
                 >
                   {lang.label}
@@ -432,7 +555,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
               {SUPPORTED_LANGUAGES.map((lang) => (
                 <DropdownMenuItem
                   key={lang.value}
-                  onClick={() => setLanguage(lang.value)}
+                  onClick={() => handleLanguageChange(lang.value)}
                   className={cn('sm:hidden', language === lang.value && 'bg-muted')}
                 >
                   {lang.label}
@@ -481,7 +604,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
 
           <Button size="sm" variant="ghost" onClick={handleCreateNote} aria-label="Create new note">
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline sm:ml-1">New</span>
+            <span className="hidden sm:ml-1 sm:inline">New</span>
           </Button>
         </div>
       </div>
@@ -490,7 +613,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
       <div className="min-h-0 flex-1">
         <NoteEditor
           value={content}
-          onChange={setContent}
+          onChange={handleContentChange}
           language={language}
           isPrivate={isPrivate}
           onTogglePrivate={togglePrivate}
