@@ -23,9 +23,7 @@
   "paths": {
     "/api/access/diagrams": {
       "get": {
-        "tags": [
-          "Diagrams"
-        ],
+        "tags": ["Diagrams"],
         "summary": "List all diagrams",
         "description": "Retrieve a paginated list of all stored diagrams. Requires `ENABLE_API_ACCESS=true`.",
         "parameters": [
@@ -65,9 +63,7 @@
         }
       },
       "post": {
-        "tags": [
-          "Diagrams"
-        ],
+        "tags": ["Diagrams"],
         "summary": "Create a new diagram",
         "description": "Create a new diagram with Mermaid content. Validates syntax before saving. Requires `ENABLE_API_ACCESS=true`.",
         "requestBody": {
@@ -102,9 +98,7 @@
     },
     "/api/access/diagrams/{id}": {
       "get": {
-        "tags": [
-          "Diagrams"
-        ],
+        "tags": ["Diagrams"],
         "summary": "Get a single diagram",
         "description": "Retrieve the full details of a specific diagram by ID. Requires `ENABLE_API_ACCESS=true`.",
         "parameters": [
@@ -140,9 +134,7 @@
     },
     "/api/access/notes": {
       "get": {
-        "tags": [
-          "Notes"
-        ],
+        "tags": ["Notes"],
         "summary": "List all notes",
         "description": "Retrieve a list of notes. Content is omitted from the list for performance. Requires `ENABLE_API_ACCESS=true`.",
         "parameters": [
@@ -182,9 +174,7 @@
         }
       },
       "post": {
-        "tags": [
-          "Notes"
-        ],
+        "tags": ["Notes"],
         "summary": "Create a new note",
         "description": "Create a new note. Requires `ENABLE_API_ACCESS=true`.",
         "requestBody": {
@@ -219,9 +209,7 @@
     },
     "/api/access/notes/{id}": {
       "get": {
-        "tags": [
-          "Notes"
-        ],
+        "tags": ["Notes"],
         "summary": "Get a note",
         "description": "Retrieve a specific note by ID. Requires `ENABLE_API_ACCESS=true`.",
         "parameters": [
@@ -293,9 +281,7 @@
       },
       "CreateDiagramRequest": {
         "type": "object",
-        "required": [
-          "content"
-        ],
+        "required": ["content"],
         "properties": {
           "title": {
             "type": "string",

@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  @@PREVIEW_FEATURES@@
 }
 
 // Provider is resolved from env (DB_CONNECTION or PRISMA_PROVIDER) with sqlite fallback

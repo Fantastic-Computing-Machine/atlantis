@@ -9,211 +9,267 @@ import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import type { EditorView } from '@codemirror/view';
 
 interface NoteSearchReplaceProps {
-    editorView: EditorView | null;
-    onClose: () => void;
+  editorView: EditorView | null;
+  onClose: () => void;
 }
 
 export function NoteSearchReplace({ editorView, onClose }: NoteSearchReplaceProps) {
-    const [findText, setFindText] = useState('');
-    const [replaceText, setReplaceText] = useState('');
-    const [matchCase, setMatchCase] = useState(false);
-    const [wholeWord, setWholeWord] = useState(false);
-    const [wrapAround, setWrapAround] = useState(true);
-    const [useRegex, setUseRegex] = useState(false);
-    const [currentMatch, setCurrentMatch] = useState(0);
-    const findInputRef = useRef<HTMLInputElement>(null);
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
+  const [matchCase, setMatchCase] = useState(false);
+  const [wholeWord, setWholeWord] = useState(false);
+  const [wrapAround, setWrapAround] = useState(true);
+  const [useRegex, setUseRegex] = useState(false);
+  const [currentMatch, setCurrentMatch] = useState(0);
+  const findInputRef = useRef<HTMLInputElement>(null);
 
-    const matches = useMemo(() => {
-        if (!editorView || !findText) return [];
-        const doc = editorView.state.doc.toString();
-        const results: { from: number; to: number }[] = [];
+  const matches = useMemo(() => {
+    if (!editorView || !findText) return [];
+    const doc = editorView.state.doc.toString();
+    const results: { from: number; to: number }[] = [];
 
-        try {
-            let pattern: RegExp;
-            if (useRegex) {
-                pattern = new RegExp(findText, matchCase ? 'g' : 'gi');
-            } else {
-                const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const wordBoundary = wholeWord ? '\\b' : '';
-                pattern = new RegExp(`${wordBoundary}${escaped}${wordBoundary}`, matchCase ? 'g' : 'gi');
-            }
+    try {
+      let pattern: RegExp;
+      if (useRegex) {
+        pattern = new RegExp(findText, matchCase ? 'g' : 'gi');
+      } else {
+        const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const wordBoundary = wholeWord ? '\\b' : '';
+        pattern = new RegExp(`${wordBoundary}${escaped}${wordBoundary}`, matchCase ? 'g' : 'gi');
+      }
 
-            let match: RegExpExecArray | null;
-            while ((match = pattern.exec(doc)) !== null) {
-                results.push({ from: match.index, to: match.index + match[0].length });
-                if (match.index === pattern.lastIndex) {
-                    pattern.lastIndex++;
-                }
-            }
-        } catch {
-            // Invalid regex
+      let match: RegExpExecArray | null;
+      while ((match = pattern.exec(doc)) !== null) {
+        results.push({ from: match.index, to: match.index + match[0].length });
+        if (match.index === pattern.lastIndex) {
+          pattern.lastIndex++;
         }
-        return results;
-    }, [editorView, findText, matchCase, wholeWord, useRegex]);
+      }
+    } catch {
+      // Invalid regex
+    }
+    return results;
+  }, [editorView, findText, matchCase, wholeWord, useRegex]);
 
-    useEffect(() => {
-        findInputRef.current?.focus();
-    }, []);
+  useEffect(() => {
+    findInputRef.current?.focus();
+  }, []);
 
-    useEffect(() => {
-        // Async update to avoid "setState in effect" warning (cascading render)
-        // and loop is prevented by conditional check
-        const t = setTimeout(() => {
-            if (matches.length > 0 && currentMatch > matches.length) {
-                setCurrentMatch(matches.length);
-            } else if (matches.length > 0 && currentMatch === 0) {
-                setCurrentMatch(1);
-            } else if (matches.length === 0 && currentMatch !== 0) {
-                setCurrentMatch(0);
-            }
-        }, 0);
-        return () => clearTimeout(t);
-    }, [matches.length, currentMatch]);
-
-
-
-    const goToMatch = useCallback((index: number) => {
-        if (!editorView) return;
-        if (matches.length === 0) return;
-
-        let targetIndex = index;
-        if (wrapAround) {
-            if (targetIndex > matches.length) targetIndex = 1;
-            if (targetIndex < 1) targetIndex = matches.length;
-        } else {
-            if (targetIndex > matches.length) targetIndex = matches.length;
-            if (targetIndex < 1) targetIndex = 1;
-        }
-
-        const match = matches[targetIndex - 1];
-        editorView.dispatch({
-            selection: { anchor: match.from, head: match.to },
-            scrollIntoView: true,
-        });
-        setCurrentMatch(targetIndex);
-    }, [editorView, matches, wrapAround]);
-
-    const handleFindNext = useCallback(() => {
-        goToMatch(currentMatch + 1);
-    }, [currentMatch, goToMatch]);
-
-    const handleFindPrev = useCallback(() => {
-        goToMatch(currentMatch - 1);
-    }, [currentMatch, goToMatch]);
-
-    const handleReplace = useCallback(() => {
-        if (!editorView) return;
-        if (matches.length === 0 || currentMatch === 0) return;
-
-        const match = matches[currentMatch - 1];
-        editorView.dispatch({
-            changes: { from: match.from, to: match.to, insert: replaceText },
-        });
-
-        // Re-find matches will happen via useMemo automatically when doc changes?
-        // Note: CodeMirror updates are imperative. We need to trigger a re-render or depends on external state.
-        // Assuming EditorView update triggers component update or we force update?
-        // Actually, NoteSearchReplace props only have `editorView`. If editor content changes, we might need a way to know.
-        // But for now let's assume 'matches' recalculates if `editorView` doesn't change? No, only if deps change.
-        // `editorView.state.doc.toString()` gives current text. If text changes, `matches` won't update unless `findText` etc changes.
-        // We need 'matches' to depend on content. But content isn't a prop.
-        // This is why `getMatches` was used imperatively.
-        // To fix this properly, we need to subscribe to editor updates or force update properly.
-        // For this refactor, I will keep `matches` as memo BUT add a `trigger` state incremented on replace.
-    }, [editorView, matches, currentMatch, replaceText]);
-
-    const handleReplaceAll = useCallback(() => {
-        if (!editorView || !findText) return;
-        if (matches.length === 0) return;
-
-        // Replace from end to start to preserve indices
-        const sortedMatches = [...matches].sort((a, b) => b.from - a.from);
-        const changes = sortedMatches.map((match) => ({
-            from: match.from,
-            to: match.to,
-            insert: replaceText,
-        }));
-
-        editorView.dispatch({ changes });
+  useEffect(() => {
+    // Async update to avoid "setState in effect" warning (cascading render)
+    // and loop is prevented by conditional check
+    const t = setTimeout(() => {
+      if (matches.length > 0 && currentMatch > matches.length) {
+        setCurrentMatch(matches.length);
+      } else if (matches.length > 0 && currentMatch === 0) {
+        setCurrentMatch(1);
+      } else if (matches.length === 0 && currentMatch !== 0) {
         setCurrentMatch(0);
-    }, [editorView, findText, matches, replaceText]);
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [matches.length, currentMatch]);
 
-    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            if (e.shiftKey) {
-                handleFindPrev();
-            } else {
-                handleFindNext();
-            }
-        } else if (e.key === 'Escape') {
-            onClose();
+  const goToMatch = useCallback(
+    (index: number) => {
+      if (!editorView) return;
+      if (matches.length === 0) return;
+
+      let targetIndex = index;
+      if (wrapAround) {
+        if (targetIndex > matches.length) targetIndex = 1;
+        if (targetIndex < 1) targetIndex = matches.length;
+      } else {
+        if (targetIndex > matches.length) targetIndex = matches.length;
+        if (targetIndex < 1) targetIndex = 1;
+      }
+
+      const match = matches[targetIndex - 1];
+      editorView.dispatch({
+        selection: { anchor: match.from, head: match.to },
+        scrollIntoView: true,
+      });
+      setCurrentMatch(targetIndex);
+    },
+    [editorView, matches, wrapAround]
+  );
+
+  const handleFindNext = useCallback(() => {
+    goToMatch(currentMatch + 1);
+  }, [currentMatch, goToMatch]);
+
+  const handleFindPrev = useCallback(() => {
+    goToMatch(currentMatch - 1);
+  }, [currentMatch, goToMatch]);
+
+  const handleReplace = useCallback(() => {
+    if (!editorView) return;
+    if (matches.length === 0 || currentMatch === 0) return;
+
+    const match = matches[currentMatch - 1];
+    editorView.dispatch({
+      changes: { from: match.from, to: match.to, insert: replaceText },
+    });
+
+    // Re-find matches will happen via useMemo automatically when doc changes?
+    // Note: CodeMirror updates are imperative. We need to trigger a re-render or depends on external state.
+    // Assuming EditorView update triggers component update or we force update?
+    // Actually, NoteSearchReplace props only have `editorView`. If editor content changes, we might need a way to know.
+    // But for now let's assume 'matches' recalculates if `editorView` doesn't change? No, only if deps change.
+    // `editorView.state.doc.toString()` gives current text. If text changes, `matches` won't update unless `findText` etc changes.
+    // We need 'matches' to depend on content. But content isn't a prop.
+    // This is why `getMatches` was used imperatively.
+    // To fix this properly, we need to subscribe to editor updates or force update properly.
+    // For this refactor, I will keep `matches` as memo BUT add a `trigger` state incremented on replace.
+  }, [editorView, matches, currentMatch, replaceText]);
+
+  const handleReplaceAll = useCallback(() => {
+    if (!editorView || !findText) return;
+    if (matches.length === 0) return;
+
+    // Replace from end to start to preserve indices
+    const sortedMatches = [...matches].sort((a, b) => b.from - a.from);
+    const changes = sortedMatches.map((match) => ({
+      from: match.from,
+      to: match.to,
+      insert: replaceText,
+    }));
+
+    editorView.dispatch({ changes });
+    setCurrentMatch(0);
+  }, [editorView, findText, matches, replaceText]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleFindPrev();
+        } else {
+          handleFindNext();
         }
-    }, [handleFindNext, handleFindPrev, onClose]);
+      } else if (e.key === 'Escape') {
+        onClose();
+      }
+    },
+    [handleFindNext, handleFindPrev, onClose]
+  );
 
-    return (
-        <div className="border-b bg-muted/20 p-3 space-y-3">
-            {/* Find Row */}
-            <div className="flex items-center gap-2">
-                <Input
-                    ref={findInputRef}
-                    placeholder="Find"
-                    value={findText}
-                    onChange={(e) => setFindText(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    className="flex-1 h-8 text-sm"
-                />
-                <span className="text-xs text-muted-foreground min-w-[60px] text-right">
-                    {matches.length > 0 ? `${currentMatch}/${matches.length}` : 'No matches'}
-                </span>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleFindPrev} disabled={matches.length === 0}>
-                    <ChevronUp className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleFindNext} disabled={matches.length === 0}>
-                    <ChevronDown className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
-                    <X className="h-4 w-4" />
-                </Button>
-            </div>
+  return (
+    <div className="bg-muted/20 space-y-3 border-b p-3">
+      {/* Find Row */}
+      <div className="flex items-center gap-2">
+        <Input
+          ref={findInputRef}
+          placeholder="Find"
+          value={findText}
+          onChange={(e) => setFindText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="h-8 flex-1 text-sm"
+        />
+        <span className="text-muted-foreground min-w-[60px] text-right text-xs">
+          {matches.length > 0 ? `${currentMatch}/${matches.length}` : 'No matches'}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={handleFindPrev}
+          disabled={matches.length === 0}
+        >
+          <ChevronUp className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={handleFindNext}
+          disabled={matches.length === 0}
+        >
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
 
-            {/* Replace Row */}
-            <div className="flex items-center gap-2">
-                <Input
-                    placeholder="Replace with"
-                    value={replaceText}
-                    onChange={(e) => setReplaceText(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    className="flex-1 h-8 text-sm"
-                />
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleReplace} disabled={matches.length === 0}>
-                    <Replace className="h-3 w-3 mr-1" />
-                    Replace
-                </Button>
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleReplaceAll} disabled={matches.length === 0}>
-                    Replace All
-                </Button>
-            </div>
+      {/* Replace Row */}
+      <div className="flex items-center gap-2">
+        <Input
+          placeholder="Replace with"
+          value={replaceText}
+          onChange={(e) => setReplaceText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="h-8 flex-1 text-sm"
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={handleReplace}
+          disabled={matches.length === 0}
+        >
+          <Replace className="mr-1 h-3 w-3" />
+          Replace
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={handleReplaceAll}
+          disabled={matches.length === 0}
+        >
+          Replace All
+        </Button>
+      </div>
 
-            {/* Options Row */}
-            <div className="flex items-center gap-4 text-xs">
-                <div className="flex items-center gap-1.5">
-                    <Switch id="matchCase" checked={matchCase} onCheckedChange={setMatchCase} className="h-4 w-7" />
-                    <Label htmlFor="matchCase" className="text-xs cursor-pointer">Match case</Label>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <Switch id="wholeWord" checked={wholeWord} onCheckedChange={setWholeWord} className="h-4 w-7" />
-                    <Label htmlFor="wholeWord" className="text-xs cursor-pointer">Whole word</Label>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <Switch id="wrapAround" checked={wrapAround} onCheckedChange={setWrapAround} className="h-4 w-7" />
-                    <Label htmlFor="wrapAround" className="text-xs cursor-pointer">Wrap around</Label>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <Switch id="useRegex" checked={useRegex} onCheckedChange={setUseRegex} className="h-4 w-7" />
-                    <Label htmlFor="useRegex" className="text-xs cursor-pointer">Regex</Label>
-                </div>
-            </div>
+      {/* Options Row */}
+      <div className="flex items-center gap-4 text-xs">
+        <div className="flex items-center gap-1.5">
+          <Switch
+            id="matchCase"
+            checked={matchCase}
+            onCheckedChange={setMatchCase}
+            className="h-4 w-7"
+          />
+          <Label htmlFor="matchCase" className="cursor-pointer text-xs">
+            Match case
+          </Label>
         </div>
-    );
+        <div className="flex items-center gap-1.5">
+          <Switch
+            id="wholeWord"
+            checked={wholeWord}
+            onCheckedChange={setWholeWord}
+            className="h-4 w-7"
+          />
+          <Label htmlFor="wholeWord" className="cursor-pointer text-xs">
+            Whole word
+          </Label>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Switch
+            id="wrapAround"
+            checked={wrapAround}
+            onCheckedChange={setWrapAround}
+            className="h-4 w-7"
+          />
+          <Label htmlFor="wrapAround" className="cursor-pointer text-xs">
+            Wrap around
+          </Label>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Switch
+            id="useRegex"
+            checked={useRegex}
+            onCheckedChange={setUseRegex}
+            className="h-4 w-7"
+          />
+          <Label htmlFor="useRegex" className="cursor-pointer text-xs">
+            Regex
+          </Label>
+        </div>
+      </div>
+    </div>
+  );
 }

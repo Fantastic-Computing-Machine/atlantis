@@ -3,19 +3,9 @@ import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { resolveDatabaseUrl, sqlitePathFromUrl } from '@/lib/database-url';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-
-function resolveDatabaseUrl(): string {
-  return process.env.DATABASE_URL ?? process.env.DB_CONNECTION ?? 'file:./data/atlantis.db';
-}
-
-function ensureDataDir(url: string) {
-  if (!url.startsWith('file:')) return;
-  const filePath = url.replace('file:', '');
-  const dir = path.dirname(filePath);
-  mkdirSync(dir, { recursive: true });
-}
 
 export function resolveProvider(): string {
   if (process.env.DATABASE_URL?.startsWith('postgres')) return 'postgresql';
@@ -25,7 +15,8 @@ export function resolveProvider(): string {
 
 function createAdapter(url: string) {
   if (url.startsWith('file:')) {
-    ensureDataDir(url);
+    const filePath = sqlitePathFromUrl(url);
+    mkdirSync(path.dirname(filePath), { recursive: true });
     return new PrismaBetterSqlite3({ url: url as ':memory:' | (string & {}) });
   }
   if (url.startsWith('postgres')) {

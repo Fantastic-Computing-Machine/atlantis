@@ -1,21 +1,15 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const Database = require('better-sqlite3');
-const path = require('path');
+const { resolveDatabaseUrl, sqlitePathFromUrl } = require('./database-url');
 
-const dbPath = (() => {
-  const url = process.env.DATABASE_URL || process.env.DB_CONNECTION;
-  if (url && !url.startsWith('file:')) {
-    console.error('This script only supports SQLite (file: URLs).');
-    process.exit(1);
-  }
-  if (!url) {
-    return path.resolve(__dirname, '../data/atlantis.db');
-  }
-  // Parse file URL: strip prefix, query params, etc
-  const withoutPrefix = url.replace(/^file:/, '');
-  const withoutQuery = withoutPrefix.split('?')[0].split('#')[0];
-  return path.resolve(process.cwd(), withoutQuery);
-})();
+const url = resolveDatabaseUrl();
+
+if (!url.startsWith('file:')) {
+  console.error('This script only supports SQLite (file: URLs).');
+  process.exit(1);
+}
+
+const dbPath = sqlitePathFromUrl(url);
 
 console.log(`Using database: ${dbPath}`);
 

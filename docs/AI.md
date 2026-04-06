@@ -12,7 +12,7 @@ Server endpoint: `POST /api/ai/assist` (requires valid CSRF token). UI handles C
 
 2. **Providers**:
    - **OpenAI**: Default. Model: `gpt-4o-mini`.
-   - **Gemini**: Model: `gemini-2.5-flash` (override with `GEMINI_MODEL`).
+   - **Gemini**: Model: `gemini-3.1-flash-lite-preview` (override with `GEMINI_MODEL`).
    - **Auto-detect**: Chooses provider from key prefix (`sk-...` vs `AIza...`/`gsk_...`).
 
 ## Usage

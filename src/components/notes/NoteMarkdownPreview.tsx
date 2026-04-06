@@ -39,9 +39,9 @@ function InternalLinkEmbed({ type, id }: { type: 'note' | 'diagram'; id: string 
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 p-3 my-2 rounded-lg border border-border bg-muted/50">
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">Loading {type}...</span>
+      <div className="border-border bg-muted/50 my-2 flex items-center gap-2 rounded-lg border p-3">
+        <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+        <span className="text-muted-foreground text-sm">Loading {type}...</span>
       </div>
     );
   }
@@ -50,7 +50,7 @@ function InternalLinkEmbed({ type, id }: { type: 'note' | 'diagram'; id: string 
     return (
       <a
         href={type === 'note' ? `/notes/${id}` : `/diagram/${id}`}
-        className="flex items-center gap-2 p-3 my-2 rounded-lg border border-border bg-muted/50 hover:bg-muted transition-colors"
+        className="border-border bg-muted/50 hover:bg-muted my-2 flex items-center gap-2 rounded-lg border p-3 transition-colors"
       >
         {type === 'note' ? <FileText className="h-4 w-4" /> : <GitBranch className="h-4 w-4" />}
         <span className="text-sm">Open {type}</span>
@@ -60,27 +60,29 @@ function InternalLinkEmbed({ type, id }: { type: 'note' | 'diagram'; id: string 
 
   const title = data.title || 'Untitled';
   const emoji = data.emoji || (type === 'note' ? '📝' : '📊');
-  const preview = data.content?.slice(0, 120).replace(/[#*`\n]/g, ' ').trim() || '';
+  const preview =
+    data.content
+      ?.slice(0, 120)
+      .replace(/[#*`\n]/g, ' ')
+      .trim() || '';
   const href = type === 'note' ? `/notes/${id}` : `/diagram/${id}`;
 
   return (
     <a
       href={href}
-      className="block p-4 my-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors group"
+      className="border-border bg-card hover:bg-muted/50 group my-3 block rounded-lg border p-4 transition-colors"
     >
       <div className="flex items-start gap-3">
         <span className="text-2xl">{emoji}</span>
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-foreground group-hover:text-primary transition-colors">
+        <div className="min-w-0 flex-1">
+          <div className="text-foreground group-hover:text-primary font-medium transition-colors">
             {title}
           </div>
           {preview && (
-            <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
-              {preview}...
-            </div>
+            <div className="text-muted-foreground mt-1 line-clamp-2 text-sm">{preview}...</div>
           )}
         </div>
-        <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1" />
+        <ExternalLink className="text-muted-foreground mt-1 h-4 w-4 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
       </div>
     </a>
   );
@@ -105,7 +107,7 @@ function parseMarkdown(text: string): string {
       const rendered = katex.renderToString(tex, {
         displayMode: true,
         throwOnError: false,
-        strict: false
+        strict: false,
       });
       latexBlocks.push(rendered);
       return `${latexBlockMarker}${latexBlocks.length - 1}${latexBlockMarker}`;
@@ -122,7 +124,7 @@ function parseMarkdown(text: string): string {
       const rendered = katex.renderToString(tex, {
         displayMode: false,
         throwOnError: false,
-        strict: false
+        strict: false,
       });
       latexBlocks.push(rendered);
       return `${latexInlineMarker}${latexBlocks.length - 1}${latexInlineMarker}`;
@@ -157,7 +159,9 @@ function parseMarkdown(text: string): string {
     // Store raw code for copy button (escape quotes for data attribute)
     const rawForCopy = code.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     const index = codeBlocks.length;
-    const langLabel = lang ? `<span class="absolute top-2 left-3 text-xs text-muted-foreground uppercase">${lang}</span>` : '';
+    const langLabel = lang
+      ? `<span class="absolute top-2 left-3 text-xs text-muted-foreground uppercase">${lang}</span>`
+      : '';
     codeBlocks.push(
       `<div class="relative group">
         ${langLabel}
@@ -208,7 +212,10 @@ function parseMarkdown(text: string): string {
   processed = processed.replace(/~~(.+?)~~/g, '<del>$1</del>');
 
   // Highlight (==text==)
-  processed = processed.replace(/==(.+?)==/g, '<mark class="bg-yellow-200 dark:bg-yellow-900 px-0.5 rounded">$1</mark>');
+  processed = processed.replace(
+    /==(.+?)==/g,
+    '<mark class="bg-yellow-200 dark:bg-yellow-900 px-0.5 rounded">$1</mark>'
+  );
 
   // Subscript (~text~) - single tilde, not double
   processed = processed.replace(/~([^~\s](?:[^~]*[^~\s])?)~/g, '<sub>$1</sub>');
@@ -232,38 +239,38 @@ function parseMarkdown(text: string): string {
   processed = processed.endsWith('\n') ? processed : processed + '\n';
 
   // Match table blocks: lines that start with | and end with |
-  processed = processed.replace(
-    /(?:^|\n)((?:\|[^\n]+\|\n)+)/g,
-    (_match, tableBlock) => {
-      const lines = tableBlock.trim().split('\n').filter((line: string) => line.trim());
-      if (lines.length < 2) return _match;
+  processed = processed.replace(/(?:^|\n)((?:\|[^\n]+\|\n)+)/g, (_match, tableBlock) => {
+    const lines = tableBlock
+      .trim()
+      .split('\n')
+      .filter((line: string) => line.trim());
+    if (lines.length < 2) return _match;
 
-      // Check for separator row (e.g., |---|---|)
-      const separatorIndex = lines.findIndex((line: string) =>
-        /^\|[\s\-:|]+\|$/.test(line.trim())
-      );
+    // Check for separator row (e.g., |---|---|)
+    const separatorIndex = lines.findIndex((line: string) => /^\|[\s\-:|]+\|$/.test(line.trim()));
 
-      if (separatorIndex === -1) return _match;
+    if (separatorIndex === -1) return _match;
 
-      const headerLines = lines.slice(0, separatorIndex);
-      // Filter out any separator-like rows from body (handles adjacent tables)
-      const isSeparatorRow = (line: string) => /^\|[\s\-:|]+\|$/.test(line.trim());
-      const bodyLines = lines.slice(separatorIndex + 1).filter((line: string) => !isSeparatorRow(line));
+    const headerLines = lines.slice(0, separatorIndex);
+    // Filter out any separator-like rows from body (handles adjacent tables)
+    const isSeparatorRow = (line: string) => /^\|[\s\-:|]+\|$/.test(line.trim());
+    const bodyLines = lines
+      .slice(separatorIndex + 1)
+      .filter((line: string) => !isSeparatorRow(line));
 
-      const parseRow = (line: string, cellTag: string) => {
-        const cells = line
-          .split('|')
-          .slice(1, -1) // Remove empty first/last from split
-          .map((cell: string) => cell.trim());
-        return `<tr>${cells.map((cell: string) => `<${cellTag} class="border border-border px-3 py-2">${cell}</${cellTag}>`).join('')}</tr>`;
-      };
+    const parseRow = (line: string, cellTag: string) => {
+      const cells = line
+        .split('|')
+        .slice(1, -1) // Remove empty first/last from split
+        .map((cell: string) => cell.trim());
+      return `<tr>${cells.map((cell: string) => `<${cellTag} class="border border-border px-3 py-2">${cell}</${cellTag}>`).join('')}</tr>`;
+    };
 
-      const headerHtml = headerLines.map((line: string) => parseRow(line, 'th')).join('');
-      const bodyHtml = bodyLines.map((line: string) => parseRow(line, 'td')).join('');
+    const headerHtml = headerLines.map((line: string) => parseRow(line, 'th')).join('');
+    const bodyHtml = bodyLines.map((line: string) => parseRow(line, 'td')).join('');
 
-      return `\n<table class="border-collapse border border-border my-4 w-full"><thead class="bg-muted">${headerHtml}</thead><tbody>${bodyHtml}</tbody></table>\n`;
-    }
-  );
+    return `\n<table class="border-collapse border border-border my-4 w-full"><thead class="bg-muted">${headerHtml}</thead><tbody>${bodyHtml}</tbody></table>\n`;
+  });
 
   // Task lists (checkboxes) - must come before regular lists
   processed = processed
@@ -295,17 +302,14 @@ function parseMarkdown(text: string): string {
 
   // Auto-link bare URLs (not already in href or markdown link)
   // Use callback to check previous character instead of lookbehind for browser compatibility
-  processed = processed.replace(
-    /(https?:\/\/[^\s<>\)]+)/g,
-    (match, url, offset) => {
-      const prevChar = offset > 0 ? processed.charAt(offset - 1) : '';
-      // Don't convert if already inside href="" or markdown link ()
-      if (prevChar === '"' || prevChar === '(') {
-        return match;
-      }
-      return `<a href="${url}" class="text-primary underline hover:no-underline" target="_blank" rel="noopener">${url}</a>`;
+  processed = processed.replace(/(https?:\/\/[^\s<>\)]+)/g, (match, url, offset) => {
+    const prevChar = offset > 0 ? processed.charAt(offset - 1) : '';
+    // Don't convert if already inside href="" or markdown link ()
+    if (prevChar === '"' || prevChar === '(') {
+      return match;
     }
-  );
+    return `<a href="${url}" class="text-primary underline hover:no-underline" target="_blank" rel="noopener">${url}</a>`;
+  });
 
   // Paragraphs - split by double newlines
   const blocks = processed.split(/\n\n+/);
@@ -345,13 +349,20 @@ function parseMarkdown(text: string): string {
   // Restore LaTeX
   for (let i = 0; i < latexBlocks.length; i++) {
     processed = processed.split(`${latexBlockMarker}${i}${latexBlockMarker}`).join(latexBlocks[i]);
-    processed = processed.split(`${latexInlineMarker}${i}${latexInlineMarker}`).join(latexBlocks[i]);
+    processed = processed
+      .split(`${latexInlineMarker}${i}${latexInlineMarker}`)
+      .join(latexBlocks[i]);
   }
 
   return processed;
 }
 
-export function NoteMarkdownPreview({ content, filename, editorScrollPercentage = 0, onScroll }: NoteMarkdownPreviewProps) {
+export function NoteMarkdownPreview({
+  content,
+  filename,
+  editorScrollPercentage = 0,
+  onScroll,
+}: NoteMarkdownPreviewProps) {
   // Debounce content updates to improve performance with large documents
   const [debouncedContent, setDebouncedContent] = useState(content);
 
@@ -436,7 +447,10 @@ export function NoteMarkdownPreview({ content, filename, editorScrollPercentage 
   const segments = useMemo(() => {
     if (internalLinks.length === 0) return [{ type: 'html' as const, content: html }];
 
-    const result: Array<{ type: 'html'; content: string } | { type: 'embed'; linkType: 'note' | 'diagram'; id: string }> = [];
+    const result: Array<
+      | { type: 'html'; content: string }
+      | { type: 'embed'; linkType: 'note' | 'diagram'; id: string }
+    > = [];
 
     // Build a map of placeholders to link info
     const placeholderMap = new Map<string, { type: 'note' | 'diagram'; id: string }>();
@@ -529,23 +543,27 @@ input[type="checkbox"] { margin-right: 8px; }
       onScroll={handleScroll}
       className="relative h-full w-full overflow-auto"
     >
-      <div className="sticky top-4 right-4 float-right z-10 flex items-center gap-2 mb-4 ml-4">
+      <div className="sticky top-4 right-4 z-10 float-right mb-4 ml-4 flex items-center gap-2">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 bg-background/50 backdrop-blur-sm border shadow-sm"
+          className="bg-background/50 h-8 w-8 border shadow-sm backdrop-blur-sm"
           onClick={popOut}
           title="Open in new window"
         >
           <ExternalLink className="h-4 w-4" />
         </Button>
       </div>
-      <div className="prose prose-sm dark:prose-invert max-w-none p-6 pt-2 clear-both">
+      <div className="prose prose-sm dark:prose-invert clear-both max-w-none p-6 pt-2">
         {segments.map((segment, i) =>
           segment.type === 'html' ? (
             <div key={`html-${i}`} dangerouslySetInnerHTML={{ __html: segment.content }} />
           ) : (
-            <InternalLinkEmbed key={`${segment.linkType}-${segment.id}`} type={segment.linkType} id={segment.id} />
+            <InternalLinkEmbed
+              key={`${segment.linkType}-${segment.id}`}
+              type={segment.linkType}
+              id={segment.id}
+            />
           )
         )}
       </div>

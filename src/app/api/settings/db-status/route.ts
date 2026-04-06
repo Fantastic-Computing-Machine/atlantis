@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { resolveDatabaseUrl } from '@/lib/database-url';
 
 type Provider = 'sqlite' | 'postgres' | 'unknown';
-
-function resolveDatabaseUrl(): string {
-  return process.env.DATABASE_URL ?? process.env.DB_CONNECTION ?? 'file:./data/atlantis.db';
-}
 
 function describeDatabase(url: string) {
   if (url.startsWith('file:')) {

@@ -1,8 +1,17 @@
 import { ensureCsrfCookie, csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { createDiagram, getDiagramPage } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
+import { publishSyncEvent } from '@/lib/pubsub';
 import { diagramSchema } from '@/lib/schemas';
-import { getCache, CacheKeys, CachePrefixes, DEFAULT_TTL_MS, withCacheHeader, withNoCacheHeaders, type CacheStatus } from '@/lib/cache';
+import {
+  getCache,
+  CacheKeys,
+  CachePrefixes,
+  DEFAULT_TTL_MS,
+  withCacheHeader,
+  withNoCacheHeaders,
+  type CacheStatus,
+} from '@/lib/cache';
 import { NextResponse } from 'next/server';
 
 const DEFAULT_LIMIT = 24;
@@ -20,16 +29,13 @@ export async function GET(request: Request) {
     const limitNumber = limit ? Number.parseInt(limit, 10) : DEFAULT_LIMIT;
     const offsetNumber = offset ? Number.parseInt(offset, 10) : 0;
 
-    // Bypass cache if fresh=true or if searching
     if (fresh || query) {
       const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query, sort });
       const status: CacheStatus = fresh ? 'BYPASS' : 'MISS';
       const response = withCacheHeader(NextResponse.json(page), status);
-      // Add no-cache headers for fresh requests to prevent browser/proxy caching
       return fresh ? withNoCacheHeaders(response) : response;
     }
 
-    // Try cache first (only for non-search requests)
     const cache = getCache();
     const cacheKey = CacheKeys.diagramList(sort, offsetNumber, limitNumber);
     const cached = await cache.get(cacheKey);
@@ -62,19 +68,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const { title, content, emoji, description } = result.data;
+    const newDiagram = await createDiagram(result.data);
 
-    const newDiagram = await createDiagram({
-      title,
-      content,
-      emoji,
-      description,
-      tags: result.data.tags,
-    });
-
-    // Invalidate list cache on create
     const cache = getCache();
     await cache.deletePrefix(CachePrefixes.diagramsList);
+
+    await publishSyncEvent({
+      topic: 'list:diagrams',
+      payload: { id: newDiagram.id, created: true },
+      source: request.headers.get('x-client-id') ?? undefined,
+    });
 
     return NextResponse.json(newDiagram);
   } catch (error) {

@@ -365,3 +365,28 @@ export const CachePrefixes = {
 } as const;
 
 export { DEFAULT_TTL_MS };
+
+// ---------------------------------------------------------------------------
+// Snapshot helpers (Redis-first) for docs (diagram/note)
+// ---------------------------------------------------------------------------
+
+const SNAPSHOT_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+type SnapshotType = 'diagram' | 'note';
+
+const snapshotKey = (type: SnapshotType, id: string) => `snap:${type}:${id}`;
+
+export async function getDocSnapshot<T>(type: SnapshotType, id: string): Promise<T | null> {
+  const cache = getCache();
+  return cache.get<T>(snapshotKey(type, id));
+}
+
+export async function setDocSnapshot<T>(type: SnapshotType, id: string, value: T): Promise<void> {
+  const cache = getCache();
+  await cache.set(snapshotKey(type, id), value, SNAPSHOT_TTL_MS);
+}
+
+export async function deleteDocSnapshot(type: SnapshotType, id: string): Promise<void> {
+  const cache = getCache();
+  await cache.delete(snapshotKey(type, id));
+}

@@ -70,7 +70,7 @@ export function NoteList() {
   };
 
   return (
-    <div className="bg-background flex h-full flex-col border-r overflow-hidden">
+    <div className="bg-background flex h-full flex-col overflow-hidden border-r">
       {/* Header */}
       <div className="space-y-3 border-b p-3">
         <div className="flex items-center gap-2">
@@ -139,7 +139,7 @@ export function NoteList() {
       </div>
 
       {/* Notes List */}
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-1 p-2">
           {filteredNotes.length === 0 ? (
             <div className="text-muted-foreground py-8 text-center text-sm">
@@ -174,8 +174,16 @@ export function NoteList() {
                   </div>
                   {note.tags && note.tags.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {note.tags.map(tag => (
-                        <div key={tag.id} className="rounded-full px-1.5 py-0.5 text-[10px] font-medium border bg-opacity-50" style={{ backgroundColor: `${tag.color}20`, borderColor: `${tag.color}40`, color: tag.color }}>
+                      {note.tags.map((tag) => (
+                        <div
+                          key={tag.id}
+                          className="bg-opacity-50 rounded-full border px-1.5 py-0.5 text-[10px] font-medium"
+                          style={{
+                            backgroundColor: `${tag.color}20`,
+                            borderColor: `${tag.color}40`,
+                            color: tag.color,
+                          }}
+                        >
                           #{tag.slug}
                         </div>
                       ))}
