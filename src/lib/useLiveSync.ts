@@ -58,8 +58,11 @@ export function useLiveSync<T extends { updatedAt: string }>({
   const currentUpdatedAtRef = useRef(currentUpdatedAt);
   const isMountedRef = useRef(false);
   const hasLocalChangesRef = useRef(hasLocalChanges);
-  const topicsRef = useRef(eventTopics);
   const clientId = useMemo(() => getLiveSyncClientId(), []);
+  const topicsQuery = useMemo(() => {
+    if (!eventTopics.length) return '';
+    return eventTopics.map((topic) => `topic=${encodeURIComponent(topic)}`).join('&');
+  }, [eventTopics]);
   const etagRef = useRef<string | null>(null);
   const lastSeqBySourceRef = useRef<Map<string, number>>(new Map());
   const [socketFallbackPolling, setSocketFallbackPolling] = useState(false);
@@ -74,8 +77,7 @@ export function useLiveSync<T extends { updatedAt: string }>({
   useEffect(() => {
     currentUpdatedAtRef.current = currentUpdatedAt;
     hasLocalChangesRef.current = hasLocalChanges;
-    topicsRef.current = eventTopics;
-  }, [currentUpdatedAt, hasLocalChanges, eventTopics]);
+  }, [currentUpdatedAt, hasLocalChanges]);
 
   const refresh = useCallback(async () => {
     if (isSyncingRef.current || !isMountedRef.current) return;
@@ -138,12 +140,11 @@ export function useLiveSync<T extends { updatedAt: string }>({
   // SSE mode: consume payload directly; ignore self-origin events; fallback to refresh only if needed
   useEffect(() => {
     if (!enabled || liveSyncMethod !== 'socket') return;
-    if (!topicsRef.current.length) return;
+    if (!topicsQuery) return;
 
     setSocketFallbackPolling(false);
 
-    const query = topicsRef.current.map((topic) => `topic=${encodeURIComponent(topic)}`).join('&');
-    const eventSource = new EventSource(`/api/sync/stream?${query}`);
+    const eventSource = new EventSource(`/api/sync/stream?${topicsQuery}`);
 
     const handleOpen = () => {
       setSocketFallbackPolling(false);
@@ -229,6 +230,7 @@ export function useLiveSync<T extends { updatedAt: string }>({
     allowWhileDirty,
     isInstantPayload,
     notifyOnInstantPayload,
+    topicsQuery,
   ]);
 
   // Visibility: only refresh if socket mode and we might have missed events while hidden

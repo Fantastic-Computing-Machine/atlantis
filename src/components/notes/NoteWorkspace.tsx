@@ -72,6 +72,12 @@ const nextIsoAfter = (currentIso: string): string => {
   return new Date(nextMs).toISOString();
 };
 
+const toNoteListItem = (fullNote: Note): Omit<Note, 'content'> => {
+  const { content, ...rest } = fullNote;
+  void content;
+  return rest;
+};
+
 export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
   const router = useRouter();
   const { settings } = useDiagramStore();
@@ -175,9 +181,8 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
       setTags(remoteNote.tags || []);
       setIsPrivate(remoteNote.private);
       setStarred(remoteNote.starred);
-      setStarred(remoteNote.starred);
       setHasChanges(false);
-      updateNote(note.id, remoteNote);
+      updateNote(note.id, toNoteListItem(remoteNote));
     },
     onExternalChange: () => {
       toast.info('Note updated by another user');
@@ -313,7 +318,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
       setHasChanges(false);
 
       // Update sidebar in real-time
-      updateNote(note.id, updatedNote);
+      updateNote(note.id, toNoteListItem(updatedNote));
     } catch {
       toast.error('Failed to save note');
     } finally {

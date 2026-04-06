@@ -166,6 +166,8 @@ export async function DELETE(request: Request, { params }: DiagramRouteParams) {
     await cache.delete(CacheKeys.diagram(id));
     await cache.deletePrefix(CachePrefixes.diagramsList);
 
+    await deleteDocSnapshot('diagram', id);
+
     const source = request.headers.get('x-client-id') ?? undefined;
     await publishSyncEvent({ topic: `doc:diagram:${id}`, payload: { id, deleted: true }, source });
     await publishSyncEvent({ topic: 'list:diagrams', payload: { id, deleted: true }, source });

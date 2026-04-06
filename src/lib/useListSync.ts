@@ -3,16 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { LIVE_SYNC_CONFIG, type LiveSyncMethod } from '@/lib/live-sync-config';
+import { getLiveSyncClientId } from '@/lib/useLiveSync';
 
 const DEFAULT_INTERVAL_MS = 10000; // 10 seconds for list sync
-
-// Stable client id per session to avoid self-echo events
-let globalClientId: string | null = null;
-function getClientId(): string {
-  if (globalClientId) return globalClientId;
-  globalClientId = `cl_${Math.random().toString(36).slice(2)}_${Date.now().toString(36)}`;
-  return globalClientId;
-}
 
 type SyncWireEvent<T> = {
   topic: string;
@@ -78,8 +71,11 @@ export function useListSync<T extends ListItem>({
   const isSyncingRef = useRef(false);
   const currentItemsRef = useRef(currentItems);
   const isMountedRef = useRef(false);
-  const topicsRef = useRef(eventTopics);
-  const clientId = useMemo(() => getClientId(), []);
+  const clientId = useMemo(() => getLiveSyncClientId(), []);
+  const topicsQuery = useMemo(() => {
+    if (!eventTopics.length) return '';
+    return eventTopics.map((topic) => `topic=${encodeURIComponent(topic)}`).join('&');
+  }, [eventTopics]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -91,10 +87,6 @@ export function useListSync<T extends ListItem>({
   useEffect(() => {
     currentItemsRef.current = currentItems;
   }, [currentItems]);
-
-  useEffect(() => {
-    topicsRef.current = eventTopics;
-  }, [eventTopics]);
 
   const refresh = useCallback(async () => {
     if (isSyncingRef.current || !isMountedRef.current) return;
@@ -143,10 +135,9 @@ export function useListSync<T extends ListItem>({
 
   useEffect(() => {
     if (!enabled || liveSyncMethod !== 'socket') return;
-    if (!topicsRef.current.length) return;
+    if (!topicsQuery) return;
 
-    const query = topicsRef.current.map((topic) => `topic=${encodeURIComponent(topic)}`).join('&');
-    const eventSource = new EventSource(`/api/sync/stream?${query}`);
+    const eventSource = new EventSource(`/api/sync/stream?${topicsQuery}`);
 
     const handleSyncEvent = (e: MessageEvent) => {
       try {
@@ -179,7 +170,7 @@ export function useListSync<T extends ListItem>({
       eventSource.removeEventListener('sync', handleSyncEvent);
       eventSource.close();
     };
-  }, [enabled, liveSyncMethod, refresh, onUpdate, onListChanged, clientId]);
+  }, [enabled, liveSyncMethod, refresh, onUpdate, onListChanged, clientId, topicsQuery]);
 
   useEffect(() => {
     if (!enabled) return;

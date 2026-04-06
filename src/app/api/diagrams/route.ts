@@ -76,6 +76,7 @@ export async function POST(request: Request) {
     await publishSyncEvent({
       topic: 'list:diagrams',
       payload: { id: newDiagram.id, created: true },
+      source: request.headers.get('x-client-id') ?? undefined,
     });
 
     return NextResponse.json(newDiagram);

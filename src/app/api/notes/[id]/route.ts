@@ -178,6 +178,8 @@ export async function DELETE(request: Request, { params }: NoteRouteParams) {
     await cache.delete(CacheKeys.note(id));
     await cache.deletePrefix(CachePrefixes.notesList);
 
+    await deleteDocSnapshot('note', id);
+
     await publishSyncEvent({
       topic: `doc:note:${id}`,
       payload: { id, deleted: true },

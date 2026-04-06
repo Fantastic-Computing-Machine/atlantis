@@ -26,7 +26,7 @@ Atlantis provides configurable settings accessible via the `/settings` page.
 ### Supported Models
 
 - **OpenAI**: `gpt-4o-mini`
-- **Gemini**: `gemini-3.1-pro-preview` (configurable via `GEMINI_MODEL` env var)
+- **Gemini**: `gemini-3.1-flash-lite-preview` (configurable via `GEMINI_MODEL` env var)
 
 > **Note**: When `AI_API_KEY` environment variable is set, the key cannot be modified through the UI and is shown as "read-only".
 
@@ -67,7 +67,7 @@ Settings can also be configured via environment variables. These are especially 
 | `DATABASE_URL`         | `file:./data/atlantis.db`                                 | Database connection string (`DB_CONNECTION` alias supported)                                                                                        |
 | `REDIS_URL`            | _(none)_                                                  | Redis connection (e.g., `redis://redis:6379`)                                                                                                       |
 | `AI_API_KEY`           | _(none)_                                                  | AI API key for OpenAI/Gemini features                                                                                                               |
-| `GEMINI_MODEL`         | `gemini-3.1-pro-preview`                                  | Gemini model to use                                                                                                                                 |
+| `GEMINI_MODEL`         | `gemini-3.1-flash-lite-preview`                                  | Gemini model to use                                                                                                                                 |
 | `GEMINI_API_VERSION`   | `v1` or `v1beta` (auto-detected)                          | Gemini API version (defaults to `v1beta` for `-preview` models)                                                                                     |
 | `ENABLE_API_ACCESS`    | `false`                                                   | Enable REST API endpoints and `/docs` (requires CSRF cookie/header for writes)                                                                      |
 | `PRISMA_AUTO_APPLY`    | `true` (dev), `false` (prod)                              | Dev bootstrap only: auto-run `prisma db push` during `npm run dev`/`npm run build` (Docker entrypoint/`npm run start` always runs `prisma db push`) |

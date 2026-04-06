@@ -7,6 +7,8 @@ export const dynamic = 'force-dynamic';
 
 const encoder = new TextEncoder();
 const KEEPALIVE_INTERVAL_MS = 25000;
+const MAX_TOPICS = 20;
+const MAX_TOPIC_LENGTH = 120;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -14,6 +16,10 @@ export async function GET(request: Request) {
 
   if (topics.length === 0) {
     return NextResponse.json({ error: 'Missing topic parameter' }, { status: 400 });
+  }
+
+  if (topics.length > MAX_TOPICS || topics.some((topic) => topic.length > MAX_TOPIC_LENGTH)) {
+    return NextResponse.json({ error: 'Invalid topic parameters' }, { status: 400 });
   }
 
   let unsubscribe: (() => void) | null = null;

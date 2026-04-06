@@ -84,12 +84,19 @@ export class MemoryPubSub implements PubSubClient {
 const DEFAULT_EVENTS_FILE = path.join(os.tmpdir(), 'atlantis-sync-events.ndjson');
 const EVENTS_FILE_PATH = path.resolve(process.env.SYNC_EVENTS_FILE ?? DEFAULT_EVENTS_FILE);
 const FILE_POLL_INTERVAL_MS = 400;
+const MAX_EVENTS_FILE_BYTES = 512 * 1024; // 512KB cap to prevent unbounded growth
+const EVENTS_DIR = path.dirname(EVENTS_FILE_PATH);
 
 type SyncEventEnvelope = SyncEvent & { ts?: number };
 
 async function ensureEventsFile(): Promise<void> {
-  await fsp.mkdir(path.dirname(EVENTS_FILE_PATH), { recursive: true });
-  await fsp.appendFile(EVENTS_FILE_PATH, '', { encoding: 'utf8' });
+  await fsp.mkdir(EVENTS_DIR, { recursive: true, mode: 0o700 });
+  try {
+    const handle = await fsp.open(EVENTS_FILE_PATH, 'a', 0o600);
+    await handle.close();
+  } catch {
+    await fsp.appendFile(EVENTS_FILE_PATH, '', { encoding: 'utf8', mode: 0o600 });
+  }
 }
 
 class FilePubSub implements PubSubClient {
@@ -97,6 +104,14 @@ class FilePubSub implements PubSubClient {
 
   async publish(event: SyncEvent): Promise<void> {
     await ensureEventsFile();
+    try {
+      const stats = await fsp.stat(EVENTS_FILE_PATH);
+      if (stats.size > MAX_EVENTS_FILE_BYTES) {
+        await fsp.truncate(EVENTS_FILE_PATH, 0);
+      }
+    } catch {
+      // ignore size checks; best-effort rotation
+    }
     const envelope: SyncEventEnvelope = {
       topic: event.topic,
       payload: event.payload,

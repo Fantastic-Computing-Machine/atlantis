@@ -107,6 +107,13 @@ export async function getDiagramPage({
   const normalizedLimit = normalizeLimit(limit);
   const normalizedOffset = normalizeOffset(offset);
 
+  const buildSafeTsQuery = (value: string) =>
+    value
+      .split(/\s+/)
+      .map((token) => token.replace(/[^a-zA-Z0-9_]/g, ''))
+      .filter(Boolean)
+      .join(' & ');
+
   const where: Prisma.DiagramWhereInput = {};
   if (query?.trim()) {
     const cleanQuery = stripStopWords(query.trim());
@@ -115,12 +122,12 @@ export async function getDiagramPage({
       process.env.DATABASE_URL?.startsWith('postgres');
 
     if (isPostgres) {
-      // Create a valid Postgres tsquery string connecting words with &
-      const tsQuery = cleanQuery.split(/\s+/).filter(Boolean).join(' & ');
+      // Create a sanitized Postgres tsquery string connecting words with &
+      const tsQuery = buildSafeTsQuery(cleanQuery);
       if (tsQuery) {
         where.searchVector = { search: tsQuery } as Prisma.StringFilter;
       } else {
-        where.searchVector = { contains: cleanQuery };
+        where.searchVector = { contains: cleanQuery.replace(/[^a-zA-Z0-9_\s]/g, '') };
       }
     } else {
       where.searchVector = { contains: cleanQuery };
