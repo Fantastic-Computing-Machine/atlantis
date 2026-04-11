@@ -510,7 +510,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
 
   const handleCursorLineChange = useCallback(
     (line: string) => {
-      const nodeId = getNodeIdFromLine(line, diagramType); console.log("nodeId ", nodeId)
+      const nodeId = getNodeIdFromLine(line, diagramType);
       if (!nodeId) {
         setSelectedNode(null);
         setSelectionRange(null);
