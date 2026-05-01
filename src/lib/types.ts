@@ -65,8 +65,6 @@ export interface AppSettings {
   defaultExportFormat?: 'svg' | 'png' | 'pdf';
   exportScale?: 1 | 2 | 3;
   snowMode?: boolean;
-  liveSync?: boolean;
-  liveSyncInterval?: number;
   kittyMode?: boolean;
 }
 
@@ -81,16 +79,5 @@ export interface DiagramStore {
   addDiagram: (diagram: Diagram) => void;
   removeDiagram: (id: string) => void;
   toggleFavorite: (id: string) => void;
-  setAutoSave: (enabled: boolean) => void;
-  setHasAiApiKey: (hasKey: boolean) => void;
-  setAiProvider: (provider: AppSettings['aiProvider']) => void;
-  setAiModel: (model: string | undefined) => void;
-  setMaxCheckpoints: (value: number) => void;
-  setAutoSaveDelay: (value: number) => void;
-  setDefaultExportFormat: (format: AppSettings['defaultExportFormat']) => void;
-  setExportScale: (scale: AppSettings['exportScale']) => void;
-  setSnowMode: (enabled: boolean) => void;
-  setLiveSync: (enabled: boolean) => void;
-  setLiveSyncInterval: (ms: number) => void;
-  setKittyMode: (enabled: boolean) => void;
+  updateSettings: (updates: Partial<AppSettings>) => void;
 }

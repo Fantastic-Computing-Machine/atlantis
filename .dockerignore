@@ -25,6 +25,7 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 !.env.example
+.env.bkp
 
 # IDE and editor
 .idea
@@ -66,11 +67,24 @@ vitest.config.*
 # Development tools
 .eslintrc*
 .prettierrc*
+.prettierignore
 .editorconfig
 tsconfig.tsbuildinfo
+next-env.d.ts
 
 # Prisma migrations history (schema.template.prisma is needed)
 prisma/migrations
 
 # Data directory (mounted at runtime)
 data/
+
+
+# Other
+.github/
+.codex/
+screenshots/
+data_new/
+plan/
+examples/
+TODO.md
+AGENTS.md

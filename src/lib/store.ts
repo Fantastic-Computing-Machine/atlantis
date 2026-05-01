@@ -12,8 +12,6 @@ const DEFAULT_SETTINGS = {
   defaultExportFormat: 'svg' as const,
   exportScale: 2 as const,
   snowMode: false,
-  liveSync: true,
-  liveSyncInterval: 30000,
   kittyMode: false,
 };
 
@@ -28,21 +26,17 @@ export const useDiagramStore = create<DiagramStore>()(
       setCurrentDiagram: (diagram) => set({ currentDiagram: diagram }),
       updateDiagram: (id, updates) =>
         set((state) => ({
-          diagrams: state.diagrams.map((d) =>
-            d.id === id ? { ...d, ...updates } : d
-          ),
+          diagrams: state.diagrams.map((d) => (d.id === id ? { ...d, ...updates } : d)),
           currentDiagram:
             state.currentDiagram?.id === id
               ? { ...state.currentDiagram, ...updates }
               : state.currentDiagram,
         })),
-      addDiagram: (diagram) =>
-        set((state) => ({ diagrams: [diagram, ...state.diagrams] })),
+      addDiagram: (diagram) => set((state) => ({ diagrams: [diagram, ...state.diagrams] })),
       removeDiagram: (id) =>
         set((state) => ({
           diagrams: state.diagrams.filter((d) => d.id !== id),
-          currentDiagram:
-            state.currentDiagram?.id === id ? null : state.currentDiagram,
+          currentDiagram: state.currentDiagram?.id === id ? null : state.currentDiagram,
         })),
       toggleFavorite: (id) =>
         set((state) => ({
@@ -54,53 +48,9 @@ export const useDiagramStore = create<DiagramStore>()(
               ? { ...state.currentDiagram, isFavorite: !state.currentDiagram.isFavorite }
               : state.currentDiagram,
         })),
-      setAutoSave: (enabled) =>
+      updateSettings: (updates) =>
         set((state) => ({
-          settings: { ...state.settings, autoSave: enabled },
-        })),
-      setHasAiApiKey: (hasKey) =>
-        set((state) => ({
-          settings: { ...state.settings, hasAiApiKey: hasKey },
-        })),
-      setAiProvider: (provider) =>
-        set((state) => ({
-          settings: { ...state.settings, aiProvider: provider ?? 'auto' },
-        })),
-      setAiModel: (model) =>
-        set((state) => ({
-          settings: { ...state.settings, aiModel: model },
-        })),
-      setMaxCheckpoints: (value) =>
-        set((state) => ({
-          settings: { ...state.settings, maxCheckpoints: value },
-        })),
-      setAutoSaveDelay: (value) =>
-        set((state) => ({
-          settings: { ...state.settings, autoSaveDelay: value },
-        })),
-      setDefaultExportFormat: (format) =>
-        set((state) => ({
-          settings: { ...state.settings, defaultExportFormat: format },
-        })),
-      setExportScale: (scale) =>
-        set((state) => ({
-          settings: { ...state.settings, exportScale: scale },
-        })),
-      setSnowMode: (enabled) =>
-        set((state) => ({
-          settings: { ...state.settings, snowMode: enabled },
-        })),
-      setLiveSync: (enabled) =>
-        set((state) => ({
-          settings: { ...state.settings, liveSync: enabled },
-        })),
-      setLiveSyncInterval: (ms) =>
-        set((state) => ({
-          settings: { ...state.settings, liveSyncInterval: ms },
-        })),
-      setKittyMode: (enabled) =>
-        set((state) => ({
-          settings: { ...state.settings, kittyMode: enabled },
+          settings: { ...state.settings, ...updates },
         })),
     }),
     {
@@ -110,4 +60,3 @@ export const useDiagramStore = create<DiagramStore>()(
     }
   )
 );
-

@@ -10,7 +10,16 @@ Purpose: concise, high-signal defaults for this Next.js 16 + TypeScript + Tailwi
 - Diagrams: Mermaid editor; persisted to Prisma SQLite or JSON backup.
 - Notes: see `src/app/notes`, server layouts fetch data and render client shells.
 - Icons/Fonts/Themes: lucide-react, `next/font`, `next-themes` (light/dark toggle).
+- Code map: `plan/code-map.md` is the required map-first index for file ownership and task routing.
 - Editors: no Cursor rules (`.cursor/` missing); no Copilot instructions (`.github/copilot-instructions.md` missing). This file is authoritative.
+
+## Mandatory Code Map Workflow
+
+- Always read `plan/code-map.md` before searching or editing code.
+- Use map-first navigation: start with the intent map and open those files before broad searching.
+- Avoid blind repo-wide searches unless the code map does not cover the task.
+- If you add/move/rename files, routes, folders, or exported functions, update `plan/code-map.md` in the same change.
+- Treat stale code-map entries as bugs; fix them as part of the task.
 
 ## Commands (npm)
 
@@ -32,13 +41,14 @@ Purpose: concise, high-signal defaults for this Next.js 16 + TypeScript + Tailwi
 ## Project Map
 
 - `src/app/`: routes/layout. `src/app/page.tsx` uses ISR 30s.
-- `src/app/[id]/`: diagram editor (client-heavy); gate browser libs with mounted checks.
+- `src/app/diagram/[id]/`: diagram editor (client-heavy); gate browser libs with mounted checks.
 - `src/app/notes/`: notes layout + list; dynamic fetch with `getNotePage`; entry page shows empty-state; `[id]/page` loads note with `getNoteById` and renders `NoteWorkspace`; `dynamic = 'force-dynamic'` on layout and page to avoid caching.
 - `src/app/api/`: API routes; keep server-only.
 - `src/components/`: feature/layout components. Avoid touching `src/components/ui` unless fixing a shared UI bug.
 - `src/lib/`: utilities, data access (`notes-data`), types, Zustand store.
 - `data/`: SQLite db/backups; `public/`: static assets; `scripts/`: bootstrap + Prisma helpers (bootstrap must run before dev/build).
 - `docs/`: repo docs; update this file and `docs/AI.md` if conventions change.
+- `plan/`: planning docs; `plan/code-map.md` must stay current with structure and ownership.
 
 ## Styling
 
@@ -149,6 +159,7 @@ Purpose: concise, high-signal defaults for this Next.js 16 + TypeScript + Tailwi
 
 - Docs live in `docs/`; see `docs/AI.md` for AI/agent usage guidance.
 - Update this file when commands, tooling, or conventions change.
+- Update `plan/code-map.md` whenever code structure, directory ownership, routes, or exported responsibilities change.
 
 ## Extension Checklist
 

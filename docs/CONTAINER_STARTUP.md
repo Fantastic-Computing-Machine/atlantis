@@ -136,7 +136,8 @@ PORT=8080 ATLANTIS_DATA_DIR=./my-data docker compose up -d
 | `PRISMA_AUTO_APPLY`              | `true` (non-prod), `false` (prod) | Auto-runs `prisma db push` on server start to ensure schema exists. |
 | `PRISMA_SKIP_AUTOPUSH`           | `false`                           | Set to `true` to skip all db push/seed operations.                  |
 | `ENABLE_API_ACCESS`              | `false`                           | Set to `true` to enable the REST API and /docs.                     |
-| `GEMINI_MODEL`                   | `gemini-2.5-flash`                | Override default Gemini model when using Gemini provider.           |
+| `GEMINI_MODEL`                   | `gemini-3.1-flash-lite-preview`   | Override default Gemini model when using Gemini provider.           |
+| `GEMINI_API_VERSION`             | `v1` or `v1beta`                  | Gemini API version; auto-detects `v1beta` for preview models.       |
 | `ATLANTIS_DATA_DIR`              | `./data`                          | Host bind mount for data when using provided compose files.         |
 
 ## Versioning

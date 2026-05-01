@@ -14,13 +14,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,13 +29,26 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
+import { LIVE_SYNC_CONFIG } from '@/lib/live-sync-config';
 import { useDiagramStore } from '@/lib/store';
 import { Diagram, SortOption } from '@/lib/types';
 import { useListSync } from '@/lib/useListSync';
 import { useShortcutPlatform } from '@/lib/use-platform';
 import { cn, copyToClipboard, formatDate, sanitizeFilename } from '@/lib/utils';
 
-import { Download, Eye, ListFilter, Loader2, MoreHorizontal, Plus, Search, Settings2, Share2, Star, Trash2 } from 'lucide-react';
+import {
+  Download,
+  Eye,
+  ListFilter,
+  Loader2,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Settings2,
+  Share2,
+  Star,
+  Trash2,
+} from 'lucide-react';
 
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
@@ -74,7 +81,7 @@ export function DiagramGrid({
   const [peekDiagram, setPeekDiagram] = useState<Diagram | null>(null);
   const [sortMode, setSortMode] = useState<SortOption>('recent');
   const { theme } = useTheme();
-  const { settings, setHasAiApiKey, setAiProvider } = useDiagramStore();
+  const { settings, updateSettings } = useDiagramStore();
   const router = useRouter();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -83,8 +90,10 @@ export function DiagramGrid({
   useListSync<Diagram>({
     listUrl: `/api/diagrams?limit=24&offset=0&sort=${sortMode}`,
     currentItems: diagrams,
-    enabled: Boolean(settings.liveSync),
-    intervalMs: (settings.liveSyncInterval ?? 5000) * 2, // Poll lists less frequently
+    enabled: LIVE_SYNC_CONFIG.enabled,
+    intervalMs: LIVE_SYNC_CONFIG.pollIntervalMs * 2,
+    liveSyncMethod: LIVE_SYNC_CONFIG.method,
+    eventTopics: ['list:diagrams'],
     onUpdate: (serverItems, newTotal) => {
       setDiagrams(serverItems);
       setTotal(newTotal);
@@ -108,17 +117,17 @@ export function DiagramGrid({
         const res = await fetch('/api/settings/ai-key');
         const data = await res.json();
         if (typeof data.hasKey === 'boolean') {
-          setHasAiApiKey(data.hasKey);
+          updateSettings({ hasAiApiKey: data.hasKey });
         }
         if (typeof data.provider === 'string') {
-          setAiProvider(data.provider);
+          updateSettings({ aiProvider: data.provider });
         }
       } catch {
         // ignore; AI optional
       }
     };
     loadAiKey();
-  }, [setHasAiApiKey, setAiProvider]);
+  }, [updateSettings]);
 
   const fetchNextPage = useCallback(async () => {
     if (!hasMore || isFetchingMore) return;
@@ -133,17 +142,11 @@ export function DiagramGrid({
       const incoming: Diagram[] = Array.isArray(data.items) ? data.items : [];
       setDiagrams((prev) => {
         const existingIds = new Set(prev.map((d) => d.id));
-        const merged = [...prev];
-        incoming.forEach((item) => {
-          if (!existingIds.has(item.id)) {
-            merged.push(item);
-          }
-        });
-        return merged;
+        return [...prev, ...incoming.filter((item) => !existingIds.has(item.id))];
       });
       setHasMore(Boolean(data.hasMore));
-      setNextOffset(typeof data.nextOffset === 'number' ? data.nextOffset : nextOffset + (data.items?.length || 0));
-      setTotal(typeof data.total === 'number' ? data.total : total);
+      setNextOffset(data.nextOffset ?? nextOffset + (data.items?.length || 0));
+      setTotal(data.total ?? total);
     } catch (error) {
       console.error(error);
       toast.error('Failed to load more diagrams');
@@ -171,27 +174,30 @@ export function DiagramGrid({
     return () => observer.disconnect();
   }, [fetchNextPage, hasMore, isFetchingMore]);
 
-  const reloadFirstPage = useCallback(async (overrideSort?: SortOption) => {
-    const sortToUse = overrideSort ?? sortMode;
-    setIsLoading(true);
-    try {
-      const res = await fetch(`/api/diagrams?limit=24&offset=0&sort=${sortToUse}`);
-      if (!res.ok) {
-        throw new Error('Failed to load diagrams');
+  const reloadFirstPage = useCallback(
+    async (overrideSort?: SortOption) => {
+      const sortToUse = overrideSort ?? sortMode;
+      setIsLoading(true);
+      try {
+        const res = await fetch(`/api/diagrams?limit=24&offset=0&sort=${sortToUse}`);
+        if (!res.ok) {
+          throw new Error('Failed to load diagrams');
+        }
+        const data = await res.json();
+        const items: Diagram[] = Array.isArray(data.items) ? data.items : [];
+        setDiagrams(items);
+        setHasMore(Boolean(data.hasMore));
+        setNextOffset(data.nextOffset ?? items.length);
+        setTotal(data.total ?? items.length);
+      } catch (error) {
+        console.error(error);
+        toast.error('Failed to load diagrams');
+      } finally {
+        setIsLoading(false);
       }
-      const data = await res.json();
-      const items: Diagram[] = Array.isArray(data.items) ? data.items : [];
-      setDiagrams(items);
-      setHasMore(Boolean(data.hasMore));
-      setNextOffset(typeof data.nextOffset === 'number' ? data.nextOffset : items.length);
-      setTotal(typeof data.total === 'number' ? data.total : items.length);
-    } catch (error) {
-      console.error(error);
-      toast.error('Failed to load diagrams');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [sortMode]);
+    },
+    [sortMode]
+  );
 
   const handleSortChange = (newSort: SortOption) => {
     if (newSort === sortMode) return;
@@ -285,9 +291,7 @@ export function DiagramGrid({
     const diagram = diagrams.find((d) => d.id === id);
     if (!diagram) return;
 
-    setDiagrams((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, isFavorite: !d.isFavorite } : d))
-    );
+    setDiagrams((prev) => prev.map((d) => (d.id === id ? { ...d, isFavorite: !d.isFavorite } : d)));
 
     const csrfToken = await ensureCsrfToken();
     await fetch(`/api/diagrams/${id}`, {
@@ -381,7 +385,7 @@ export function DiagramGrid({
           const pdf = new jsPDF({
             orientation: isLandscape ? 'landscape' : 'portrait',
             unit: 'px',
-            format: [svgWidth + 40, svgHeight + 40]
+            format: [svgWidth + 40, svgHeight + 40],
           });
           pdf.setFillColor(255, 255, 255);
           pdf.rect(0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight(), 'F');
@@ -397,44 +401,42 @@ export function DiagramGrid({
     }
   };
 
-
-
   const diagramToDelete = deleteId ? diagrams.find((d) => d.id === deleteId) : null;
 
   const renderDiagramGrid = (list: Diagram[]) => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {list.map((diagram) => (
         <Card
           key={diagram.id}
           className={cn(
-            'group relative overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-primary/50 h-full flex flex-col',
+            'group hover:border-primary/50 relative flex h-full flex-col overflow-hidden transition-all duration-200 hover:shadow-lg'
           )}
         >
           <Link href={`/diagram/${diagram.id}`} className="absolute inset-0 z-0 focus:outline-none">
             <span className="sr-only">Open {diagram.title}</span>
           </Link>
 
-          <CardHeader className="pb-2 relative z-10 pointer-events-none">
+          <CardHeader className="pointer-events-none relative z-10 pb-2">
             <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="text-2xl shrink-0">{diagram.emoji || '📊'}</span>
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="shrink-0 text-2xl">{diagram.emoji || '📊'}</span>
                 <div className="min-w-0 flex-1">
-                  <CardTitle className="text-base truncate">{diagram.title}</CardTitle>
-                  <CardDescription className="text-xs flex items-center gap-2">
+                  <CardTitle className="truncate text-base">{diagram.title}</CardTitle>
+                  <CardDescription className="flex items-center gap-2 text-xs">
                     <span>{formatDate(diagram.updatedAt)}</span>
                     {diagram.totalVersions > 1 && (
-                      <span className="bg-muted px-1.5 py-0.5 rounded-full text-[10px] font-medium">
+                      <span className="bg-muted rounded-full px-1.5 py-0.5 text-[10px] font-medium">
                         v{diagram.totalVersions}
                       </span>
                     )}
                   </CardDescription>
                 </div>
               </div>
-              <div className="flex items-center gap-1 pointer-events-auto">
+              <div className="pointer-events-auto flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-muted-foreground"
+                  className="text-muted-foreground h-8 w-8"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -449,7 +451,7 @@ export function DiagramGrid({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground"
+                      className="text-muted-foreground h-8 w-8"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -460,15 +462,11 @@ export function DiagramGrid({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={(e) => handleShare(e, diagram.id)}
-                    >
+                    <DropdownMenuItem onClick={(e) => handleShare(e, diagram.id)}>
                       <Share2 className="mr-2 h-4 w-4" />
                       <span>Copy link</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(e) => handleFavorite(e, diagram.id)}
-                    >
+                    <DropdownMenuItem onClick={(e) => handleFavorite(e, diagram.id)}>
                       <Star
                         className={cn(
                           'mr-2 h-4 w-4',
@@ -531,21 +529,21 @@ export function DiagramGrid({
               </div>
             </div>
           </CardHeader>
-          <CardContent className="relative z-10 pointer-events-none flex-1">
+          <CardContent className="pointer-events-none relative z-10 flex-1">
             {diagram.description && (
-              <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+              <p className="text-muted-foreground mb-3 line-clamp-2 text-xs">
                 {diagram.description}
               </p>
             )}
             {diagram.tags && diagram.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mb-2 pointer-events-auto">
-                {diagram.tags.map(tag => (
+              <div className="pointer-events-auto mb-2 flex flex-wrap gap-1">
+                {diagram.tags.map((tag) => (
                   <TagBadge key={tag.id} tag={tag} />
                 ))}
               </div>
             )}
-            <div className="bg-muted/50 rounded-md p-3 h-24 overflow-hidden">
-              <pre className="text-xs text-muted-foreground font-mono whitespace-pre-wrap line-clamp-4">
+            <div className="bg-muted/50 h-24 overflow-hidden rounded-md p-3">
+              <pre className="text-muted-foreground line-clamp-4 font-mono text-xs whitespace-pre-wrap">
                 {diagram.content}
               </pre>
             </div>
@@ -557,12 +555,15 @@ export function DiagramGrid({
 
   return (
     <>
-      <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <div className="bg-background text-foreground flex min-h-screen flex-col">
         {/* Header */}
-        <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm shrink-0">
-          <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        <header className="bg-background/80 sticky top-0 z-50 shrink-0 border-b backdrop-blur-sm">
+          <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
             <div className="flex items-center gap-2">
-              <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+              <Link
+                href="/"
+                className="flex items-center gap-2 transition-opacity hover:opacity-80"
+              >
                 <span className="text-2xl" role="img" aria-label="atlantis logo">
                   🔱
                 </span>
@@ -570,7 +571,7 @@ export function DiagramGrid({
               </Link>
             </div>
 
-            <div className="flex-1 max-w-md flex justify-center">
+            <div className="flex max-w-md flex-1 justify-center">
               <Button
                 variant="outline"
                 className="gap-2"
@@ -579,26 +580,25 @@ export function DiagramGrid({
               >
                 <Search className="h-4 w-4" />
                 <span className="hidden sm:inline">Search</span>
-                <span className="text-xs text-muted-foreground hidden lg:inline">{shortcutHint}</span>
-
+                <span className="text-muted-foreground hidden text-xs lg:inline">
+                  {shortcutHint}
+                </span>
               </Button>
             </div>
 
             <div className="flex items-center gap-2">
-
-
-
-
               <Button onClick={handleCreate} className="gap-2" disabled={isCreating}>
                 {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus size={18} />}
-                <span className="hidden sm:inline">{isCreating ? 'Creating...' : 'New Diagram'}</span>
+                <span className="hidden sm:inline">
+                  {isCreating ? 'Creating...' : 'New Diagram'}
+                </span>
               </Button>
 
               <Button variant="outline" className="gap-2" asChild>
                 <Link href="/settings">
                   <Settings2 className="h-4 w-4" />
                   <span className="hidden sm:inline">Settings</span>
-                  <span className="text-xs text-muted-foreground hidden lg:inline">
+                  <span className="text-muted-foreground hidden text-xs lg:inline">
                     Auto-save {settings.autoSave ? 'On' : 'Off'}
                   </span>
                 </Link>
@@ -608,9 +608,9 @@ export function DiagramGrid({
         </header>
 
         {/* Main Content */}
-        <main className="container mx-auto px-4 py-8 flex-1">
+        <main className="container mx-auto flex-1 px-4 py-8">
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                 <Card key={i} className="overflow-hidden">
                   <CardHeader className="pb-2">
@@ -625,8 +625,8 @@ export function DiagramGrid({
             </div>
           ) : diagrams.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
-              <Card className="max-w-md text-center border-dashed">
-                <CardHeader className="pb-4 space-y-3">
+              <Card className="max-w-md border-dashed text-center">
+                <CardHeader className="space-y-3 pb-4">
                   <div className="flex justify-center">
                     <span className="text-5xl" role="img" aria-label="atlantis logo">
                       🔱
@@ -649,7 +649,7 @@ export function DiagramGrid({
             <div className="space-y-8">
               {hasStarred && (
                 <section>
-                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                     <span>Starred //</span>
                     <span className="text-muted-foreground">{starredDiagrams.length}</span>
@@ -660,8 +660,13 @@ export function DiagramGrid({
 
               {(otherDiagrams.length > 0 || !hasStarred) && (
                 <section>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className={cn("text-lg font-semibold flex items-center gap-2", hasStarred && "text-muted-foreground")}>
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2
+                      className={cn(
+                        'flex items-center gap-2 text-lg font-semibold',
+                        hasStarred && 'text-muted-foreground'
+                      )}
+                    >
                       <span>All diagrams //</span>
                       <span className="text-muted-foreground">
                         {otherDiagrams.length} of {Math.max(total - starredDiagrams.length, 0)}
@@ -676,10 +681,15 @@ export function DiagramGrid({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuRadioGroup value={sortMode} onValueChange={(v) => handleSortChange(v as SortOption)}>
+                        <DropdownMenuRadioGroup
+                          value={sortMode}
+                          onValueChange={(v) => handleSortChange(v as SortOption)}
+                        >
                           <DropdownMenuRadioItem value="recent">Recent</DropdownMenuRadioItem>
                           <DropdownMenuRadioItem value="old">Oldest</DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="alphabetical">Alphabetical</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="alphabetical">
+                            Alphabetical
+                          </DropdownMenuRadioItem>
                           <DropdownMenuRadioItem value="versions">Versions</DropdownMenuRadioItem>
                         </DropdownMenuRadioGroup>
                       </DropdownMenuContent>
@@ -690,7 +700,10 @@ export function DiagramGrid({
               )}
 
               {isFetchingMore && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" aria-hidden>
+                <div
+                  className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                  aria-hidden
+                >
                   {[1, 2, 3, 4].map((i) => (
                     <Card key={`skeleton-${i}`} className="overflow-hidden">
                       <CardHeader className="pb-2">
@@ -711,14 +724,14 @@ export function DiagramGrid({
         </main>
 
         {/* Footer */}
-        <footer className="border-t py-6 mt-auto shrink-0">
-          <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+        <footer className="mt-auto shrink-0 border-t py-6">
+          <div className="text-muted-foreground container mx-auto px-4 text-center text-sm">
             Powered by{' '}
             <a
               href="https://mermaid.js.org"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline hover:text-foreground transition-colors"
+              className="hover:text-foreground underline transition-colors"
             >
               Mermaid.js
             </a>
@@ -731,7 +744,6 @@ export function DiagramGrid({
         onOpenChange={setIsSearchOpen}
         initialDiagrams={diagrams}
       />
-
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>

@@ -59,11 +59,11 @@ export function AiChatPanel({ diagramId, currentContent, onApply }: AiChatPanelP
   };
 
   return (
-    <div className="border-t bg-muted/40 p-3 space-y-2">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+    <div className="bg-muted/40 space-y-2 border-t p-3">
+      <div className="text-muted-foreground flex items-center justify-between text-xs">
         <div className="flex items-center gap-2">
-          <GeminiSpark className="h-4 w-4 text-primary" />
-          <span className="font-medium text-foreground">AI assistant</span>
+          <GeminiSpark className="text-primary h-4 w-4" />
+          <span className="text-foreground font-medium">AI assistant</span>
         </div>
         <span>{isLoading ? 'Thinking…' : 'Ready'}</span>
       </div>
@@ -79,9 +79,8 @@ export function AiChatPanel({ diagramId, currentContent, onApply }: AiChatPanelP
         </p>
       )}
       <div className="flex flex-col items-end gap-1">
-
         <div className="flex w-full items-center justify-between">
-          <p className="text-xs text-muted-foreground/70 text-center flex-1">
+          <p className="text-muted-foreground/70 flex-1 text-center text-xs">
             AI can make mistakes. Please cross-check the output.
           </p>
           <div className="flex gap-2">

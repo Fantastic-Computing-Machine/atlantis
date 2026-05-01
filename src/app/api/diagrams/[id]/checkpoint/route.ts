@@ -1,12 +1,15 @@
 import { csrfFailureResponse, ensureCsrfCookie, validateCsrfToken } from '@/lib/csrf';
-import { createCheckpoint, deleteCheckpoint, getDiagramById, listCheckpoints, restoreCheckpoint } from '@/lib/data';
+import {
+  createCheckpoint,
+  deleteCheckpoint,
+  getDiagramById,
+  listCheckpoints,
+  restoreCheckpoint,
+} from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { NextResponse } from 'next/server';
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     await ensureCsrfCookie();
     const { id } = await params;
@@ -23,10 +26,7 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await validateCsrfToken(request))) {
     return csrfFailureResponse();
   }
@@ -63,10 +63,7 @@ export async function POST(
 /**
  * Restore a checkpoint as the current version
  */
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await validateCsrfToken(request))) {
     return csrfFailureResponse();
   }
@@ -96,10 +93,7 @@ export async function PATCH(
 /**
  * Delete a checkpoint
  */
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await validateCsrfToken(request))) {
     return csrfFailureResponse();
   }

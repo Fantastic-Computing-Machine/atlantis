@@ -31,9 +31,10 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 import { Textarea } from '@/components/ui/textarea';
 import { ResponsiveTagPicker } from '@/components/responsive-tag-picker';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
+import { LIVE_SYNC_CONFIG } from '@/lib/live-sync-config';
 import { useDiagramStore } from '@/lib/store';
 import { Checkpoint, Diagram, Tag } from '@/lib/types';
-import { useLiveSync } from '@/lib/useLiveSync';
+import { getLiveSyncClientId, useLiveSync } from '@/lib/useLiveSync';
 
 import { copyToClipboard, formatDate, cn } from '@/lib/utils';
 import {
@@ -244,6 +245,13 @@ const upsertNodeStyleLine = (content: string, nodeId: string, color: string | nu
   return lines.join('\n');
 };
 
+const nextIsoAfter = (currentIso: string): string => {
+  const currentMs = Date.parse(currentIso);
+  const nowMs = Date.now();
+  const nextMs = Number.isFinite(currentMs) ? Math.max(nowMs, currentMs + 1) : nowMs;
+  return new Date(nextMs).toISOString();
+};
+
 export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const router = useRouter();
   const [diagram, setDiagram] = useState<Diagram>(initialDiagram);
@@ -263,14 +271,16 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const settings = useDiagramStore((state) => state.settings);
   const updateDiagram = useDiagramStore((state) => state.updateDiagram);
   const removeDiagram = useDiagramStore((state) => state.removeDiagram);
-  const setHasAiApiKey = useDiagramStore((state) => state.setHasAiApiKey);
-  const setAiProvider = useDiagramStore((state) => state.setAiProvider);
+  const updateSettings = useDiagramStore((state) => state.updateSettings);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const draftPublishTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedContentRef = useRef(initialDiagram.content);
   const lastSavedTitleRef = useRef(initialDiagram.title);
   const lastSavedDescriptionRef = useRef(initialDiagram.description);
   const lastSavedTagsRef = useRef(initialDiagram.tags || []);
+  const draftSeqRef = useRef(0);
   const selectedNodeId = selectedNode?.id ?? null;
+  const clientId = useMemo(() => getLiveSyncClientId(), []);
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [activePane, setActivePane] = useState<'editor' | 'preview'>('preview');
 
@@ -278,15 +288,76 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const hasLocalChanges =
     diagram.content !== lastSavedContentRef.current ||
     diagram.title !== lastSavedTitleRef.current ||
-    diagram.description !== lastSavedDescriptionRef.current;
+    diagram.description !== lastSavedDescriptionRef.current ||
+    JSON.stringify(tags) !== JSON.stringify(lastSavedTagsRef.current);
 
-  // Live sync: poll for external changes from other users
-  const { refresh: syncFromServer } = useLiveSync<Diagram>({
+  const publishDraftUpdate = useCallback(
+    async (nextDiagram: Diagram) => {
+      if (!mounted) return;
+
+      try {
+        const csrfToken = await ensureCsrfToken();
+        const seq = ++draftSeqRef.current;
+        await fetch('/api/sync/publish', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            [CSRF_HEADER_NAME]: csrfToken,
+            'x-client-id': clientId,
+          },
+          body: JSON.stringify({
+            topic: `draft:diagram:${nextDiagram.id}`,
+            source: clientId,
+            payload: {
+              ...nextDiagram,
+              tags,
+              seq,
+            },
+          }),
+        });
+      } catch {
+        // ignore draft sync errors; autosave remains source of truth
+      }
+    },
+    [clientId, mounted, tags]
+  );
+
+  const queueDraftUpdate = useCallback(
+    (nextDiagram: Diagram) => {
+      if (!mounted) return;
+
+      if (draftPublishTimerRef.current) {
+        clearTimeout(draftPublishTimerRef.current);
+      }
+
+      draftPublishTimerRef.current = setTimeout(() => {
+        draftPublishTimerRef.current = null;
+        void publishDraftUpdate(nextDiagram);
+      }, 180);
+    },
+    [mounted, publishDraftUpdate]
+  );
+
+  useLiveSync<Diagram>({
     resourceUrl: `/api/diagrams/${diagram.id}`,
     currentUpdatedAt: diagram.updatedAt,
     hasLocalChanges,
-    enabled: Boolean(settings.liveSync) && mounted,
-    intervalMs: settings.liveSyncInterval ?? 5000,
+    enabled: LIVE_SYNC_CONFIG.enabled && mounted,
+    intervalMs: LIVE_SYNC_CONFIG.pollIntervalMs,
+    liveSyncMethod: LIVE_SYNC_CONFIG.method,
+    eventTopics: [`doc:diagram:${diagram.id}`, `draft:diagram:${diagram.id}`],
+    allowWhileDirty: true,
+    isInstantPayload: (payload): payload is Diagram => {
+      if (!payload || typeof payload !== 'object') return false;
+      const candidate = payload as Partial<Diagram>;
+      return (
+        typeof candidate.id === 'string' &&
+        typeof candidate.title === 'string' &&
+        typeof candidate.description === 'string' &&
+        typeof candidate.content === 'string' &&
+        typeof candidate.updatedAt === 'string'
+      );
+    },
     onUpdate: (remoteDiagram) => {
       setDiagram(remoteDiagram);
       setTags(remoteDiagram.tags || []);
@@ -307,22 +378,30 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (draftPublishTimerRef.current) {
+        clearTimeout(draftPublishTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const loadAiKey = async () => {
       try {
         const res = await fetch('/api/settings/ai-key');
         const data = await res.json();
         if (typeof data.hasKey === 'boolean') {
-          setHasAiApiKey(data.hasKey);
+          updateSettings({ hasAiApiKey: data.hasKey });
         }
         if (typeof data.provider === 'string') {
-          setAiProvider(data.provider);
+          updateSettings({ aiProvider: data.provider });
         }
       } catch {
         // silently ignore; AI is optional
       }
     };
     loadAiKey();
-  }, [setHasAiApiKey, setAiProvider]);
+  }, [updateSettings]);
 
   useEffect(() => {
     if (!selectedNodeId) {
@@ -333,18 +412,40 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     setSelectionRange(range);
   }, [diagram.content, selectedNodeId]);
 
+  useEffect(() => {
+    if (!mounted) return;
+    const tagsChanged = JSON.stringify(tags) !== JSON.stringify(lastSavedTagsRef.current);
+    if (!tagsChanged) return;
+
+    const nextDiagram = {
+      ...diagram,
+      tags,
+      updatedAt: nextIsoAfter(diagram.updatedAt),
+    };
+    queueDraftUpdate(nextDiagram);
+  }, [diagram, mounted, queueDraftUpdate, tags]);
+
   const handleEditorChange = (value: string) => {
     // Ignore changes when viewing a past checkpoint (read-only mode)
     if (viewingCheckpointId !== null) return;
-    setDiagram((prev) => ({ ...prev, content: value }));
+    const nextUpdatedAt = nextIsoAfter(diagram.updatedAt);
+    const nextDiagram = { ...diagram, content: value, updatedAt: nextUpdatedAt };
+    setDiagram(nextDiagram);
+    queueDraftUpdate(nextDiagram);
   };
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDiagram((prev) => ({ ...prev, title: e.target.value }));
+    const nextUpdatedAt = nextIsoAfter(diagram.updatedAt);
+    const nextDiagram = { ...diagram, title: e.target.value, updatedAt: nextUpdatedAt };
+    setDiagram(nextDiagram);
+    queueDraftUpdate(nextDiagram);
   };
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setDiagram((prev) => ({ ...prev, description: e.target.value }));
+    const nextUpdatedAt = nextIsoAfter(diagram.updatedAt);
+    const nextDiagram = { ...diagram, description: e.target.value, updatedAt: nextUpdatedAt };
+    setDiagram(nextDiagram);
+    queueDraftUpdate(nextDiagram);
   };
 
   const handleNodeSelect = useCallback(
@@ -384,12 +485,16 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const handleNodeColorChange = useCallback(
     (color: string | null) => {
       if (!selectedNodeId) return;
-      setDiagram((prev) => {
-        const updatedContent = upsertNodeStyleLine(prev.content, selectedNodeId, color);
-        return { ...prev, content: updatedContent };
-      });
+      const updatedContent = upsertNodeStyleLine(diagram.content, selectedNodeId, color);
+      const nextDiagram = {
+        ...diagram,
+        content: updatedContent,
+        updatedAt: nextIsoAfter(diagram.updatedAt),
+      };
+      setDiagram(nextDiagram);
+      queueDraftUpdate(nextDiagram);
     },
-    [selectedNodeId]
+    [diagram, queueDraftUpdate, selectedNodeId]
   );
 
   const handleToggleAiChat = useCallback(() => {
@@ -398,10 +503,16 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
 
   const handleApplyAiContent = useCallback(
     (content: string) => {
-      setDiagram((prev) => ({ ...prev, content }));
+      const nextDiagram = {
+        ...diagram,
+        content,
+        updatedAt: nextIsoAfter(diagram.updatedAt),
+      };
+      setDiagram(nextDiagram);
+      queueDraftUpdate(nextDiagram);
       updateDiagram(diagram.id, { content });
     },
-    [diagram.id, updateDiagram]
+    [diagram, queueDraftUpdate, updateDiagram]
   );
 
   const saveChanges = useCallback(
@@ -413,6 +524,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
           headers: {
             'Content-Type': 'application/json',
             [CSRF_HEADER_NAME]: csrfToken,
+            'x-client-id': clientId,
           },
           body: JSON.stringify({ ...diagram, tags: tags.map((t) => t.id) }),
         });
@@ -435,13 +547,11 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
         if (showToast) {
           toast.success('Changes saved');
         }
-        // Sync from server after save to pull any concurrent changes
-        syncFromServer();
       } catch {
         toast.error('Failed to save changes');
       }
     },
-    [diagram, updateDiagram, syncFromServer, tags]
+    [diagram, updateDiagram, tags, clientId]
   );
 
   // Ctrl+S to save
@@ -462,27 +572,21 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   }, [saveChanges, viewingCheckpointId]);
 
   // Auto-save with debounce
-  // Content-only auto-save with debounce
   useEffect(() => {
-    // Don't auto-save when viewing a past checkpoint
-    if (!settings.autoSave || viewingCheckpointId !== null) return;
-
-    const hasContentChanged = diagram.content !== lastSavedContentRef.current;
-    const hasTitleChanged = diagram.title !== lastSavedTitleRef.current;
-    const hasDescriptionChanged = diagram.description !== lastSavedDescriptionRef.current;
-
-    // Explicitly exclude tags from this check
-    if (!hasContentChanged && !hasTitleChanged && !hasDescriptionChanged) return;
+    // Don't auto-save when viewing a past checkpoint or if there are no changes
+    if (!settings.autoSave || viewingCheckpointId !== null || !hasLocalChanges) return;
 
     // Clear existing timer
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current);
     }
 
-    // Set new timer for auto-save (2 second debounce)
+    const autoSaveDelay = settings.autoSaveDelay ?? 2000;
+
+    // Set new timer for auto-save
     autoSaveTimerRef.current = setTimeout(() => {
       saveChanges(false); // Silent save
-    }, 2000);
+    }, autoSaveDelay);
 
     return () => {
       if (autoSaveTimerRef.current) {
@@ -490,27 +594,12 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
       }
     };
   }, [
-    diagram.content,
-    diagram.title,
-    diagram.description,
-    // tags removed from dependencies
+    hasLocalChanges,
     settings.autoSave,
+    settings.autoSaveDelay,
     saveChanges,
     viewingCheckpointId,
   ]);
-
-  // Immediate save for tags
-  useEffect(() => {
-    // Skip initial mount or if no changes
-    if (JSON.stringify(tags) === JSON.stringify(lastSavedTagsRef.current)) return;
-
-    // If we are viewing a past checkpoint, we shouldn't save tags either (or maybe we should? tags are global).
-    // Logic above says "Don't save when viewing a past checkpoint". Following that rule.
-    if (viewingCheckpointId !== null) return;
-
-    // Save immediately
-    saveChanges(false);
-  }, [tags, saveChanges, viewingCheckpointId]);
 
   // Save on blur for title (if auto-save is off)
   const handleTitleBlur = () => {
@@ -541,6 +630,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
         headers: {
           'Content-Type': 'application/json',
           [CSRF_HEADER_NAME]: csrfToken,
+          'x-client-id': clientId,
         },
         body: JSON.stringify({ isFavorite: nextFavorite }),
       });

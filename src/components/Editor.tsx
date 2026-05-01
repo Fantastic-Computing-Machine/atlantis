@@ -11,20 +11,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { indentWithTab } from '@codemirror/commands';
+import { indentUnit } from '@codemirror/language';
 import type { Extension } from '@codemirror/state';
 import { EditorState, StateEffect, StateField, Transaction } from '@codemirror/state';
 import type { ViewUpdate } from '@codemirror/view';
 import { Decoration, EditorView, keymap } from '@codemirror/view';
-import { indentWithTab } from '@codemirror/commands';
-import { indentUnit } from '@codemirror/language';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
-import CodeMirror from '@uiw/react-codemirror';
 import { githubDark, githubLight } from '@uiw/codemirror-theme-github';
+import CodeMirror from '@uiw/react-codemirror';
 import { mermaid } from 'codemirror-lang-mermaid';
 import { Copy, Settings2, WrapText } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -59,9 +55,7 @@ const highlightLineField = StateField.define({
           break;
         }
         const line = tr.state.doc.lineAt(Math.max(0, Math.min(range.from, tr.state.doc.length)));
-        next = Decoration.set([
-          Decoration.line({ class: 'cm-highlight-line' }).range(line.from)
-        ]);
+        next = Decoration.set([Decoration.line({ class: 'cm-highlight-line' }).range(line.from)]);
         break;
       }
     }
@@ -70,12 +64,18 @@ const highlightLineField = StateField.define({
   provide: (field) => EditorView.decorations.from(field),
 });
 
-const insertNewlineAndIndent = ({ state, dispatch }: { state: EditorState; dispatch: (tr: Transaction) => void }) => {
+const insertNewlineAndIndent = ({
+  state,
+  dispatch,
+}: {
+  state: EditorState;
+  dispatch: (tr: Transaction) => void;
+}) => {
   const { from, to } = state.selection.main;
   const line = state.doc.lineAt(from);
-  const indent = line.text.match(/^\s*/)?.[0] || "";
+  const indent = line.text.match(/^\s*/)?.[0] || '';
 
-  let additionalIndent = "";
+  let additionalIndent = '';
   const trimmed = line.text.trim();
   if (
     trimmed.startsWith('subgraph') ||
@@ -88,7 +88,7 @@ const insertNewlineAndIndent = ({ state, dispatch }: { state: EditorState; dispa
   }
 
   const transaction = state.update({
-    changes: { from, to, insert: "\n" + indent + additionalIndent },
+    changes: { from, to, insert: '\n' + indent + additionalIndent },
     selection: { anchor: from + 1 + indent.length + additionalIndent.length },
     scrollIntoView: true,
   });
@@ -114,9 +114,12 @@ export function Editor({
   const [wordWrap, setWordWrap] = useState(true);
   const editorViewRef = useRef<EditorView | null>(null);
 
-  const handleChange = useCallback((val: string) => {
-    onChange(val);
-  }, [onChange]);
+  const handleChange = useCallback(
+    (val: string) => {
+      onChange(val);
+    },
+    [onChange]
+  );
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(value);
@@ -140,12 +143,15 @@ export function Editor({
     view.dispatch({ effects: setHighlightedLine.of({ from, to }) });
   }, [selectionRange]);
 
-  const handleUpdate = useCallback((update: ViewUpdate) => {
-    if (!onCursorLineChange) return;
-    if (!update.selectionSet) return;
-    const line = update.state.doc.lineAt(update.state.selection.main.head).text;
-    onCursorLineChange(line);
-  }, [onCursorLineChange]);
+  const handleUpdate = useCallback(
+    (update: ViewUpdate) => {
+      if (!onCursorLineChange) return;
+      if (!update.selectionSet) return;
+      const line = update.state.doc.lineAt(update.state.selection.main.head).text;
+      onCursorLineChange(line);
+    },
+    [onCursorLineChange]
+  );
 
   const extensions = useMemo(() => {
     const exts: Extension[] = [highlightLineField, mermaid()];
@@ -155,22 +161,18 @@ export function Editor({
     if (showIndentGuides) {
       exts.push(indentationMarkers());
     }
-    exts.push(keymap.of([
-      { key: "Enter", run: insertNewlineAndIndent },
-      indentWithTab
-    ]));
+    exts.push(keymap.of([{ key: 'Enter', run: insertNewlineAndIndent }, indentWithTab]));
     return exts;
   }, [wordWrap, showIndentGuides]);
 
   return (
-    <div className="h-full w-full overflow-hidden bg-background flex flex-col">
+    <div className="bg-background flex h-full w-full flex-col overflow-hidden">
       {/* Editor Toolbar */}
-      <div className="h-10 border-b flex items-center justify-between px-3 bg-muted/30 shrink-0">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <div className="bg-muted/30 flex h-10 shrink-0 items-center justify-between border-b px-3">
+        <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
           Mermaid
         </span>
         <div className="flex items-center gap-1">
-
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -188,9 +190,7 @@ export function Editor({
                 <GeminiSpark className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>
-              {aiEnabled ? 'Hide AI chat' : 'AI helper'}
-            </TooltipContent>
+            <TooltipContent>{aiEnabled ? 'Hide AI chat' : 'AI helper'}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -198,13 +198,13 @@ export function Editor({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                aria-label="Copy code"
+                aria-label="Copy diagram"
                 onClick={handleCopy}
               >
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Copy code</TooltipContent>
+            <TooltipContent>Copy diagram</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -219,18 +219,19 @@ export function Editor({
                 <WrapText className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>
-              {wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
-            </TooltipContent>
+            <TooltipContent>{wordWrap ? 'Disable word wrap' : 'Enable word wrap'}</TooltipContent>
           </Tooltip>
-
-
 
           <DropdownMenu>
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Editor settings">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    aria-label="Editor settings"
+                  >
                     <Settings2 className="h-3.5 w-3.5" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -252,10 +253,7 @@ export function Editor({
               >
                 Indentation guides
               </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={wordWrap}
-                onCheckedChange={setWordWrap}
-              >
+              <DropdownMenuCheckboxItem checked={wordWrap} onCheckedChange={setWordWrap}>
                 Word wrap
               </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
@@ -264,8 +262,8 @@ export function Editor({
       </div>
 
       {/* Code Editor + AI Panel */}
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <div className="flex-1 min-h-0">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="min-h-0 flex-1">
           <CodeMirror
             value={value}
             height="100%"
@@ -292,11 +290,7 @@ export function Editor({
           />
         </div>
         {aiChatOpen && onApplyAiContent && diagramId && (
-          <AiChatPanel
-            diagramId={diagramId}
-            currentContent={value}
-            onApply={onApplyAiContent}
-          />
+          <AiChatPanel diagramId={diagramId} currentContent={value} onApply={onApplyAiContent} />
         )}
       </div>
     </div>

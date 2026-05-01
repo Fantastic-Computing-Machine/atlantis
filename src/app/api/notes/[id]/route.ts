@@ -5,13 +5,17 @@ import {
   CacheKeys,
   CachePrefixes,
   DEFAULT_TTL_MS,
+  deleteDocSnapshot,
   getCache,
+  getDocSnapshot,
+  setDocSnapshot,
   withCacheHeader,
   withNoCacheHeaders,
 } from '@/lib/cache';
 import { csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { logApiError } from '@/lib/logger';
-import { deleteNoteById, getNoteById, getNoteUpdatedAt, updateNoteById } from '@/lib/notes-data';
+import { deleteNoteById, getNoteById, updateNoteById } from '@/lib/notes-data';
+import { publishSyncEvent } from '@/lib/pubsub';
 import { noteUpdateSchema } from '@/lib/schemas';
 
 const PRIVATE_CONTENT_MESSAGE = 'Content policy in effect.';
@@ -19,52 +23,63 @@ type NoteRouteParams = {
   params: Promise<{ id: string }>;
 };
 
-const maskPrivateNote = (note: Note) => ({
-  id: note.id,
-  title: note.title,
+const maskPrivateNote = (note: Note): Note => ({
+  ...note,
   content: PRIVATE_CONTENT_MESSAGE,
-  language: note.language,
-  starred: note.starred,
-  private: note.private,
-  emoji: note.emoji,
-  tags: note.tags,
-  createdAt: note.createdAt,
-  updatedAt: note.updatedAt,
 });
+
+const toEtag = (id: string, updatedAt: string) => `W/"note-${id}-${updatedAt}"`;
 
 export async function GET(request: Request, { params }: NoteRouteParams) {
   try {
     const { id } = await params;
     const url = new URL(request.url);
     const fresh = url.searchParams.get('fresh') === 'true';
-    const select = url.searchParams.get('select');
+    const ifNoneMatch = request.headers.get('if-none-match');
+
+    const snapshot = await getDocSnapshot<Note>('note', id);
+    if (snapshot) {
+      const etag = toEtag(id, snapshot.updatedAt);
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        return new NextResponse(null, { status: 304, headers: { ETag: etag } });
+      }
+      const payload = snapshot.private ? maskPrivateNote(snapshot) : snapshot;
+      const response = NextResponse.json(payload);
+      response.headers.set('ETag', etag);
+      response.headers.set('Cache-Control', 'no-cache');
+      const withCache = withCacheHeader(response, fresh ? 'BYPASS' : 'HIT');
+      return fresh ? withNoCacheHeaders(withCache) : withCache;
+    }
 
     if (fresh) {
-      if (select === 'updatedAt') {
-        const meta = await getNoteUpdatedAt(id);
-        if (!meta) {
-          return NextResponse.json({ error: 'Note not found' }, { status: 404 });
-        }
-        return withNoCacheHeaders(withCacheHeader(NextResponse.json(meta), 'BYPASS'));
-      }
-
       const note = await getNoteById(id);
       if (!note) {
         return NextResponse.json({ error: 'Note not found' }, { status: 404 });
       }
-      if (note.private) {
-        const privateNote = maskPrivateNote(note);
-        return withNoCacheHeaders(withCacheHeader(NextResponse.json(privateNote), 'BYPASS'));
-      }
-      return withNoCacheHeaders(withCacheHeader(NextResponse.json(note), 'BYPASS'));
+      const finalNote = note.private ? maskPrivateNote(note) : note;
+      await setDocSnapshot('note', id, finalNote as Note);
+      const etag = toEtag(id, finalNote.updatedAt);
+      const response = withCacheHeader(NextResponse.json(finalNote), 'BYPASS');
+      response.headers.set('ETag', etag);
+      response.headers.set('Cache-Control', 'no-cache');
+      return withNoCacheHeaders(response);
     }
 
     const cache = getCache();
     const cacheKey = CacheKeys.note(id);
 
-    const cached = await cache.get<{ private?: boolean }>(cacheKey);
+    const cached = await cache.get<{ private?: boolean; updatedAt?: string; createdAt?: string }>(
+      cacheKey
+    );
     if (cached) {
-      return withCacheHeader(NextResponse.json(cached), 'HIT');
+      const etag = toEtag(id, cached.updatedAt ?? cached.createdAt ?? '');
+      if (ifNoneMatch && ifNoneMatch === etag) {
+        return new NextResponse(null, { status: 304, headers: { ETag: etag } });
+      }
+      const response = NextResponse.json(cached);
+      response.headers.set('ETag', etag);
+      response.headers.set('Cache-Control', 'no-cache');
+      return withCacheHeader(response, 'HIT');
     }
 
     const note = await getNoteById(id);
@@ -73,14 +88,14 @@ export async function GET(request: Request, { params }: NoteRouteParams) {
       return NextResponse.json({ error: 'Note not found' }, { status: 404 });
     }
 
-    if (note.private) {
-      const privateNote = maskPrivateNote(note);
-      await cache.set(cacheKey, privateNote, DEFAULT_TTL_MS);
-      return withCacheHeader(NextResponse.json(privateNote), 'MISS');
-    }
-
-    await cache.set(cacheKey, note, DEFAULT_TTL_MS);
-    return withCacheHeader(NextResponse.json(note), 'MISS');
+    const finalNote = note.private ? maskPrivateNote(note) : note;
+    await cache.set(cacheKey, finalNote, DEFAULT_TTL_MS);
+    await setDocSnapshot('note', id, finalNote as Note);
+    const etag = toEtag(id, finalNote.updatedAt);
+    const response = NextResponse.json(finalNote);
+    response.headers.set('ETag', etag);
+    response.headers.set('Cache-Control', 'no-cache');
+    return withCacheHeader(response, 'MISS');
   } catch (error) {
     logApiError('GET /api/notes/[id]', error);
     return NextResponse.json({ error: 'Failed to load note' }, { status: 500 });
@@ -120,8 +135,26 @@ export async function PATCH(request: Request, { params }: NoteRouteParams) {
     const cache = getCache();
     await cache.delete(CacheKeys.note(id));
     await cache.deletePrefix(CachePrefixes.notesList);
+    await deleteDocSnapshot('note', id);
 
-    return NextResponse.json(updatedNote);
+    await setDocSnapshot('note', id, updatedNote);
+
+    const source = request.headers.get('x-client-id') ?? undefined;
+    await publishSyncEvent({
+      topic: `doc:note:${id}`,
+      payload: { id, updatedAt: updatedNote.updatedAt },
+      source,
+    });
+    await publishSyncEvent({
+      topic: 'list:notes',
+      payload: { id, updatedAt: updatedNote.updatedAt },
+      source,
+    });
+
+    const etag = toEtag(id, updatedNote.updatedAt);
+    const response = NextResponse.json(updatedNote);
+    response.headers.set('ETag', etag);
+    return response;
   } catch (error) {
     logApiError('PATCH /api/notes/[id]', error);
     return NextResponse.json({ error: 'Failed to update note' }, { status: 500 });
@@ -144,6 +177,19 @@ export async function DELETE(request: Request, { params }: NoteRouteParams) {
     const cache = getCache();
     await cache.delete(CacheKeys.note(id));
     await cache.deletePrefix(CachePrefixes.notesList);
+
+    await deleteDocSnapshot('note', id);
+
+    await publishSyncEvent({
+      topic: `doc:note:${id}`,
+      payload: { id, deleted: true },
+      source: request.headers.get('x-client-id') ?? undefined,
+    });
+    await publishSyncEvent({
+      topic: 'list:notes',
+      payload: { id, deleted: true },
+      source: request.headers.get('x-client-id') ?? undefined,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

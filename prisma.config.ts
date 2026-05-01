@@ -1,6 +1,7 @@
 import { defineConfig } from '@prisma/config';
+import { resolveDatabaseUrl } from './scripts/database-url';
 
-const url = process.env.DATABASE_URL ?? process.env.DB_CONNECTION ?? 'file:./data/atlantis.db';
+const url = resolveDatabaseUrl();
 
 export default defineConfig({
   datasource: {

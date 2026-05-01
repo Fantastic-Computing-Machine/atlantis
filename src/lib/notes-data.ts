@@ -92,9 +92,30 @@ export async function getNotePage({
   const normalizedLimit = normalizeLimit(limit);
   const normalizedOffset = normalizeOffset(offset);
 
+  const buildSafeTsQuery = (value: string) =>
+    value
+      .split(/\s+/)
+      .map((token) => token.replace(/[^a-zA-Z0-9_]/g, ''))
+      .filter(Boolean)
+      .join(' & ');
+
   const where: Prisma.NoteWhereInput = {};
   if (query?.trim()) {
-    where.searchVector = { contains: query.trim().toLowerCase() };
+    const cleanQuery = query.trim().toLowerCase();
+    const isPostgres =
+      process.env.PRISMA_PROVIDER === 'postgresql' ||
+      process.env.DATABASE_URL?.startsWith('postgres');
+
+    if (isPostgres) {
+      const tsQuery = buildSafeTsQuery(cleanQuery);
+      if (tsQuery) {
+        where.searchVector = { search: tsQuery } as Prisma.StringFilter;
+      } else {
+        where.searchVector = { contains: cleanQuery.replace(/[^a-zA-Z0-9_\s]/g, '') };
+      }
+    } else {
+      where.searchVector = { contains: cleanQuery };
+    }
   }
   if (starredOnly) {
     where.starred = true;

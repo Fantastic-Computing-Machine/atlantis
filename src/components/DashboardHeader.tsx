@@ -23,7 +23,7 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
-  const { settings, setHasAiApiKey, setAiProvider } = useDiagramStore();
+  const { settings, updateSettings } = useDiagramStore();
   const { isMac } = useShortcutPlatform();
   const { setPaletteOpen } = useKeyboardShortcuts();
 
@@ -34,17 +34,17 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
         const res = await fetch('/api/settings/ai-key');
         const data = await res.json();
         if (typeof data.hasKey === 'boolean') {
-          setHasAiApiKey(data.hasKey);
+          updateSettings({ hasAiApiKey: data.hasKey });
         }
         if (typeof data.provider === 'string') {
-          setAiProvider(data.provider);
+          updateSettings({ aiProvider: data.provider });
         }
       } catch {
         // ignore
       }
     };
     loadAiKey();
-  }, [setHasAiApiKey, setAiProvider]);
+  }, [updateSettings]);
 
   return (
     <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm shrink-0">
