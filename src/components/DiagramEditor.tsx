@@ -36,7 +36,7 @@ import { useDiagramStore } from '@/lib/store';
 import { Checkpoint, Diagram, Tag } from '@/lib/types';
 import { getLiveSyncClientId, useLiveSync } from '@/lib/useLiveSync';
 
-import { copyToClipboard, formatDate, cn } from '@/lib/utils';
+import { copyToClipboard, formatDate, cn, getDiagramType } from '@/lib/utils';
 import {
   Info,
   Moon,
@@ -92,6 +92,15 @@ const COLOR_PRESETS = [
   { name: 'Pink', value: '#ec4899' },
   { name: 'Slate', value: '#94a3b8' },
 ] as const;
+
+const SUPPORTED_COLOR_DIAGRAMS = [
+  'flowchart',
+  'graph',
+  'stateDiagram-v2',
+  'classDiagram',
+  'stateDiagram',
+  'erDiagram'
+];
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -158,18 +167,53 @@ const extractMermaidNodes = (src: string): NodeOption[] => {
   return Array.from(nodes.values()).sort((a, b) => a.id.localeCompare(b.id));
 };
 
-const getNodeIdFromLine = (line: string): string | null => {
-  const styleMatch = line.match(/^\s*style\s+([A-Za-z0-9_:-]+)/);
+const getNodeIdFromLine = (line: string, type: string): string | null => {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('%%')) return null;
+
+  // 1. Common style directive
+  const styleMatch = trimmed.match(/^\s*style\s+([A-Za-z0-9_:-]+)/);
   if (styleMatch) return styleMatch[1];
 
-  // Ignore edge-only lines to avoid showing palette on connectors
-  if (/\s*[A-Za-z0-9_:-]+\s*[-.]*[-=]*>\s*[A-Za-z0-9_:-]+/.test(line)) return null;
-  if (/\s*[A-Za-z0-9_:-]+\s*---\s*[A-Za-z0-9_:-]+/.test(line)) return null;
+  // 2. Connector filtering
+  const isEdge =
+    /\s*[A-Za-z0-9_:-]+\s*[-.]*[-=]*>\s*[A-Za-z0-9_:-]+/.test(line) ||
+    /\s*[A-Za-z0-9_:-]+\s*---\s*[A-Za-z0-9_:-]+/.test(line);
 
-  const nodeMatch = line.match(/(^|\s)([A-Za-z0-9_:-]+)\s*(\[|\(|\{|\"|:::|>|\\{\\{)/);
-  if (nodeMatch) return nodeMatch[2];
+  if (isEdge && type !== 'erDiagram') return null;
 
-  return null;
+  // 3. Diagram-specific logic
+  switch (type) {
+    case 'flowchart':
+    case 'graph': {
+      const match = trimmed.match(/^([A-Za-z0-9_][A-Za-z0-9_:-]*)\s*(?:\[|\(|\{|\"|:::|>|\\{\\{)/);
+      return match ? match[1] : null;
+    }
+    case 'sequenceDiagram': {
+      const match = trimmed.match(/^\s*(?:participant|actor)\s+([A-Za-z0-9_][A-Za-z0-9_:-]*)/i);
+      return match ? match[1] : null;
+    }
+    case 'erDiagram': {
+      const relMatch = trimmed.match(/^([A-Za-z0-9_]+)\s+[|{}-]{2,}/);
+      if (relMatch) return relMatch[1];
+      const defMatch = trimmed.match(/^([A-Za-z0-9_]+)\s*\{/);
+      if (defMatch) return defMatch[1];
+      return null;
+    }
+    case 'stateDiagram':
+    case 'stateDiagram-v2': {
+      const match = trimmed.match(/^\s*state\s+([A-Za-z0-9_][A-Za-z0-9_:-]*)/i);
+      return match ? match[1] : null;
+    }
+    case 'classDiagram': {
+      const match = trimmed.match(/^\s*class\s+([A-Za-z0-9_][A-Za-z0-9_:-]*)/i);
+      return match ? match[1] : null;
+    }
+    default: {
+      const match = trimmed.match(/^([A-Za-z0-9_][A-Za-z0-9_:-]*)\s*(\[|\(|\{|\"|:::|>|\\{\\{)/);
+      return match ? match[1] : null;
+    }
+  }
 };
 
 const findNodeDefinitionRange = (content: string, nodeId: string): TextRange | null => {
@@ -199,9 +243,7 @@ const getNodeFillColor = (content: string, nodeId: string): string | null => {
 const upsertNodeStyleLine = (content: string, nodeId: string, color: string | null): string => {
   const lines = content.split('\n');
   const styleRegex = new RegExp(`^\\s*style\\s+${escapeRegExp(nodeId)}\\s+([^\\n]+)$`);
-  const nodeRegex = new RegExp(`(^|\\s)${escapeRegExp(nodeId)}\\s*(\\[|\\(|\\{|\"|:::|>|\\{\\{)`);
   const styleIndex = lines.findIndex((line) => styleRegex.test(line));
-  const nodeIndex = lines.findIndex((line) => nodeRegex.test(line));
 
   if (color === null) {
     if (styleIndex !== -1) {
@@ -237,9 +279,7 @@ const upsertNodeStyleLine = (content: string, nodeId: string, color: string | nu
     const indent = lines[styleIndex].match(/^\s*/)?.[0] ?? '';
     lines[styleIndex] = `${indent}style ${nodeId} ${buildProps(props)}`;
   } else {
-    const insertAt = nodeIndex !== -1 ? nodeIndex + 1 : lines.length;
-    const indent = nodeIndex !== -1 ? (lines[nodeIndex].match(/^\s*/)?.[0] ?? '') : '';
-    lines.splice(insertAt, 0, `${indent}style ${nodeId} ${buildProps()}`);
+    lines.splice(lines.length, 0, ` style ${nodeId} ${buildProps()}`);
   }
 
   return lines.join('\n');
@@ -255,6 +295,7 @@ const nextIsoAfter = (currentIso: string): string => {
 export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   const router = useRouter();
   const [diagram, setDiagram] = useState<Diagram>(initialDiagram);
+  const [diagramType, setDiagramType] = useState<string>(getDiagramType(initialDiagram.content));
   const [tags, setTags] = useState<Tag[]>(initialDiagram.tags || []);
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -404,6 +445,8 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   }, [updateSettings]);
 
   useEffect(() => {
+    setDiagramType(getDiagramType(diagram.content));
+
     if (!selectedNodeId) {
       setSelectionRange(null);
       return;
@@ -467,7 +510,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
 
   const handleCursorLineChange = useCallback(
     (line: string) => {
-      const nodeId = getNodeIdFromLine(line);
+      const nodeId = getNodeIdFromLine(line, diagramType);
       if (!nodeId) {
         setSelectedNode(null);
         setSelectionRange(null);
@@ -479,7 +522,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
       const range = findNodeDefinitionRange(diagram.content, nodeId);
       setSelectionRange(range);
     },
-    [diagram.content, nodeOptions, selectedNodeId]
+    [diagram.content, diagramType, nodeOptions, selectedNodeId]
   );
 
   const handleNodeColorChange = useCallback(
@@ -1062,7 +1105,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
         </div>
       </div>
 
-      {selectedNode && (
+      {selectedNode && SUPPORTED_COLOR_DIAGRAMS.includes(diagramType) && (
         <div className="fixed right-0 bottom-3 left-0 z-30 px-2 pb-[env(safe-area-inset-bottom)] sm:right-auto sm:bottom-4 sm:left-1/2 sm:-translate-x-1/2 sm:px-0">
           <div className="bg-background/95 mx-auto flex max-w-full min-w-0 items-center gap-2 overflow-x-auto rounded-full border px-2.5 py-2 shadow-lg backdrop-blur sm:max-w-3xl sm:justify-center sm:px-4">
             <DropdownMenu>

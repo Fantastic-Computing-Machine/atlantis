@@ -166,3 +166,21 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 export function sanitizeFilename(name: string): string {
   return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 }
+
+/**
+ * Get diagram type
+ */
+export function getDiagramType(text: string): string {
+  const lines = text.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (!trimmed || trimmed.startsWith('%%')) continue;
+
+    const match = trimmed.match(/^(\S+)/);
+    if (match) return match[1];
+  }
+
+  return '';
+}
