@@ -39,6 +39,36 @@ function run(cmd, args, options = {}) {
   }
 }
 
+function sqliteTableHasColumn(db, tableName, columnName) {
+  const safeTable = tableName.replace(/"/g, '""');
+  const rows = db.prepare(`PRAGMA table_info("${safeTable}")`).all();
+  return rows.some((row) => row.name === columnName);
+}
+
+function sqliteSchemaNeedsPush(filePath) {
+  try {
+    const Database = require('better-sqlite3');
+    const db = new Database(filePath, { readonly: true, fileMustExist: true });
+    try {
+      // Keep this list focused on columns required by bootstrap backfills.
+      const requiredColumns = [
+        ['Tag', 'usageCount'],
+        ['Note', 'hasTodos'],
+      ];
+
+      return requiredColumns.some(([tableName, columnName]) => {
+        return !sqliteTableHasColumn(db, tableName, columnName);
+      });
+    } finally {
+      db.close();
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[bootstrap] unable to inspect sqlite schema (${message}); forcing db push`);
+    return true;
+  }
+}
+
 function ensureDataDir(url) {
   if (!url || !url.startsWith('file:')) return;
   const filePath = sqlitePathFromUrl(url);
@@ -145,7 +175,10 @@ function needsSqliteDbPush(url) {
     const stats = fs.statSync(filePath);
     // SQLite header is 100 bytes; an empty schema db is typically ~12KB+
     // If file is tiny or missing, we need to push
-    return stats.size < 1000;
+    if (stats.size < 1000) return true;
+
+    // Existing SQLite files can still be out-of-date with newer schema columns.
+    return sqliteSchemaNeedsPush(filePath);
   } catch {
     // File doesn't exist
     return true;

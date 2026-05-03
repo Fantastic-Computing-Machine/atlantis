@@ -33,6 +33,18 @@ export interface DiagramPage {
   nextOffset: number;
 }
 
+export interface DiagramMetadataItem {
+  id: string;
+  updatedAt: string;
+}
+
+export interface DiagramMetadataPage {
+  items: DiagramMetadataItem[];
+  total: number;
+  hasMore: boolean;
+  nextOffset: number;
+}
+
 export interface Note {
   id: string;
   title: string;
@@ -50,6 +62,18 @@ export type NoteSortOption = 'recent' | 'old' | 'alphabetical';
 
 export interface NotePage {
   items: Omit<Note, 'content'>[];
+  total: number;
+  hasMore: boolean;
+  nextOffset: number;
+}
+
+export interface NoteMetadataItem {
+  id: string;
+  updatedAt: string;
+}
+
+export interface NoteMetadataPage {
+  items: NoteMetadataItem[];
   total: number;
   hasMore: boolean;
   nextOffset: number;

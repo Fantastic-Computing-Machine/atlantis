@@ -1,8 +1,9 @@
 #!/bin/sh
 set -e
 
-# Add node_modules binaries to PATH
-export PATH="/app/node_modules/.bin:$PATH"
+# Add Prisma runtime tools and app binaries to PATH
+export PATH="/app/runtime-tools/node_modules/.bin:/app/node_modules/.bin:$PATH"
+export NODE_PATH="/app/runtime-tools/node_modules${NODE_PATH:+:$NODE_PATH}"
 
 # Normalize SQLite DATABASE_URL to an absolute path
 normalize_sqlite_url() {

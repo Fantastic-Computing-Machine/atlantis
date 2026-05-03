@@ -82,7 +82,21 @@ export class MemoryPubSub implements PubSubClient {
 // ---------------------------------------------------------------------------
 
 const DEFAULT_EVENTS_FILE = path.join(os.tmpdir(), 'atlantis-sync-events.ndjson');
-const EVENTS_FILE_PATH = path.resolve(process.env.SYNC_EVENTS_FILE ?? DEFAULT_EVENTS_FILE);
+const configuredEventsFile = process.env.SYNC_EVENTS_FILE?.trim();
+
+function resolveEventsFilePath(configuredPath?: string): string {
+  if (!configuredPath) {
+    return DEFAULT_EVENTS_FILE;
+  }
+
+  if (path.isAbsolute(configuredPath)) {
+    return configuredPath;
+  }
+
+  return path.join(/*turbopackIgnore: true*/ process.cwd(), configuredPath);
+}
+
+const EVENTS_FILE_PATH = resolveEventsFilePath(configuredEventsFile);
 const FILE_POLL_INTERVAL_MS = 400;
 const MAX_EVENTS_FILE_BYTES = 512 * 1024; // 512KB cap to prevent unbounded growth
 const EVENTS_DIR = path.dirname(EVENTS_FILE_PATH);

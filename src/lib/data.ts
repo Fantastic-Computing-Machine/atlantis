@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 
 import { prisma } from './prisma';
 import { buildSearchVector, stripStopWords } from './search';
-import { Checkpoint, Diagram, DiagramPage } from './types';
+import type { Checkpoint, Diagram, DiagramMetadataPage, DiagramPage, SortOption } from './types';
 import { generateShortId, getRandomEmoji } from './utils';
 
 const DEFAULT_PAGE_SIZE = 24;
@@ -77,17 +77,59 @@ async function withTx<T>(fn: (tx: TransactionClient) => Promise<T>): Promise<T> 
   return prisma.$transaction(async (tx) => fn(tx as TransactionClient)) as Promise<T>;
 }
 
-const normalizeLimit = (limit?: number | null) => {
+function normalizeLimit(limit?: number | null): number {
   if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
   return Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE);
-};
+}
 
-const normalizeOffset = (offset?: number | null) => {
+function normalizeOffset(offset?: number | null): number {
   if (!Number.isFinite(offset)) return 0;
   return Math.max(Math.trunc(offset as number), 0);
+}
+
+function mapTagIds(ids: string[]): Array<{ id: string }> {
+  return ids.map((tagId) => ({ id: tagId }));
+}
+
+function buildSafeTsQuery(value: string): string {
+  return value
+    .split(/\s+/)
+    .map((token) => token.replace(/[^a-zA-Z0-9_]/g, ''))
+    .filter(Boolean)
+    .join(' & ');
+}
+
+function getDiagramOrderBy(sort: SortOption): Prisma.DiagramOrderByWithRelationInput {
+  switch (sort) {
+    case 'old':
+      return { updatedAt: 'asc' };
+    case 'alphabetical':
+      return { title: 'asc' };
+    case 'versions':
+      return { totalVersions: 'desc' };
+    case 'recent':
+    default:
+      return { updatedAt: 'desc' };
+  }
+}
+
+type GetDiagramPageParams = {
+  limit?: number;
+  offset?: number;
+  query?: string;
+  sort?: SortOption;
+  favoritesOnly?: boolean;
+  tagSlug?: string;
+  metadataOnly?: boolean;
 };
 
-const mapTagIds = (ids: string[]) => ids.map((tagId) => ({ id: tagId }));
+export function getDiagramPage(
+  params: Omit<GetDiagramPageParams, 'metadataOnly'> & { metadataOnly: true }
+): Promise<DiagramMetadataPage>;
+export function getDiagramPage(
+  params: Omit<GetDiagramPageParams, 'metadataOnly'> & { metadataOnly?: false }
+): Promise<DiagramPage>;
+export function getDiagramPage(params: GetDiagramPageParams): Promise<DiagramPage | DiagramMetadataPage>;
 
 export async function getDiagramPage({
   limit = DEFAULT_PAGE_SIZE,
@@ -97,24 +139,9 @@ export async function getDiagramPage({
   favoritesOnly = false,
   tagSlug,
   metadataOnly = false,
-}: {
-  limit?: number;
-  offset?: number;
-  query?: string;
-  sort?: import('./types').SortOption;
-  favoritesOnly?: boolean;
-  tagSlug?: string;
-  metadataOnly?: boolean;
-}): Promise<DiagramPage> {
+}: GetDiagramPageParams): Promise<DiagramPage | DiagramMetadataPage> {
   const normalizedLimit = normalizeLimit(limit);
   const normalizedOffset = normalizeOffset(offset);
-
-  const buildSafeTsQuery = (value: string) =>
-    value
-      .split(/\s+/)
-      .map((token) => token.replace(/[^a-zA-Z0-9_]/g, ''))
-      .filter(Boolean)
-      .join(' & ');
 
   const where: Prisma.DiagramWhereInput = {};
   if (query?.trim()) {
@@ -142,21 +169,24 @@ export async function getDiagramPage({
     where.tags = { some: { slug: tagSlug } };
   }
 
-  let orderBy: Prisma.DiagramOrderByWithRelationInput = { updatedAt: 'desc' };
-  switch (sort) {
-    case 'old':
-      orderBy = { updatedAt: 'asc' };
-      break;
-    case 'alphabetical':
-      orderBy = { title: 'asc' };
-      break;
-    case 'versions':
-      orderBy = { totalVersions: 'desc' };
-      break;
-    case 'recent':
-    default:
-      orderBy = { updatedAt: 'desc' };
-      break;
+  const orderBy = getDiagramOrderBy(sort);
+
+  if (metadataOnly) {
+    const diagrams = await prisma.diagram.findMany({
+      where,
+      orderBy,
+      skip: normalizedOffset,
+      take: normalizedLimit,
+      select: { id: true, updatedAt: true },
+    });
+
+    const items = diagrams.map((diagram) => ({
+      id: diagram.id,
+      updatedAt: diagram.updatedAt.toISOString(),
+    }));
+    const nextOffset = normalizedOffset + items.length;
+
+    return { items, total: items.length, hasMore: false, nextOffset };
   }
 
   const [diagrams, total] = await Promise.all([
@@ -165,28 +195,12 @@ export async function getDiagramPage({
       orderBy,
       skip: normalizedOffset,
       take: normalizedLimit,
-      select: metadataOnly ? { id: true, updatedAt: true } : diagramWithLatestSelect,
+      select: diagramWithLatestSelect,
     }),
     prisma.diagram.count({ where }),
   ]);
 
-  const items = diagrams.map((d) => {
-    if (metadataOnly) {
-      return {
-        id: d.id,
-        updatedAt: d.updatedAt.toISOString(),
-        title: '',
-        description: '',
-        content: '',
-        emoji: '',
-        createdAt: new Date().toISOString(),
-        isFavorite: false,
-        totalVersions: 0,
-        tags: []
-      };
-    }
-    return toDiagram(d as DiagramWithLatest);
-  });
+  const items = diagrams.map((diagram) => toDiagram(diagram as DiagramWithLatest));
   const nextOffset = normalizedOffset + items.length;
   const hasMore = nextOffset < total;
 

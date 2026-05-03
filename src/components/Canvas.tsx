@@ -44,6 +44,30 @@ type BgPattern = 'none' | 'dots' | 'grid';
 
 // Smooth animation duration in ms
 const ANIMATION_DURATION = 200;
+const FENCED_BLOCK_LINE_RE = /^\s*```/m;
+const FENCED_INPUT_ERROR = 'Remove Markdown fences (```); paste raw Mermaid only.';
+
+function hasFencedBlock(input: string): boolean {
+  return FENCED_BLOCK_LINE_RE.test(input);
+}
+
+function parseMermaidErrorMessage(err: unknown): string {
+  if (typeof err === 'string') {
+    return err;
+  }
+
+  if (typeof err === 'object' && err !== null) {
+    const maybeError = err as { str?: string; message?: string };
+    if (maybeError.str) {
+      return maybeError.str;
+    }
+    if (maybeError.message) {
+      return maybeError.message;
+    }
+  }
+
+  return 'Mermaid parse error';
+}
 
 const extractNodeId = (element: Element): string | null => {
   const dataId = element.getAttribute('data-id');
@@ -130,6 +154,7 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
   const wrapperRef = useRef<HTMLDivElement>(null);
   const transformRef = useRef<ReactZoomPanPinchRef>(null);
   const pointerDownRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const renderRequestRef = useRef(0);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState<string | null>(null);
   const lastErrorRef = useRef<string | null>(null);
@@ -137,42 +162,6 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
   const [bgPattern, setBgPattern] = useState<BgPattern>('dots');
   const [bgColorClass, setBgColorClass] = useState<string>('bg-muted/30');
   const { resolvedTheme } = useTheme();
-
-  useEffect(() => {
-    import('mermaid').then((mermaid) => {
-      mermaid.default.initialize({
-        startOnLoad: false,
-        theme: resolvedTheme === 'dark' ? 'dark' : 'default',
-        securityLevel: 'loose',
-        fontFamily: 'inherit',
-        flowchart: { useMaxWidth: false },
-        sequence: { useMaxWidth: false },
-        gantt: { useMaxWidth: false },
-        journey: { useMaxWidth: false },
-        class: { useMaxWidth: false },
-        state: { useMaxWidth: false },
-        er: { useMaxWidth: false },
-        pie: { useMaxWidth: false },
-        // Newer diagrams often don't support useMaxWidth or handle it differently
-        // gitGraph, mindmap, timeline seem to benefit from it, but others might fail
-        gitGraph: { useMaxWidth: false },
-        mindmap: { useMaxWidth: false },
-        timeline: { useMaxWidth: false },
-        // Suppress built-in error SVG/banner; handle errors ourselves
-        suppressErrorRendering: true,
-        // @ts-expect-error parseError exists at runtime in Mermaid 11
-        parseError: (err: unknown) => {
-          const message =
-            typeof err === 'string'
-              ? err
-              : (err as { str?: string; message?: string }).str ||
-                (err as { str?: string; message?: string }).message ||
-                'Mermaid parse error';
-          throw new Error(message);
-        },
-      });
-    });
-  }, [resolvedTheme]);
 
   const toggleFullscreen = () => {
     if (!wrapperRef.current) return;
@@ -202,62 +191,97 @@ export function Canvas({ code, diagramId, title, selectedNodeId, onNodeSelect }:
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
+    const requestId = ++renderRequestRef.current;
+    let cancelled = false;
+
+    const isLatestRequest = () => !cancelled && renderRequestRef.current === requestId;
+
     const renderDiagram = async () => {
       try {
-        if (isMounted) {
-          setError(null);
-          setSvg('');
+        if (!isLatestRequest()) return;
+        setError(null);
+        setSvg('');
+
+        if (hasFencedBlock(code)) {
+          if (!isLatestRequest()) return;
+          setError(FENCED_INPUT_ERROR);
+          return;
         }
-        const id = `mermaid-${Date.now()}`;
+
         const mermaid = (await import('mermaid')).default;
-        // Validate before render to surface parser errors cleanly
-        try {
-          mermaid.parse(code);
-        } catch (parseErr) {
-          if (isMounted) {
-            const message = parseErr instanceof Error ? parseErr.message : String(parseErr);
-            setError(message || 'Mermaid parse error');
-            setSvg('');
-          }
-          return;
-        }
+        if (!isLatestRequest()) return;
 
-        const { svg } = await mermaid.render(id, code);
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: resolvedTheme === 'dark' ? 'dark' : 'default',
+          securityLevel: 'loose',
+          fontFamily: 'inherit',
+          flowchart: { useMaxWidth: false },
+          sequence: { useMaxWidth: false },
+          gantt: { useMaxWidth: false },
+          journey: { useMaxWidth: false },
+          class: { useMaxWidth: false },
+          state: { useMaxWidth: false },
+          er: { useMaxWidth: false },
+          pie: { useMaxWidth: false },
+          // Newer diagrams often don't support useMaxWidth or handle it differently
+          // gitGraph, mindmap, timeline seem to benefit from it, but others might fail
+          gitGraph: { useMaxWidth: false },
+          mindmap: { useMaxWidth: false },
+          timeline: { useMaxWidth: false },
+          // Suppress built-in error SVG/banner; handle errors ourselves
+          suppressErrorRendering: true,
+          // @ts-expect-error parseError exists at runtime in Mermaid 11
+          parseError: (err: unknown) => {
+            throw new Error(parseMermaidErrorMessage(err));
+          },
+        });
+
+        await mermaid.parse(code);
+        if (!isLatestRequest()) return;
+
+        const { svg: renderedSvg } = await mermaid.render(`mermaid-${requestId}`, code);
+        if (!isLatestRequest()) return;
+
         // Mermaid can return an error SVG; guard against it
-        if (svg.includes('Syntax error in text') || svg.includes('Parse error')) {
-          if (isMounted) {
-            setError('Mermaid parse error');
-            setSvg('');
-          }
+        if (renderedSvg.includes('Syntax error in text') || renderedSvg.includes('Parse error')) {
+          setError('Mermaid parse error');
+          setSvg('');
           return;
         }
 
-        if (isMounted) setSvg(svg);
+        setSvg(renderedSvg);
+        lastErrorRef.current = null;
       } catch (err) {
-        if (isMounted) {
-          const message = err instanceof Error ? err.message : String(err);
-          if (lastErrorRef.current !== message) {
-            console.error('Mermaid render error:', err);
-            lastErrorRef.current = message;
-          }
-          setError(message);
-          setSvg('');
+        if (!isLatestRequest()) return;
+        const message = err instanceof Error ? err.message : String(err);
+        if (lastErrorRef.current !== message) {
+          console.error('Mermaid render error:', err);
+          lastErrorRef.current = message;
         }
+        setError(message);
+        setSvg('');
       }
     };
 
     if (code) {
-      const timeout = setTimeout(renderDiagram, 300);
-      return () => clearTimeout(timeout);
+      const timeout = setTimeout(() => {
+        void renderDiagram();
+      }, 300);
+      return () => {
+        cancelled = true;
+        clearTimeout(timeout);
+      };
     }
 
     // If code is empty, clear previous output and errors
-    setSvg('');
-    setError(null);
+    if (isLatestRequest()) {
+      setSvg('');
+      setError(null);
+    }
 
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
   }, [code, resolvedTheme]);
 
