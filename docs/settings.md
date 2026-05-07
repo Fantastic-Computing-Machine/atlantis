@@ -70,7 +70,7 @@ Settings can also be configured via environment variables. These are especially 
 | `GEMINI_MODEL`         | `gemini-3.1-flash-lite-preview`                           | Gemini model to use                                                                                                                                 |
 | `GEMINI_API_VERSION`   | `v1` or `v1beta` (auto-detected)                          | Gemini API version (defaults to `v1beta` for `-preview` models)                                                                                     |
 | `ENABLE_API_ACCESS`    | `false`                                                   | Enable REST API endpoints and `/docs` (requires CSRF cookie/header for writes)                                                                      |
-| `PRISMA_AUTO_APPLY`    | `true` (dev), `false` (prod)                              | Dev bootstrap only: auto-run `prisma db push` during `npm run dev`/`npm run build` (Docker entrypoint/`npm run start` always runs `prisma db push`) |
+| `PRISMA_AUTO_APPLY`    | `true` (dev), `false` (prod)                              | Dev bootstrap only: auto-run `prisma db push` during `npm run db:setup` (Docker entrypoint/`npm run start` always runs `prisma db push`) |
 | `PRISMA_SKIP_AUTOPUSH` | `false`                                                   | Dev bootstrap only: skip automatic db push/seed in `scripts/bootstrap.js` (no effect on `npm run start` or Docker)                                  |
 
 ### Docker Compose Usage

@@ -100,7 +100,7 @@ docker compose -f docker-compose.simple.yml logs -f
 docker compose -f docker-compose.simple.yml down
 ```
 
-> **Note**: For in-memory caching during local development, run without `NODE_ENV=production` or use `npm run dev` instead of the Docker image. In Docker/production, caching stays off unless `REDIS_URL` is provided.
+> **Note**: For in-memory caching during local development, run without `NODE_ENV=production` or use `npm run db:setup` then `npm run dev` instead of the Docker image. In Docker/production, caching stays off unless `REDIS_URL` is provided.
 
 ### Building Your Own Image
 
@@ -113,8 +113,6 @@ docker build -t my-atlantis:local .
 # Run your custom image
 docker run -d -p 3000:3000 -v $(pwd)/data:/app/data my-atlantis:local
 ```
-
-The production image uses Next.js standalone output and a reduced runtime dependency set to keep the image smaller. LaTeX PDF compilation remains available through `pdflatex` using Alpine's `texlive-latexrecommended` package plus `texmf-dist-latexextra` instead of the complete `texlive-full` distribution.
 
 ## Configuration
 
