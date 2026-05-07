@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 
 import { buildSearchVector } from './search';
 import { prisma } from './prisma';
-import type { Note, NotePage, NoteSortOption } from './types';
+import type { Note, NoteMetadataPage, NotePage, NoteSortOption } from './types';
 import { generateNoteId, getRandomEmoji } from './utils';
 
 const DEFAULT_PAGE_SIZE = 24;
@@ -13,54 +13,84 @@ const TITLE_MAX = 200;
 type TagRow = { id: string; name: string; slug: string; color: string };
 type NoteRow = Prisma.NoteGetPayload<object> & { tags?: TagRow[] };
 
-const normalizeLimit = (limit?: number | null) => {
+function normalizeLimit(limit?: number | null): number {
   if (!Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
   return Math.min(Math.max(Math.trunc(limit as number), 1), MAX_PAGE_SIZE);
-};
+}
 
-const normalizeOffset = (offset?: number | null) => {
+function normalizeOffset(offset?: number | null): number {
   if (!Number.isFinite(offset)) return 0;
   return Math.max(Math.trunc(offset as number), 0);
-};
+}
 
-const mapTagIds = (ids: string[]) => ids.map((tagId) => ({ id: tagId }));
+function mapTagIds(ids: string[]): Array<{ id: string }> {
+  return ids.map((tagId) => ({ id: tagId }));
+}
 
-const buildNoteSearchVector = (title: string, content: string): string =>
-  buildSearchVector(title, undefined, content);
+function buildNoteSearchVector(title: string, content: string): string {
+  return buildSearchVector(title, undefined, content);
+}
 
-const toNote = (row: NoteRow): Note => ({
-  id: row.id,
-  title: row.title,
-  content: row.content,
-  language: row.language,
-  emoji: row.emoji,
-  starred: row.starred,
-  private: row.private,
-  createdAt: row.createdAt.toISOString(),
-  updatedAt: row.updatedAt.toISOString(),
-  tags: row.tags,
-});
+function toNote(row: NoteRow): Note {
+  return {
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    language: row.language,
+    emoji: row.emoji,
+    starred: row.starred,
+    private: row.private,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    tags: row.tags,
+  };
+}
 
-const toNoteListItem = (row: NoteRow): Omit<Note, 'content'> => ({
-  id: row.id,
-  title: row.title,
-  language: row.language,
-  emoji: row.emoji,
-  starred: row.starred,
-  private: row.private,
-  createdAt: row.createdAt.toISOString(),
-  updatedAt: row.updatedAt.toISOString(),
-  tags: row.tags,
-});
+function toNoteListItem(row: NoteRow): Omit<Note, 'content'> {
+  return {
+    id: row.id,
+    title: row.title,
+    language: row.language,
+    emoji: row.emoji,
+    starred: row.starred,
+    private: row.private,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    tags: row.tags,
+  };
+}
 
-const validateNoteLengths = (title?: string) => {
+function validateNoteLengths(title?: string): void {
   if (typeof title === 'string' && title.length > TITLE_MAX) {
     throw new Error(`Title exceeds ${TITLE_MAX} characters`);
   }
-};
+}
 
-const isNotFoundError = (error: unknown): boolean =>
-  typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2025';
+function isNotFoundError(error: unknown): boolean {
+  return (
+    typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2025'
+  );
+}
+
+function buildSafeTsQuery(value: string): string {
+  return value
+    .split(/\s+/)
+    .map((token) => token.replace(/[^a-zA-Z0-9_]/g, ''))
+    .filter(Boolean)
+    .join(' & ');
+}
+
+function getNoteOrderBy(sort: NoteSortOption): Prisma.NoteOrderByWithRelationInput {
+  switch (sort) {
+    case 'old':
+      return { updatedAt: 'asc' };
+    case 'alphabetical':
+      return { title: 'asc' };
+    case 'recent':
+    default:
+      return { updatedAt: 'desc' };
+  }
+}
 
 async function ensureUniqueNoteId(): Promise<string> {
   let id = generateNoteId();
@@ -72,6 +102,24 @@ async function ensureUniqueNoteId(): Promise<string> {
   return id;
 }
 
+type GetNotePageParams = {
+  limit?: number;
+  offset?: number;
+  query?: string;
+  sort?: NoteSortOption;
+  starredOnly?: boolean;
+  tagSlug?: string;
+  metadataOnly?: boolean;
+};
+
+export function getNotePage(
+  params: Omit<GetNotePageParams, 'metadataOnly'> & { metadataOnly: true }
+): Promise<NoteMetadataPage>;
+export function getNotePage(
+  params: Omit<GetNotePageParams, 'metadataOnly'> & { metadataOnly?: false }
+): Promise<NotePage>;
+export function getNotePage(params: GetNotePageParams): Promise<NotePage | NoteMetadataPage>;
+
 export async function getNotePage({
   limit = DEFAULT_PAGE_SIZE,
   offset = 0,
@@ -79,23 +127,10 @@ export async function getNotePage({
   sort = 'recent',
   starredOnly = false,
   tagSlug,
-}: {
-  limit?: number;
-  offset?: number;
-  query?: string;
-  sort?: NoteSortOption;
-  starredOnly?: boolean;
-  tagSlug?: string;
-}): Promise<NotePage> {
+  metadataOnly = false,
+}: GetNotePageParams): Promise<NotePage | NoteMetadataPage> {
   const normalizedLimit = normalizeLimit(limit);
   const normalizedOffset = normalizeOffset(offset);
-
-  const buildSafeTsQuery = (value: string) =>
-    value
-      .split(/\s+/)
-      .map((token) => token.replace(/[^a-zA-Z0-9_]/g, ''))
-      .filter(Boolean)
-      .join(' & ');
 
   const where: Prisma.NoteWhereInput = {};
   if (query?.trim()) {
@@ -122,30 +157,39 @@ export async function getNotePage({
     where.tags = { some: { slug: tagSlug } };
   }
 
-  const orderBy: Prisma.NoteOrderByWithRelationInput = (() => {
-    switch (sort) {
-      case 'old':
-        return { updatedAt: 'asc' };
-      case 'alphabetical':
-        return { title: 'asc' };
-      case 'recent':
-      default:
-        return { updatedAt: 'desc' };
-    }
-  })();
+  const orderBy = getNoteOrderBy(sort);
+
+  const findManyArgs: Prisma.NoteFindManyArgs = {
+    where,
+    orderBy,
+    skip: normalizedOffset,
+    take: normalizedLimit,
+  };
+
+  if (metadataOnly) {
+    findManyArgs.select = { id: true, updatedAt: true };
+  } else {
+    findManyArgs.include = { tags: true };
+  }
+
+  if (metadataOnly) {
+    const notes = await prisma.note.findMany(findManyArgs);
+    const items = notes.map((note) => ({
+      id: note.id,
+      updatedAt: note.updatedAt.toISOString(),
+    }));
+    const nextOffset = normalizedOffset + items.length;
+
+    return { items, total: items.length, hasMore: false, nextOffset };
+  }
 
   const [notes, total] = await Promise.all([
-    prisma.note.findMany({
-      where,
-      orderBy,
-      skip: normalizedOffset,
-      take: normalizedLimit,
-      include: { tags: true },
-    }),
+    prisma.note.findMany(findManyArgs),
     prisma.note.count({ where }),
   ]);
 
-  const items = notes.map(toNoteListItem);
+  const items = notes.map((note) => toNoteListItem(note as NoteRow));
+
   const nextOffset = normalizedOffset + items.length;
   const hasMore = nextOffset < total;
 
@@ -159,6 +203,15 @@ export async function getNoteById(id: string): Promise<Note | null> {
   });
   if (!note) return null;
   return toNote(note);
+}
+
+export async function getNoteUpdatedAt(id: string): Promise<{ updatedAt: string } | null> {
+  const note = await prisma.note.findUnique({
+    where: { id },
+    select: { updatedAt: true },
+  });
+  if (!note) return null;
+  return { updatedAt: note.updatedAt.toISOString() };
 }
 
 const TODO_REGEX = /^\s*[-*+]\s*\[\s\]/m;

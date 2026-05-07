@@ -24,8 +24,9 @@ Purpose: concise, high-signal defaults for this Next.js 16 + TypeScript + Tailwi
 ## Commands (npm)
 
 - Install deps: `npm install` (first step before any command).
-- Dev server: `npm run dev` (runs `node scripts/bootstrap.js` then `next dev`, http://localhost:3000).
-- Build (type-safety gate): `npm run build` (runs bootstrap then Next build).
+- DB setup: `npm run db:setup` (runs `node scripts/bootstrap.js`), run this first and once.
+- Dev server: `npm run dev` (runs `next dev`, http://localhost:3000).
+- Build (type-safety gate): `npm run build` (runs `next build`).
 - Start prod: `npm run start` (after build).
 - Lint: `npm run lint` (ESLint via Next config).
 - Prisma helpers: `npm run prisma:prepare`, `prisma:generate`, `prisma:push`, `prisma:migrate`, `migrate:json-to-db`.

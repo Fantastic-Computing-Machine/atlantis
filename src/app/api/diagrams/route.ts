@@ -30,7 +30,10 @@ export async function GET(request: Request) {
     const offsetNumber = offset ? Number.parseInt(offset, 10) : 0;
 
     if (fresh || query) {
-      const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query, sort });
+      const select = url.searchParams.get('select');
+      const metadataOnly = select === 'id,updatedAt';
+
+      const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query, sort, metadataOnly });
       const status: CacheStatus = fresh ? 'BYPASS' : 'MISS';
       const response = withCacheHeader(NextResponse.json(page), status);
       return fresh ? withNoCacheHeaders(response) : response;

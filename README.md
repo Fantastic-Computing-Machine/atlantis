@@ -49,6 +49,7 @@ git clone https://github.com/Fantastic-Computing-Machine/atlantis.git
 cd atlantis
 npm install
 cp .env.example .env
+npm run db:setup
 npm run dev
 ```
 

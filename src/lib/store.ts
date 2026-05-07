@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DiagramStore } from './types';
+
+import type { DiagramStore } from './types';
 
 const DEFAULT_SETTINGS = {
   autoSave: true,
@@ -14,6 +15,8 @@ const DEFAULT_SETTINGS = {
   snowMode: false,
   kittyMode: false,
 };
+
+type PersistedDiagramStoreState = Pick<DiagramStore, 'settings'>;
 
 export const useDiagramStore = create<DiagramStore>()(
   persist(
@@ -57,6 +60,17 @@ export const useDiagramStore = create<DiagramStore>()(
       name: 'atlantis-settings',
       // Only persist settings, not diagrams (those come from the server)
       partialize: (state) => ({ settings: state.settings }),
+      merge: (persistedState, currentState) => {
+        const state = persistedState as PersistedDiagramStoreState | undefined;
+        return {
+          ...currentState,
+          ...state,
+          settings: {
+            ...DEFAULT_SETTINGS,
+            ...(state?.settings ?? {}),
+          },
+        };
+      },
     }
   )
 );

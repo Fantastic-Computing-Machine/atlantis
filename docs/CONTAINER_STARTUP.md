@@ -100,7 +100,7 @@ docker compose -f docker-compose.simple.yml logs -f
 docker compose -f docker-compose.simple.yml down
 ```
 
-> **Note**: For in-memory caching during local development, run without `NODE_ENV=production` or use `npm run dev` instead of the Docker image. In Docker/production, caching stays off unless `REDIS_URL` is provided.
+> **Note**: For in-memory caching during local development, run without `NODE_ENV=production` or use `npm run db:setup` then `npm run dev` instead of the Docker image. In Docker/production, caching stays off unless `REDIS_URL` is provided.
 
 ### Building Your Own Image
 

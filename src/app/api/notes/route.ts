@@ -14,8 +14,17 @@ import { logApiError } from '@/lib/logger';
 import { createNote, getNotePage } from '@/lib/notes-data';
 import { publishSyncEvent } from '@/lib/pubsub';
 import { noteCreateSchema } from '@/lib/schemas';
+import type { NoteSortOption } from '@/lib/types';
 
 const DEFAULT_LIMIT = 24;
+const METADATA_SELECT = 'id,updatedAt';
+
+function parseSort(rawSort: string | null): NoteSortOption {
+  if (rawSort === 'old' || rawSort === 'alphabetical' || rawSort === 'recent') {
+    return rawSort;
+  }
+  return 'recent';
+}
 
 export async function GET(request: Request) {
   try {
@@ -24,7 +33,7 @@ export async function GET(request: Request) {
     const limit = url.searchParams.get('limit');
     const offset = url.searchParams.get('offset');
     const query = url.searchParams.get('query') || undefined;
-    const sort = (url.searchParams.get('sort') as import('@/lib/types').NoteSortOption) || 'recent';
+    const sort = parseSort(url.searchParams.get('sort'));
     const starredOnly = url.searchParams.get('starred') === 'true';
     const fresh = url.searchParams.get('fresh') === 'true';
 
@@ -32,12 +41,16 @@ export async function GET(request: Request) {
     const offsetNumber = offset ? Number.parseInt(offset, 10) : 0;
 
     if (fresh || query || starredOnly) {
+      const select = url.searchParams.get('select');
+      const metadataOnly = select === METADATA_SELECT;
+
       const page = await getNotePage({
         limit: limitNumber,
         offset: offsetNumber,
         query,
         sort,
         starredOnly,
+        metadataOnly,
       });
       const status: CacheStatus = fresh ? 'BYPASS' : 'MISS';
       const response = withCacheHeader(NextResponse.json(page), status);

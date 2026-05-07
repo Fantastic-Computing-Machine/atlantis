@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   // Enable Turbopack (Next.js 16 default)
   turbopack: {},
 
+  devIndicators: false,
+
   // Cache-Control headers for static assets in public/
   async headers() {
     return [

@@ -28,6 +28,8 @@ const shouldAutoApply =
 const shouldGenerate = forceGenerate || !isProd;
 
 function run(cmd, args, options = {}) {
+  console.log(`[bootstrap] running: ${cmd} ${args.join(' ')}`);
+
   const result = spawnSync(cmd, args, {
     stdio: 'inherit',
     cwd: root,
@@ -35,6 +37,7 @@ function run(cmd, args, options = {}) {
     ...options,
   });
   if (result.status !== 0) {
+    console.error(`[bootstrap] failed at ${cmd}`);
     process.exit(result.status ?? 1);
   }
 }
@@ -116,14 +119,14 @@ async function main() {
 
   // Step 2: generate client (skip in prod unless forced)
   if (shouldGenerate) {
-    run('npx', ['prisma', 'generate']);
+    run('node', ['./node_modules/prisma/build/index.js', 'generate']);
   }
 
   // Step 3: apply schema to DB
   // Always push for SQLite if database file is missing or empty (ensures tables exist)
   // Also push in dev mode or when explicitly enabled
   if (!skipAutoPush && (shouldAutoApply || sqliteNeedsPush)) {
-    run('npx', ['prisma', 'db', 'push']);
+    run('node', ['./node_modules/prisma/build/index.js', 'db', 'push']);
   }
 
   // Step 3.5: backfill tag usage counts and note todos (idempotent)

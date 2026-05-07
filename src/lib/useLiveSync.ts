@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { LIVE_SYNC_CONFIG, type LiveSyncMethod } from '@/lib/live-sync-config';
 
-const DEFAULT_INTERVAL_MS = 5000;
+const DEFAULT_INTERVAL_MS = 30000;
 
 // Stable client id per session to avoid self-echo events
 let globalClientId: string | null = null;

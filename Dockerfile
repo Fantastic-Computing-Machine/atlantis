@@ -3,7 +3,7 @@
 # ============================================
 # Base image with security updates
 # ============================================
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 # Install OpenSSL (required for Prisma) and CA certificates
 # libc6-compat is sometimes needed for compatibility with certain libraries
 RUN apk add --no-cache openssl ca-certificates libc6-compat
@@ -25,31 +25,42 @@ COPY prisma ./prisma
 COPY scripts/prepare-prisma-schema.js ./scripts/prepare-prisma-schema.js
 
 # Install all dependencies (including devDependencies for build) and generate Prisma client
-RUN --mount=type=cache,target=/root/.npm \
-  npm ci && \
+ENV NPM_CONFIG_FETCH_RETRIES=5 \
+  NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+  NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000
+
+RUN --mount=type=cache,id=npm-cache,target=/root/.npm \
+  for i in 1 2 3; do \
+  npm ci --no-audit --no-fund && break || \
+  { [ $i -lt 3 ] && echo "npm ci attempt $i failed, retrying..." && sleep 5; }; \
+  done && \
   npm run prisma:prepare && \
   npx prisma generate
 
 # ============================================
-# Stage 1.5: Install production dependencies only
+# Stage 1.5: Install runtime startup tools only
 # ============================================
-FROM base AS production-deps
-WORKDIR /app
+FROM base AS runtime-tools
+WORKDIR /runtime-tools
 
-ARG PRISMA_PROVIDER=sqlite
-ARG DATABASE_URL=file:./data/atlantis.db
-ENV PRISMA_PROVIDER=${PRISMA_PROVIDER}
-ENV DATABASE_URL=${DATABASE_URL}
+COPY package-lock.json ./
 
-COPY package.json package-lock.json ./
-COPY prisma ./prisma
-COPY scripts/prepare-prisma-schema.js ./scripts/prepare-prisma-schema.js
+# Install only the Prisma CLI needed by docker-entrypoint.sh.
+ENV NPM_CONFIG_FETCH_RETRIES=5 \
+  NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+  NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000
 
-# Install only production dependencies (now includes prisma)
-RUN --mount=type=cache,target=/root/.npm \
-  npm ci --omit=dev && \
-  npm run prisma:prepare && \
-  npx prisma generate
+RUN --mount=type=cache,id=npm-cache,target=/root/.npm \
+  set -eu; \
+  npm init -y >/dev/null; \
+  PRISMA_VERSION="$(node -p "require('./package-lock.json').packages['node_modules/prisma'].version")"; \
+  for i in 1 2 3; do \
+    npm install --omit=dev --no-audit --no-fund --package-lock=false --no-save \
+      "prisma@$PRISMA_VERSION" && break; \
+    if [ "$i" -eq 3 ]; then exit 1; fi; \
+    echo "runtime tool install attempt $i failed, retrying..."; \
+    sleep 5; \
+  done
 
 # ============================================
 # Stage 2: Build the application
@@ -108,28 +119,31 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 # 3. Static files
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# 4. Production node_modules from production-deps stage
-# (Contains only what's needed for runtime, including prisma)
-COPY --from=production-deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+# 4. Prisma client runtime compiler files pruned by Next tracing
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/@prisma/client/runtime ./node_modules/@prisma/client/runtime
 
-# 5. Prisma schema template, config, and scripts for runtime generation
+# 5. Runtime startup tools for Prisma schema generation/sync
+COPY --from=runtime-tools --chown=nextjs:nodejs /runtime-tools/node_modules ./runtime-tools/node_modules
+
+# 6. Prisma schema template, config, and scripts for runtime generation
 COPY --from=builder --chown=nextjs:nodejs /app/prisma/schema.template.prisma ./prisma/schema.template.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma/prisma.config.ts ./prisma/prisma.config.ts
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/prepare-prisma-schema.js ./scripts/prepare-prisma-schema.js
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/database-url.js ./scripts/database-url.js
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
 RUN chmod +x ./scripts/docker-entrypoint.sh
 
-# 6. Baseline SQLite database (empty schema)
+# 7. Baseline SQLite database (empty schema)
 COPY --from=builder --chown=nextjs:nodejs /app/data ./data
 
 # Create data directory for diagram persistence
 RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
 
-# Install TeX Live for LaTeX support
-RUN apk add --no-cache texlive-full fontconfig
-
-# Install su-exec for privilege dropping in entrypoint
-RUN apk add --no-cache su-exec
+# Install a reduced LaTeX runtime and su-exec for privilege dropping.
+# --no-scripts avoids slow all-format generation; mktexlsr is enough for pdflatex package lookup.
+RUN apk add --no-cache --no-scripts texlive-latexrecommended texmf-dist-latexextra fontconfig su-exec && \
+  mktexlsr && \
+  fmtutil-sys --byfmt pdflatex
 
 # NOTE: We do NOT switch to nextjs user here because the entrypoint
 # needs to run as root initially to fix mounted volume permissions.

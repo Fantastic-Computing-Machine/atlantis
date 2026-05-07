@@ -101,13 +101,19 @@ sudo pacman -S texlive-full
    npm install
    ```
 
-3. **Start the development server**
+3. **DB setup**
+
+   ```bash
+   npm run db:setup
+   ```
+
+4. **Start the development server**
 
    ```bash
    npm run dev
    ```
 
-4. **Open your browser**
+5. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
 ## Tech Stack

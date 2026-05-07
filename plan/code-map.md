@@ -24,7 +24,8 @@ Goal: minimize search tokens and maximize first-pass routing accuracy.
 11. API docs/public access API -> `src/app/docs/page.tsx` + `src/components/ApiDoc.tsx` + `docs/API_GUIDE.md` -> `src/app/api/access/diagrams/route.ts` + `src/app/api/access/diagrams/[id]/route.ts` + `src/app/api/access/notes/route.ts` + `src/app/api/access/notes/[id]/route.ts`.
 12. CSRF/auth guard -> `src/lib/csrf.ts` + `src/lib/csrf-client.ts` + `src/lib/csrf-constants.ts` -> `src/app/api/csrf/route.ts`.
 13. Backup/restore/wipe -> `src/app/api/backup/route.ts` + `src/app/api/settings/wipe/route.ts` -> `src/lib/data.ts` + `src/lib/schemas.ts`.
-14. DB/provider/bootstrap changes -> `prisma/schema.prisma` + `src/lib/prisma.ts` + `src/lib/database-url.ts` + `scripts/database-url.js` + `scripts/bootstrap.js` + `scripts/prepare-prisma-schema.js` + `scripts/backfill-tag-counts.js`.
+14. DB/provider/bootstrap changes -> `prisma/schema.prisma` + `src/lib/prisma.ts` + `src/lib/database-url.ts` + `scripts/database-url.js` + `scripts/bootstrap.js` + `scripts/prepare-prisma-schema.js` + `scripts/backfill-tag-counts.js` (bootstrap now inspects SQLite schema drift for backfill-required columns before deciding `prisma db push`).
+15. Container image/runtime -> `Dockerfile` + `scripts/docker-entrypoint.sh` + `docs/CONTAINER_STARTUP.md` (Next standalone runtime, Prisma startup tools, reduced LaTeX package set).
 
 ## Ownership Map (Condensed)
 
@@ -34,6 +35,7 @@ Goal: minimize search tokens and maximize first-pass routing accuracy.
 - `src/lib/`: domain logic (data, notes-data, cache, sync, csrf, settings, schemas, types, store).
 - `prisma/`: schema source of truth.
 - `scripts/`: bootstrap/prisma/backfill flows.
+- `Dockerfile` + `docker/`: container build/runtime packaging and compose defaults.
 - `docs/`: user-facing docs.
 
 ## Critical Contracts

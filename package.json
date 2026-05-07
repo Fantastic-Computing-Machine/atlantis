@@ -3,9 +3,10 @@
   "version": "1.1.0",
   "private": true,
   "scripts": {
-    "dev": "node scripts/bootstrap.js && next dev",
-    "build": "node scripts/bootstrap.js && next build",
-    "start": "node scripts/bootstrap.js && next start",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:setup": "node scripts/bootstrap.js",
     "lint": "eslint",
     "prisma:prepare": "node scripts/prepare-prisma-schema.js",
     "prisma:generate": "npm run prisma:prepare && prisma generate",
