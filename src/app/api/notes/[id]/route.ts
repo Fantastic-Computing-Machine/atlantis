@@ -142,7 +142,7 @@ export async function PATCH(request: Request, { params }: NoteRouteParams) {
     const source = request.headers.get('x-client-id') ?? undefined;
     await publishSyncEvent({
       topic: `doc:note:${id}`,
-      payload: { id, updatedAt: updatedNote.updatedAt },
+      payload: updatedNote,
       source,
     });
     await publishSyncEvent({

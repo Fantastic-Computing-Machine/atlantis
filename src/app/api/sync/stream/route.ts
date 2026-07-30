@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { subscribeToSyncEvents, type SyncEvent } from '@/lib/pubsub';
+import { getPubSubStatus, subscribeToSyncEvents, type SyncEvent } from '@/lib/pubsub';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,6 +20,10 @@ export async function GET(request: Request) {
 
   if (topics.length > MAX_TOPICS || topics.some((topic) => topic.length > MAX_TOPIC_LENGTH)) {
     return NextResponse.json({ error: 'Invalid topic parameters' }, { status: 400 });
+  }
+
+  if (!(await getPubSubStatus()).connected) {
+    return NextResponse.json({ error: 'Live sync is unavailable' }, { status: 503 });
   }
 
   let unsubscribe: (() => void) | null = null;
@@ -69,9 +73,12 @@ export async function GET(request: Request) {
 
       sendPing();
 
-      unsubscribe = await subscribeToSyncEvents(topics, (event) => {
-        sendSyncEvent(event);
-      });
+      try {
+        unsubscribe = await subscribeToSyncEvents(topics, sendSyncEvent);
+      } catch {
+        close();
+        return;
+      }
 
       keepalive = setInterval(() => {
         sendPing();

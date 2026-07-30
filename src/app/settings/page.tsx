@@ -753,7 +753,9 @@ export default function SettingsPage() {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="flex items-center gap-2 font-medium">🐱 Kitty Mode</p>
+                <p className="flex items-center gap-2 font-medium">
+                  🐱 Kitty Mode
+                </p>
                 <p className="text-muted-foreground text-sm">
                   A playful kitty wanders across your screen!
                 </p>

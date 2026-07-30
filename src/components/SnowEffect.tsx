@@ -16,13 +16,11 @@ type SnowflakeData = {
   opacity: number;
 };
 
-// Simple seeded random for consistent but random-looking values
 function seededRandom(seed: number): number {
   const x = Math.sin(seed * 9999) * 10000;
   return x - Math.floor(x);
 }
 
-// Generate stable snowflake data once with more natural distribution
 function generateSnowflakes(count: number): SnowflakeData[] {
   const flakes: SnowflakeData[] = [];
   for (let i = 0; i < count; i++) {
@@ -34,11 +32,11 @@ function generateSnowflakes(count: number): SnowflakeData[] {
 
     flakes.push({
       id: i,
-      size: r1 * 4 + 2, // 2-6px
+      size: r1 * 4 + 2,
       left: r2 * 100,
-      delay: r3 * 5, // 0-5s
-      duration: r4 * 5 + 8, // 8-13s
-      opacity: r5 * 0.5 + 0.5, // 0.5-1
+      delay: r3 * 5,
+      duration: r4 * 5 + 8,
+      opacity: r5 * 0.5 + 0.5,
     });
   }
   return flakes;
@@ -56,8 +54,7 @@ export function SnowEffect({ enabled }: SnowEffectProps) {
 
   if (!mounted || !enabled) return null;
 
-  const isDark = resolvedTheme === 'dark';
-  const snowColor = isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(135, 206, 235, 0.8)';
+  const snowColor = resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(135, 206, 235, 0.8)';
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[9999] overflow-hidden">

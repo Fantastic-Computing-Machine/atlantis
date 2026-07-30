@@ -205,15 +205,6 @@ export async function getNoteById(id: string): Promise<Note | null> {
   return toNote(note);
 }
 
-export async function getNoteUpdatedAt(id: string): Promise<{ updatedAt: string } | null> {
-  const note = await prisma.note.findUnique({
-    where: { id },
-    select: { updatedAt: true },
-  });
-  if (!note) return null;
-  return { updatedAt: note.updatedAt.toISOString() };
-}
-
 const TODO_REGEX = /^\s*[-*+]\s*\[\s\]/m;
 
 export async function createNote({

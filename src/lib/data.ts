@@ -217,15 +217,6 @@ export async function getDiagramById(id: string): Promise<Diagram | null> {
   return toDiagram(diagram as DiagramWithLatest);
 }
 
-export async function getDiagramUpdatedAt(id: string): Promise<{ updatedAt: string } | null> {
-  const diagram = await prisma.diagram.findUnique({
-    where: { id },
-    select: { updatedAt: true },
-  });
-  if (!diagram) return null;
-  return { updatedAt: diagram.updatedAt.toISOString() };
-}
-
 export async function getDiagrams(): Promise<Diagram[]> {
   const diagrams = await prisma.diagram.findMany({
     orderBy: { updatedAt: 'desc' },

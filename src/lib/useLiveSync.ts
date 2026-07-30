@@ -1,12 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
-import { LIVE_SYNC_CONFIG, type LiveSyncMethod } from '@/lib/live-sync-config';
-
-const DEFAULT_INTERVAL_MS = 30000;
-
-// Stable client id per session to avoid self-echo events
 let globalClientId: string | null = null;
 
 export function getLiveSyncClientId(): string {
@@ -14,244 +9,70 @@ export function getLiveSyncClientId(): string {
   return globalClientId;
 }
 
-type SyncWireEvent<T> = {
-  topic: string;
-  payload?: T;
-  source?: string;
-};
+type SyncWireEvent = { payload?: unknown; source?: string };
 
-interface UseLiveSyncOptions<T> {
-  resourceUrl: string;
+type UseLiveSyncOptions<T> = {
   currentUpdatedAt: string;
   hasLocalChanges: boolean;
   enabled: boolean;
-  intervalMs?: number;
-  liveSyncMethod?: LiveSyncMethod;
-  eventTopics?: string[];
+  eventTopics: string[];
   allowWhileDirty?: boolean;
-  isInstantPayload?: (payload: unknown) => payload is T;
-  notifyOnInstantPayload?: boolean;
+  isInstantPayload: (payload: unknown) => payload is T;
   onUpdate: (data: T) => void;
   onExternalChange?: () => void;
-}
-
-interface UseLiveSyncResult {
-  refresh: () => Promise<void>;
-  isSyncing: boolean;
-}
+  onDeleted?: () => void;
+};
 
 export function useLiveSync<T extends { updatedAt: string }>({
-  resourceUrl,
   currentUpdatedAt,
   hasLocalChanges,
   enabled,
-  intervalMs = DEFAULT_INTERVAL_MS,
-  liveSyncMethod = LIVE_SYNC_CONFIG.method,
-  eventTopics = [],
+  eventTopics,
   allowWhileDirty = false,
   isInstantPayload,
-  notifyOnInstantPayload = false,
   onUpdate,
   onExternalChange,
-}: UseLiveSyncOptions<T>): UseLiveSyncResult {
-  const isSyncingRef = useRef(false);
+  onDeleted,
+}: UseLiveSyncOptions<T>): void {
   const currentUpdatedAtRef = useRef(currentUpdatedAt);
-  const isMountedRef = useRef(false);
   const hasLocalChangesRef = useRef(hasLocalChanges);
   const clientId = useMemo(() => getLiveSyncClientId(), []);
-  const topicsQuery = useMemo(() => {
-    if (!eventTopics.length) return '';
-    return eventTopics.map((topic) => `topic=${encodeURIComponent(topic)}`).join('&');
-  }, [eventTopics]);
-  const etagRef = useRef<string | null>(null);
-  const lastSeqBySourceRef = useRef<Map<string, number>>(new Map());
-  const [socketFallbackPolling, setSocketFallbackPolling] = useState(false);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
+  const topicsQuery = useMemo(
+    () => eventTopics.map((topic) => `topic=${encodeURIComponent(topic)}`).join('&'),
+    [eventTopics]
+  );
 
   useEffect(() => {
     currentUpdatedAtRef.current = currentUpdatedAt;
     hasLocalChangesRef.current = hasLocalChanges;
   }, [currentUpdatedAt, hasLocalChanges]);
 
-  const refresh = useCallback(async () => {
-    if (isSyncingRef.current || !isMountedRef.current) return;
-    isSyncingRef.current = true;
-
-    try {
-      const headers: Record<string, string> = {};
-      if (etagRef.current) {
-        headers['If-None-Match'] = etagRef.current;
-      }
-
-      const res = await fetch(resourceUrl, { headers, cache: 'no-cache' });
-      if (res.status === 304 || !res.ok) return;
-
-      const data = (await res.json()) as T;
-      const nextEtag = res.headers.get('etag');
-
-      if (nextEtag) {
-        etagRef.current = nextEtag;
-      }
-
-      if (!isMountedRef.current) return;
-
-      if (data.updatedAt > currentUpdatedAtRef.current) {
-        currentUpdatedAtRef.current = data.updatedAt;
-        onExternalChange?.();
-        onUpdate(data);
-      }
-    } catch {
-      // ignore
-    } finally {
-      if (isMountedRef.current) {
-        isSyncingRef.current = false;
-      }
-    }
-  }, [resourceUrl, onUpdate, onExternalChange]);
-
-  // Polling mode (or fallback when socket is unhealthy)
   useEffect(() => {
-    const shouldPoll =
-      liveSyncMethod === 'polling' || (liveSyncMethod === 'socket' && socketFallbackPolling);
-    if (!enabled || !shouldPoll) return;
+    if (!enabled || !topicsQuery) return;
 
-    const poll = () => {
+    const stream = new EventSource(`/api/sync/stream?${topicsQuery}`);
+    const onSync = (event: MessageEvent) => {
       if (hasLocalChangesRef.current && !allowWhileDirty) return;
-      void refresh();
-    };
-
-    const intervalId = setInterval(poll, intervalMs);
-
-    // fire one initial poll after a small delay to avoid immediate clash with SSR hydration
-    const initialTimeout = setTimeout(poll, 500);
-
-    return () => {
-      clearTimeout(initialTimeout);
-      clearInterval(intervalId);
-    };
-  }, [enabled, intervalMs, liveSyncMethod, socketFallbackPolling, refresh, allowWhileDirty]);
-
-  // SSE mode: consume payload directly; ignore self-origin events; fallback to refresh only if needed
-  useEffect(() => {
-    if (!enabled || liveSyncMethod !== 'socket') return;
-    if (!topicsQuery) return;
-
-    setSocketFallbackPolling(false);
-
-    const eventSource = new EventSource(`/api/sync/stream?${topicsQuery}`);
-
-    const handleOpen = () => {
-      setSocketFallbackPolling(false);
-    };
-
-    const handleSyncEvent = (e: MessageEvent) => {
-      if (hasLocalChangesRef.current && !allowWhileDirty) return;
-
       try {
-        const parsed = JSON.parse(e.data) as SyncWireEvent<T>;
-
-        // Ignore invalid events or self echos
-        if (!parsed || parsed.source === clientId) {
+        const { payload, source } = JSON.parse(event.data) as SyncWireEvent;
+        if (source === clientId || !payload || typeof payload !== 'object') return;
+        if ('deleted' in payload && payload.deleted === true) {
+          onDeleted?.();
           return;
         }
-
-        // Prevent processing older messages from the same source
-        if (parsed.source && parsed.payload && typeof parsed.payload === 'object') {
-          const payloadObj = parsed.payload as Record<string, unknown>;
-          if (typeof payloadObj.seq === 'number') {
-            const prevSeq = lastSeqBySourceRef.current.get(parsed.source) ?? -1;
-            if (payloadObj.seq <= prevSeq) return;
-            lastSeqBySourceRef.current.set(parsed.source, payloadObj.seq);
-          }
-        }
-
-        const incoming = parsed.payload;
-        if (!incoming) {
-          void refresh();
-          return;
-        }
-
-        // Ignore older or same-age updates
-        if (incoming.updatedAt && incoming.updatedAt <= currentUpdatedAtRef.current) {
-          return;
-        }
-
-        // Handle instant complete payload updates
-        if (isInstantPayload?.(incoming)) {
-          currentUpdatedAtRef.current = incoming.updatedAt;
-          if (notifyOnInstantPayload) {
-            onExternalChange?.();
-          }
-          onUpdate(incoming);
-          return;
-        }
-
-        // Handle delta triggers that require fetching the full payload
-        if (incoming.updatedAt) {
-          onExternalChange?.();
-          void refresh();
-          return;
-        }
+        if (!isInstantPayload(payload) || payload.updatedAt <= currentUpdatedAtRef.current) return;
+        currentUpdatedAtRef.current = payload.updatedAt;
+        onExternalChange?.();
+        onUpdate(payload);
       } catch {
-        // Fallback to refresh on parse error
+        // EventSource reconnects; never turn a transient socket error into polling.
       }
-
-      void refresh();
     };
 
-    const handleError = () => {
-      setSocketFallbackPolling(true);
-      void refresh();
-    };
-
-    eventSource.addEventListener('open', handleOpen);
-    eventSource.addEventListener('sync', handleSyncEvent);
-    eventSource.addEventListener('error', handleError);
-
+    stream.addEventListener('sync', onSync);
     return () => {
-      eventSource.removeEventListener('open', handleOpen);
-      eventSource.removeEventListener('sync', handleSyncEvent);
-      eventSource.removeEventListener('error', handleError);
-      eventSource.close();
+      stream.removeEventListener('sync', onSync);
+      stream.close();
     };
-  }, [
-    enabled,
-    liveSyncMethod,
-    refresh,
-    onUpdate,
-    onExternalChange,
-    clientId,
-    allowWhileDirty,
-    isInstantPayload,
-    notifyOnInstantPayload,
-    topicsQuery,
-  ]);
-
-  // Visibility: only refresh if socket mode and we might have missed events while hidden
-  useEffect(() => {
-    if (!enabled) return;
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !hasLocalChangesRef.current) {
-        if (liveSyncMethod === 'polling' || socketFallbackPolling) {
-          void refresh();
-        }
-        // For socket mode, assume stream will resume; no extra fetch unless needed.
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [enabled, liveSyncMethod, socketFallbackPolling, refresh]);
-
-  return {
-    refresh,
-    isSyncing: isSyncingRef.current,
-  };
+  }, [allowWhileDirty, clientId, enabled, isInstantPayload, onDeleted, onExternalChange, onUpdate, topicsQuery]);
 }

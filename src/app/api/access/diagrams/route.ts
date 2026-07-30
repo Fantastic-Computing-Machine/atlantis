@@ -1,6 +1,8 @@
 import { csrfFailureResponse, ensureCsrfCookie, validateCsrfToken } from '@/lib/csrf';
 import { createDiagram, getDiagramPage } from '@/lib/data';
+import { CachePrefixes, getCache } from '@/lib/cache';
 import { logApiError } from '@/lib/logger';
+import { publishSyncEvent } from '@/lib/pubsub';
 import { NextResponse } from 'next/server';
 import mermaid from 'mermaid';
 
@@ -80,6 +82,8 @@ export async function POST(request: Request) {
     }
 
     const newDiagram = await createDiagram({ title, content });
+    await getCache().deletePrefix(CachePrefixes.diagramsList);
+    await publishSyncEvent({ topic: 'list:diagrams', payload: { id: newDiagram.id, created: true } });
 
     return NextResponse.json(newDiagram, { status: 201 });
   } catch (error) {

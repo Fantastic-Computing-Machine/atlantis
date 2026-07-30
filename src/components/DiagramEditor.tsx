@@ -31,7 +31,6 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/componen
 import { Textarea } from '@/components/ui/textarea';
 import { ResponsiveTagPicker } from '@/components/responsive-tag-picker';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
-import { LIVE_SYNC_CONFIG } from '@/lib/live-sync-config';
 import { useDiagramStore } from '@/lib/store';
 import { Checkpoint, Diagram, Tag } from '@/lib/types';
 import { getLiveSyncClientId, useLiveSync } from '@/lib/useLiveSync';
@@ -339,12 +338,9 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
   );
 
   useLiveSync<Diagram>({
-    resourceUrl: `/api/diagrams/${diagram.id}`,
     currentUpdatedAt: diagram.updatedAt,
     hasLocalChanges,
-    enabled: LIVE_SYNC_CONFIG.enabled && mounted,
-    intervalMs: LIVE_SYNC_CONFIG.pollIntervalMs,
-    liveSyncMethod: LIVE_SYNC_CONFIG.method,
+    enabled: mounted,
     eventTopics: [`doc:diagram:${diagram.id}`, `draft:diagram:${diagram.id}`],
     allowWhileDirty: true,
     isInstantPayload: (payload): payload is Diagram => {
@@ -370,6 +366,7 @@ export function DiagramEditor({ initialDiagram }: DiagramEditorProps) {
     onExternalChange: () => {
       toast.info('Document updated by another user');
     },
+    onDeleted: () => router.replace('/diagram'),
   });
 
   // Prevent hydration mismatch by only rendering client-dependent UI after mount

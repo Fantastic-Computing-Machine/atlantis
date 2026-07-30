@@ -1,6 +1,8 @@
 import { ensureCsrfCookie, csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { createNote, getNotePage } from '@/lib/notes-data';
+import { CachePrefixes, getCache } from '@/lib/cache';
 import { logApiError } from '@/lib/logger';
+import { publishSyncEvent } from '@/lib/pubsub';
 import { NextResponse } from 'next/server';
 import { noteCreateSchema } from '@/lib/schemas';
 
@@ -68,6 +70,8 @@ export async function POST(request: Request) {
     const { title, content, language } = result.data;
 
     const newNote = await createNote({ title, content, language });
+    await getCache().deletePrefix(CachePrefixes.notesList);
+    await publishSyncEvent({ topic: 'list:notes', payload: { id: newNote.id, created: true } });
 
     return NextResponse.json(
       {

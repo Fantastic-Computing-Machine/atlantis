@@ -26,7 +26,6 @@ import {
 
 import type { Note, Tag } from '@/lib/types';
 import { ensureCsrfToken, withCsrfHeader } from '@/lib/csrf-client';
-import { LIVE_SYNC_CONFIG } from '@/lib/live-sync-config';
 import { cn } from '@/lib/utils';
 import { useDiagramStore } from '@/lib/store';
 import { getLiveSyncClientId, useLiveSync } from '@/lib/useLiveSync';
@@ -153,12 +152,9 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
   );
 
   useLiveSync<Note>({
-    resourceUrl: `/api/notes/${note.id}`,
     currentUpdatedAt: liveUpdatedAt,
     hasLocalChanges: hasChanges,
-    enabled: LIVE_SYNC_CONFIG.enabled && mounted && !isPrivate,
-    intervalMs: LIVE_SYNC_CONFIG.pollIntervalMs,
-    liveSyncMethod: LIVE_SYNC_CONFIG.method,
+    enabled: mounted && !isPrivate,
     eventTopics: [`doc:note:${note.id}`, `draft:note:${note.id}`],
     allowWhileDirty: true,
     isInstantPayload: (payload): payload is Note => {
@@ -187,6 +183,7 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     onExternalChange: () => {
       toast.info('Note updated by another user');
     },
+    onDeleted: () => router.replace('/notes'),
   });
 
   // Track changes (only for auto-save debounce candidates: title and content)

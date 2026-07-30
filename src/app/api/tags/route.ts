@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { prisma } from '@/lib/prisma';
+import { publishSyncEvent } from '@/lib/pubsub';
 
 const MAX_TAGS = 25;
 
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
         color: color || '#000000',
       },
     });
+    await publishSyncEvent({ topic: 'list:tags' });
 
     return NextResponse.json(tag, { status: 201 });
   } catch (error) {

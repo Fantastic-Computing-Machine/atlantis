@@ -12,8 +12,6 @@ const DEFAULT_SETTINGS = {
   autoSaveDelay: 2000,
   defaultExportFormat: 'svg' as const,
   exportScale: 2 as const,
-  snowMode: false,
-  kittyMode: false,
 };
 
 type PersistedDiagramStoreState = Pick<DiagramStore, 'settings'>;

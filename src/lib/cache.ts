@@ -124,13 +124,6 @@ class InMemoryCache implements CacheProvider {
     return 0;
   }
 
-  destroy(): void {
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
-    }
-    this.cache.clear();
-  }
 }
 
 // ============================================================================
@@ -246,13 +239,6 @@ class RedisCache implements CacheProvider {
     }
   }
 
-  async destroy(): Promise<void> {
-    if (this.client) {
-      await this.client.quit();
-      this.client = null;
-      this.connected = false;
-    }
-  }
 }
 
 // ============================================================================
@@ -293,10 +279,6 @@ export function getCache(): CacheProvider {
 /**
  * Check if caching is enabled (Redis URL is configured)
  */
-export function isCacheEnabled(): boolean {
-  return Boolean(process.env.REDIS_URL) || process.env.NODE_ENV !== 'production';
-}
-
 /**
  * Get cache status for settings page
  */
@@ -362,7 +344,17 @@ export const CachePrefixes = {
   diagramsList: 'diagrams:list',
   notes: 'note',
   notesList: 'notes:list',
+  snapshots: 'snap:',
 } as const;
+
+export async function clearContentCache(): Promise<void> {
+  const cache = getCache();
+  await Promise.all([
+    cache.deletePrefix(CachePrefixes.diagrams),
+    cache.deletePrefix(CachePrefixes.notes),
+    cache.deletePrefix(CachePrefixes.snapshots),
+  ]);
+}
 
 export { DEFAULT_TTL_MS };
 

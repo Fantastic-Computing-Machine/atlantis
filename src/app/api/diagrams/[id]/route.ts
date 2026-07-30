@@ -131,7 +131,7 @@ export async function PUT(request: Request, { params }: DiagramRouteParams) {
     const source = request.headers.get('x-client-id') ?? undefined;
     await publishSyncEvent({
       topic: `doc:diagram:${id}`,
-      payload: { id, updatedAt: updatedDiagram.updatedAt },
+      payload: updatedDiagram,
       source,
     });
     await publishSyncEvent({

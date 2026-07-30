@@ -1,11 +1,10 @@
+import { KittyMode } from '@/components/KittyMode';
+import { LiveRefresh } from '@/components/LiveRefresh';
+import { SnowEffectWrapper } from '@/components/SnowEffectWrapper';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { ConsoleWelcome } from '@/components/ConsoleWelcome';
 import { GlobalShortcutsWrapper } from '@/components/GlobalShortcutsWrapper';
-import { SnowEffectWrapper } from '@/components/SnowEffectWrapper';
-import { KittyMode } from '@/components/KittyMode';
-import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration';
 import type { Metadata } from 'next';
 import './globals.css';
 
@@ -56,13 +55,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ConsoleWelcome />
+          <LiveRefresh />
           <GlobalShortcutsWrapper>
             <TooltipProvider>{children}</TooltipProvider>
           </GlobalShortcutsWrapper>
           <SnowEffectWrapper />
           <KittyMode />
-          <ServiceWorkerRegistration />
           <Toaster />
         </ThemeProvider>
       </body>
