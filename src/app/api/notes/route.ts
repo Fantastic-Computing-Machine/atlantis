@@ -1,21 +1,21 @@
 import { NextResponse } from 'next/server';
 
-import {
-  CacheKeys,
-  CachePrefixes,
-  DEFAULT_TTL_MS,
-  getCache,
-  type CacheStatus,
-  withCacheHeader,
-  withNoCacheHeaders,
-} from '@/lib/cache';
 import { ensureCsrfCookie, csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { logApiError } from '@/lib/logger';
 import { createNote, getNotePage } from '@/lib/notes-data';
 import { publishSyncEvent } from '@/lib/pubsub';
 import { noteCreateSchema } from '@/lib/schemas';
+import type { NoteSortOption } from '@/lib/types';
 
 const DEFAULT_LIMIT = 24;
+const METADATA_SELECT = 'id,updatedAt';
+
+function parseSort(rawSort: string | null): NoteSortOption {
+  if (rawSort === 'old' || rawSort === 'alphabetical' || rawSort === 'recent') {
+    return rawSort;
+  }
+  return 'recent';
+}
 
 export async function GET(request: Request) {
   try {
@@ -24,42 +24,21 @@ export async function GET(request: Request) {
     const limit = url.searchParams.get('limit');
     const offset = url.searchParams.get('offset');
     const query = url.searchParams.get('query') || undefined;
-    const sort = (url.searchParams.get('sort') as import('@/lib/types').NoteSortOption) || 'recent';
+    const sort = parseSort(url.searchParams.get('sort'));
     const starredOnly = url.searchParams.get('starred') === 'true';
-    const fresh = url.searchParams.get('fresh') === 'true';
-
     const limitNumber = limit ? Number.parseInt(limit, 10) : DEFAULT_LIMIT;
     const offsetNumber = offset ? Number.parseInt(offset, 10) : 0;
-
-    if (fresh || query || starredOnly) {
-      const page = await getNotePage({
-        limit: limitNumber,
-        offset: offsetNumber,
-        query,
-        sort,
-        starredOnly,
-      });
-      const status: CacheStatus = fresh ? 'BYPASS' : 'MISS';
-      const response = withCacheHeader(NextResponse.json(page), status);
-      return fresh ? withNoCacheHeaders(response) : response;
-    }
-
-    const cache = getCache();
-    const cacheKey = CacheKeys.noteList(sort, offsetNumber, limitNumber);
-    const cached = await cache.get(cacheKey);
-    if (cached) {
-      return withCacheHeader(NextResponse.json(cached), 'HIT');
-    }
-
+    const metadataOnly = url.searchParams.get('select') === METADATA_SELECT;
     const page = await getNotePage({
       limit: limitNumber,
       offset: offsetNumber,
       query,
       sort,
       starredOnly,
+      metadataOnly,
     });
-    await cache.set(cacheKey, page, DEFAULT_TTL_MS);
-    return withCacheHeader(NextResponse.json(page), 'MISS');
+
+    return NextResponse.json(page);
   } catch (error) {
     logApiError('GET /api/notes', error);
     return NextResponse.json({ error: 'Failed to load notes' }, { status: 500 });
@@ -72,9 +51,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json();
-    const result = noteCreateSchema.safeParse(body);
-
+    const result = noteCreateSchema.safeParse(await request.json());
     if (!result.success) {
       return NextResponse.json(
         { error: 'Invalid input', details: result.error.flatten() },
@@ -83,15 +60,10 @@ export async function POST(request: Request) {
     }
 
     const newNote = await createNote(result.data);
-
-    const cache = getCache();
-    await cache.deletePrefix(CachePrefixes.notesList);
-
-    const source = request.headers.get('x-client-id') ?? undefined;
     await publishSyncEvent({
       topic: 'list:notes',
       payload: { id: newNote.id, created: true },
-      source,
+      source: request.headers.get('x-client-id') ?? undefined,
     });
 
     return NextResponse.json({
@@ -109,4 +81,4 @@ export async function POST(request: Request) {
     logApiError('POST /api/notes', error);
     return NextResponse.json({ error: 'Unable to create note' }, { status: 500 });
   }
-}
+}

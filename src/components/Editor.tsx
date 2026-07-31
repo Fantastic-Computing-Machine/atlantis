@@ -12,15 +12,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { indentWithTab } from '@codemirror/commands';
+import { indentUnit } from '@codemirror/language';
 import type { Extension } from '@codemirror/state';
 import { EditorState, StateEffect, StateField, Transaction } from '@codemirror/state';
 import type { ViewUpdate } from '@codemirror/view';
 import { Decoration, EditorView, keymap } from '@codemirror/view';
-import { indentWithTab } from '@codemirror/commands';
-import { indentUnit } from '@codemirror/language';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
-import CodeMirror from '@uiw/react-codemirror';
 import { githubDark, githubLight } from '@uiw/codemirror-theme-github';
+import CodeMirror from '@uiw/react-codemirror';
 import { mermaid } from 'codemirror-lang-mermaid';
 import { Copy, Settings2, WrapText } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -198,13 +198,13 @@ export function Editor({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7"
-                aria-label="Copy code"
+                aria-label="Copy diagram"
                 onClick={handleCopy}
               >
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Copy code</TooltipContent>
+            <TooltipContent>Copy diagram</TooltipContent>
           </Tooltip>
 
           <Tooltip>

@@ -18,16 +18,10 @@ import { GeminiSpark } from '@/components/icons/GeminiSpark';
 import { LIVE_SYNC_CONFIG } from '@/lib/live-sync-config';
 import { useDiagramStore } from '@/lib/store';
 import { CSRF_HEADER_NAME, ensureCsrfToken } from '@/lib/csrf-client';
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { CartesianGrid, Line, LineChart, XAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { toast } from 'sonner';
 import {
   AlertTriangle,
@@ -52,17 +46,6 @@ import {
   Github,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const activityChartConfig = {
-  notes: {
-    label: 'Notes',
-    color: 'var(--chart-1)',
-  },
-  diagrams: {
-    label: 'Diagrams',
-    color: 'var(--chart-2)',
-  },
-} satisfies ChartConfig;
 
 const formatActivityDate = (value: string) => {
   const date = new Date(value);
@@ -143,31 +126,6 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadDbStatus();
-  }, []);
-
-  // Cache Status
-  const [cacheStatus, setCacheStatus] = useState<{
-    enabled: boolean;
-    backend: 'redis' | 'memory' | null;
-    connected: boolean;
-  }>({
-    enabled: false,
-    backend: null,
-    connected: false,
-  });
-
-  const loadCacheStatus = async () => {
-    try {
-      const res = await fetch('/api/settings/cache-status');
-      const data = await res.json();
-      setCacheStatus(data);
-    } catch {
-      // ignore
-    }
-  };
-
-  useEffect(() => {
-    loadCacheStatus();
   }, []);
 
   // Load stats on mount
@@ -521,60 +479,6 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Cache Status */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Zap className="text-primary h-5 w-5" />
-              <CardTitle>Cache</CardTitle>
-            </div>
-            <CardDescription>Performance acceleration status.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Backend</p>
-                <p className="text-muted-foreground text-sm capitalize">
-                  {cacheStatus.backend || 'Loading...'}
-                </p>
-              </div>
-              <span
-                className={cn(
-                  'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold',
-                  cacheStatus.connected
-                    ? 'border-emerald-200 bg-emerald-500/10 text-emerald-600 dark:border-emerald-800 dark:text-emerald-300'
-                    : 'border-yellow-200 bg-yellow-500/10 text-yellow-600 dark:border-yellow-800 dark:text-yellow-300'
-                )}
-              >
-                {cacheStatus.connected ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4" />
-                )}
-                {cacheStatus.connected ? 'Active' : 'Fallback'}
-              </span>
-            </div>
-            <div className="grid grid-cols-1 gap-2 text-sm">
-              <div className="border-muted-foreground/30 bg-muted/30 rounded-md border border-dashed px-3 py-2">
-                <p className="text-muted-foreground text-xs">Enabled</p>
-                <p className="font-medium">{cacheStatus.enabled ? 'Yes' : 'No'}</p>
-              </div>
-            </div>
-            {cacheStatus.backend !== 'redis' && (
-              <div className="rounded-md border border-amber-200 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:text-amber-300">
-                Redis is not configured. Live sync still works, but collaboration may fall back to
-                polling and increase database traffic.
-              </div>
-            )}
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={loadCacheStatus}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Re-check
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Statistics */}
         <Card>
           <CardHeader>
@@ -614,11 +518,8 @@ export default function SettingsPage() {
                   <div className="border-muted-foreground/30 bg-muted/30 rounded-lg border border-dashed p-4">
                     {stats.activity.length > 0 ? (
                       <>
-                        <ChartContainer
-                          config={activityChartConfig}
-                          className="min-h-[220px] w-full"
-                        >
-                          <LineChart
+                        <div className="min-h-[220px] w-full">
+                          <ResponsiveContainer width="100%" height={220}><LineChart
                             accessibilityLayer
                             data={stats.activity}
                             margin={{
@@ -635,7 +536,7 @@ export default function SettingsPage() {
                               minTickGap={24}
                               tickFormatter={(value) => formatActivityDate(String(value))}
                             />
-                            <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                            <Tooltip cursor={false} />
                             <Line
                               dataKey="notes"
                               type="monotone"
@@ -651,7 +552,8 @@ export default function SettingsPage() {
                               dot={false}
                             />
                           </LineChart>
-                        </ChartContainer>
+                        </ResponsiveContainer>
+                        </div>
                         <div className="text-muted-foreground mt-3 flex items-center justify-between text-xs">
                           <div className="flex gap-3">
                             <div className="flex items-center gap-1.5">
@@ -753,7 +655,9 @@ export default function SettingsPage() {
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="flex items-center gap-2 font-medium">🐱 Kitty Mode</p>
+                <p className="flex items-center gap-2 font-medium">
+                  🐱 Kitty Mode
+                </p>
                 <p className="text-muted-foreground text-sm">
                   A playful kitty wanders across your screen!
                 </p>

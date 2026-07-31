@@ -47,13 +47,13 @@ export function DashboardHeader({ enableApiAccess }: DashboardHeaderProps) {
   }, [updateSettings]);
 
   return (
-    <header className="bg-background/80 sticky top-0 z-50 shrink-0 border-b backdrop-blur-sm">
+    <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm shrink-0">
       <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
         <Link href="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
           <span className="text-2xl" role="img" aria-label="atlantis logo">
             🔱
           </span>
-          <h1 className="hidden text-xl font-bold sm:block">atlantis</h1>
+          <h1 className="text-xl font-bold hidden sm:block">atlantis</h1>
         </Link>
 
         <div className="flex max-w-md flex-1 justify-center">

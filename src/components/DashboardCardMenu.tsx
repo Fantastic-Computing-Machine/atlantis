@@ -50,7 +50,7 @@ export function DashboardCardMenu({ id, title, type, isStarred }: DashboardCardM
       const body = type === 'diagram' ? { isFavorite: newStarred } : { starred: newStarred };
 
       const res = await fetch(url, {
-        method: 'PUT',
+        method: type === 'diagram' ? 'PUT' : 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           [CSRF_HEADER_NAME]: csrfToken,

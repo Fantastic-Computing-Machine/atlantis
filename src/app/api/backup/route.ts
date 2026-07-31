@@ -1,6 +1,7 @@
 import { csrfFailureResponse, ensureCsrfCookie, validateCsrfToken } from '@/lib/csrf';
 import { getDiagrams, restoreDiagrams } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
+import { publishSyncEvent } from '@/lib/pubsub';
 import { backupSchema } from '@/lib/schemas';
 import { NextResponse } from 'next/server';
 
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
     }
 
     await restoreDiagrams(result.data as import('@/lib/types').Diagram[]);
+    await publishSyncEvent({ topic: 'data:reset' });
     return NextResponse.json({ success: true, count: result.data.length });
   } catch (error) {
     logApiError('POST /api/backup', error);

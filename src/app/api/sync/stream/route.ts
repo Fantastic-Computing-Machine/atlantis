@@ -22,6 +22,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Invalid topic parameters' }, { status: 400 });
   }
 
+
   let unsubscribe: (() => void) | null = null;
   let keepalive: NodeJS.Timeout | null = null;
   let closed = false;
@@ -69,9 +70,12 @@ export async function GET(request: Request) {
 
       sendPing();
 
-      unsubscribe = await subscribeToSyncEvents(topics, (event) => {
-        sendSyncEvent(event);
-      });
+      try {
+        unsubscribe = await subscribeToSyncEvents(topics, sendSyncEvent);
+      } catch {
+        close();
+        return;
+      }
 
       keepalive = setInterval(() => {
         sendPing();

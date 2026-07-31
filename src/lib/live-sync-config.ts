@@ -38,7 +38,6 @@ const method = parseLiveSyncMethod(process.env.NEXT_PUBLIC_LIVE_SYNC_METHOD);
 const pollIntervalMs = parsePollInterval(process.env.NEXT_PUBLIC_LIVE_SYNC_POLL_INTERVAL_MS);
 
 export const LIVE_SYNC_CONFIG = {
-  enabled: true as const,
   method,
   pollIntervalMs,
   isPolling: method === 'polling',

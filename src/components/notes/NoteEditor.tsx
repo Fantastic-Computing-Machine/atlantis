@@ -10,28 +10,28 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { css } from '@codemirror/lang-css';
+import { html } from '@codemirror/lang-html';
+import { javascript } from '@codemirror/lang-javascript';
+import { json } from '@codemirror/lang-json';
+import { markdown } from '@codemirror/lang-markdown';
+import { python } from '@codemirror/lang-python';
+import { StreamLanguage } from '@codemirror/language';
+import { stex } from '@codemirror/legacy-modes/mode/stex';
 import type { Extension } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
-import CodeMirror from '@uiw/react-codemirror';
 import { githubDark, githubLight } from '@uiw/codemirror-theme-github';
-import { javascript } from '@codemirror/lang-javascript';
-import { python } from '@codemirror/lang-python';
-import { html } from '@codemirror/lang-html';
-import { css } from '@codemirror/lang-css';
-import { json } from '@codemirror/lang-json';
-import { markdown } from '@codemirror/lang-markdown';
-import { StreamLanguage } from '@codemirror/language';
-import { stex } from '@codemirror/legacy-modes/mode/stex';
-import { Copy, Settings2, WrapText, Search, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
+import CodeMirror from '@uiw/react-codemirror';
+import { Copy, Eye, EyeOff, Lock, Search, Settings2, Unlock, WrapText } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { toast } from 'sonner';
-import { NoteSearchReplace } from './NoteSearchReplace';
-import { NoteMarkdownPreview } from './NoteMarkdownPreview';
 import dynamic from 'next/dynamic';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
+import { toast } from 'sonner';
+import { NoteMarkdownPreview } from './NoteMarkdownPreview';
+import { NoteSearchReplace } from './NoteSearchReplace';
 import { TodoList } from './TodoList';
-import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 
 const NoteLatexPreview = dynamic(
   () => import('./NoteLatexPreview').then((mod) => mod.NoteLatexPreview),
@@ -220,13 +220,13 @@ export function NoteEditor({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 shrink-0"
-                aria-label="Copy code"
+                aria-label="Copy content"
                 onClick={handleCopy}
               >
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Copy code</TooltipContent>
+            <TooltipContent>Copy content</TooltipContent>
           </Tooltip>
 
           <Tooltip>

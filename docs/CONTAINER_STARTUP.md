@@ -114,6 +114,8 @@ docker build -t my-atlantis:local .
 docker run -d -p 3000:3000 -v $(pwd)/data:/app/data my-atlantis:local
 ```
 
+The production image uses Next.js standalone output and a reduced runtime dependency set to keep the image smaller. LaTeX PDF compilation remains available through `pdflatex` using Alpine's `texlive-latexrecommended` package plus `texmf-dist-latexextra` instead of the complete `texlive-full` distribution.
+
 ## Configuration
 
 ### Custom Port & Data Directory

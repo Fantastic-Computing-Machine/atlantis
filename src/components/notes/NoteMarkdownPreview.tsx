@@ -1,11 +1,18 @@
 'use client';
 
-import { useMemo, useEffect, useState, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { ExternalLink, FileText, GitBranch, Loader2 } from 'lucide-react';
-import type { Note, Diagram } from '@/lib/types';
-import katex from 'katex';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import matter from 'gray-matter';
+import { Check, Copy, ExternalLink, FileText, GitBranch, Loader2 } from 'lucide-react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import rehypeKatex from 'rehype-katex';
+import rehypeRaw from 'rehype-raw';
+import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import 'katex/dist/katex.min.css';
+
+import { Button } from '@/components/ui/button';
+import type { Diagram, Note } from '@/lib/types';
 
 interface NoteMarkdownPreviewProps {
   content: string;
@@ -14,11 +21,41 @@ interface NoteMarkdownPreviewProps {
   onScroll?: (percentage: number) => void;
 }
 
-// Internal link embed component
-function InternalLinkEmbed({ type, id }: { type: 'note' | 'diagram'; id: string }) {
+type FrontmatterEntry = {
+  key: string;
+  label: string;
+  values: string[];
+};
+
+type ParsedMarkdown = {
+  body: string;
+  frontmatter: FrontmatterEntry[];
+};
+
+type InternalLink = {
+  type: 'note' | 'diagram';
+  id: string;
+};
+
+type MarkdownExtraProps = {
+  node?: unknown;
+};
+
+const remarkPlugins = [remarkGfm, remarkMath, remarkBreaks];
+const rehypePlugins = [rehypeRaw, rehypeKatex];
+
+const markdownComponents: Components = {
+  a: MarkdownLink,
+  code: MarkdownCode,
+  pre: ({ children }) => <>{children}</>,
+  img: MarkdownImage,
+};
+
+function InternalLinkEmbed({ type, id }: InternalLink) {
   const [data, setData] = useState<Note | Diagram | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const href = type === 'note' ? `/notes/${id}` : `/diagram/${id}`;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -34,23 +71,24 @@ function InternalLinkEmbed({ type, id }: { type: 'note' | 'diagram'; id: string 
         setLoading(false);
       }
     };
+
     fetchData();
   }, [type, id]);
 
   if (loading) {
     return (
-      <div className="border-border bg-muted/50 my-2 flex items-center gap-2 rounded-lg border p-3">
+      <span className="border-border bg-muted/50 my-2 flex items-center gap-2 rounded-md border p-3">
         <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
         <span className="text-muted-foreground text-sm">Loading {type}...</span>
-      </div>
+      </span>
     );
   }
 
   if (error || !data) {
     return (
       <a
-        href={type === 'note' ? `/notes/${id}` : `/diagram/${id}`}
-        className="border-border bg-muted/50 hover:bg-muted my-2 flex items-center gap-2 rounded-lg border p-3 transition-colors"
+        href={href}
+        className="border-border bg-muted/50 hover:bg-muted my-2 flex items-center gap-2 rounded-md border p-3 no-underline transition-colors"
       >
         {type === 'note' ? <FileText className="h-4 w-4" /> : <GitBranch className="h-4 w-4" />}
         <span className="text-sm">Open {type}</span>
@@ -65,296 +103,140 @@ function InternalLinkEmbed({ type, id }: { type: 'note' | 'diagram'; id: string 
       ?.slice(0, 120)
       .replace(/[#*`\n]/g, ' ')
       .trim() || '';
-  const href = type === 'note' ? `/notes/${id}` : `/diagram/${id}`;
 
   return (
     <a
       href={href}
-      className="border-border bg-card hover:bg-muted/50 group my-3 block rounded-lg border p-4 transition-colors"
+      className="border-border bg-card hover:bg-muted/50 group my-3 flex items-start gap-3 rounded-md border p-4 no-underline transition-colors"
     >
-      <div className="flex items-start gap-3">
-        <span className="text-2xl">{emoji}</span>
-        <div className="min-w-0 flex-1">
-          <div className="text-foreground group-hover:text-primary font-medium transition-colors">
-            {title}
-          </div>
-          {preview && (
-            <div className="text-muted-foreground mt-1 line-clamp-2 text-sm">{preview}...</div>
-          )}
-        </div>
-        <ExternalLink className="text-muted-foreground mt-1 h-4 w-4 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
-      </div>
+      <span className="text-2xl">{emoji}</span>
+      <span className="min-w-0 flex-1">
+        <span className="text-foreground group-hover:text-primary block font-medium transition-colors">
+          {title}
+        </span>
+        {preview && (
+          <span className="text-muted-foreground mt-1 line-clamp-2 block text-sm">
+            {preview}...
+          </span>
+        )}
+      </span>
+      <ExternalLink className="text-muted-foreground mt-1 h-4 w-4 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
     </a>
   );
 }
 
-// Parse markdown to HTML with proper code block handling
-function parseMarkdown(text: string): string {
-  // Use markers that won't be affected by HTML escaping
-  const codeBlockMarker = '\u0000CB';
-  const inlineCodeMarker = '\u0000IC';
-  const latexBlockMarker = '\u0000LB';
-  const latexInlineMarker = '\u0000LI';
+function Frontmatter({ entries }: { entries: FrontmatterEntry[] }) {
+  if (entries.length === 0) return null;
 
-  // First, extract and protect code blocks
-  const codeBlocks: string[] = [];
-  const latexBlocks: string[] = [];
-  let processed = text;
+  return (
+    <dl className="markdown-frontmatter">
+      {entries.map((entry) => (
+        <div key={entry.key}>
+          <dt>{entry.label}</dt>
+          <dd>
+            {entry.values.length > 1 ? (
+              <span className="markdown-frontmatter-list">
+                {entry.values.map((value) => (
+                  <span key={`${entry.key}-${value}`}>{value}</span>
+                ))}
+              </span>
+            ) : (
+              entry.values[0]
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
-  // 1. Extract LaTeX Blocks ($$ ... $$)
-  processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, (_match, tex) => {
-    try {
-      const rendered = katex.renderToString(tex, {
-        displayMode: true,
-        throwOnError: false,
-        strict: false,
-      });
-      latexBlocks.push(rendered);
-      return `${latexBlockMarker}${latexBlocks.length - 1}${latexBlockMarker}`;
-    } catch (e) {
-      console.error(e);
-      return `$$${tex}$$`;
-    }
-  });
+function MarkdownLink(props: React.AnchorHTMLAttributes<HTMLAnchorElement> & MarkdownExtraProps) {
+  const { children, href, ...linkProps } = omitMarkdownNode(props);
+  const internalLink = parseInternalHref(href);
 
-  // 2. Extract LaTeX Inline ($ ... $)
-  // Helper function to render inline LaTeX
-  const renderInlineLatex = (_match: string, tex: string): string => {
-    try {
-      const rendered = katex.renderToString(tex, {
-        displayMode: false,
-        throwOnError: false,
-        strict: false,
-      });
-      latexBlocks.push(rendered);
-      return `${latexInlineMarker}${latexBlocks.length - 1}${latexInlineMarker}`;
-    } catch {
-      return `$${tex}$`;
-    }
-  };
-
-  // Feature-detect lookbehind support and fall back for older browsers
-  const supportsLookbehind = (() => {
-    try {
-      new RegExp('(?<!\\\\)\\$');
-      return true;
-    } catch {
-      return false;
-    }
-  })();
-
-  if (supportsLookbehind) {
-    processed = processed.replace(/(?<!\\)\$([^$\n]+?)(?<!\\)\$/g, renderInlineLatex);
-  } else {
-    // Fallback: manually check for escaped dollars
-    processed = processed.replace(/\$([^$\n]+?)\$/g, (match, tex, offset) => {
-      if (offset > 0 && processed[offset - 1] === '\\') return match;
-      return renderInlineLatex(match, tex);
-    });
+  if (internalLink) {
+    return <InternalLinkEmbed {...internalLink} />;
   }
 
-  // 3. Extract fenced code blocks (```)
-  processed = processed.replace(/```(\w*)\n?([\s\S]*?)```/g, (_match, lang, code) => {
-    const escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    // Store raw code for copy button (escape quotes for data attribute)
-    const rawForCopy = code.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    const index = codeBlocks.length;
-    const langLabel = lang
-      ? `<span class="absolute top-2 left-3 text-xs text-muted-foreground uppercase">${lang}</span>`
-      : '';
-    codeBlocks.push(
-      `<div class="relative group">
-        ${langLabel}
-        <button 
-          class="absolute top-2 right-2 p-1.5 rounded bg-muted-foreground/10 hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-          onclick="navigator.clipboard.writeText(this.dataset.code).then(() => { this.textContent = '✓'; setTimeout(() => this.textContent = 'Copy', 1500); })"
-          data-code="${rawForCopy}"
-        >Copy</button>
-        <pre class="bg-muted p-4 ${lang ? 'pt-8' : ''} rounded-lg overflow-x-auto my-4"><code class="text-sm font-mono block whitespace-pre">${escaped}</code></pre>
-      </div>`
+  return (
+    <a
+      href={href}
+      rel={href?.startsWith('#') ? undefined : 'noopener'}
+      target={href?.startsWith('#') ? undefined : '_blank'}
+      {...linkProps}
+    >
+      {children}
+    </a>
+  );
+}
+
+function MarkdownCode(props: React.HTMLAttributes<HTMLElement> & MarkdownExtraProps) {
+  const { children, className, ...codeProps } = omitMarkdownNode(props);
+  const code = String(children).replace(/\n$/, '');
+  const language = /language-([\w-]+)/.exec(className || '')?.[1];
+  const isBlock = Boolean(language) || code.includes('\n');
+
+  if (!isBlock) {
+    return (
+      <code className={className} {...codeProps}>
+        {children}
+      </code>
     );
-    return `${codeBlockMarker}${index}${codeBlockMarker}`;
-  });
+  }
 
-  // Extract inline code (`)
-  const inlineCodes: string[] = [];
-  processed = processed.replace(/`([^`\n]+)`/g, (_match, code) => {
-    const escaped = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const index = inlineCodes.length;
-    inlineCodes.push(
-      `<code class="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">${escaped}</code>`
-    );
-    return `${inlineCodeMarker}${index}${inlineCodeMarker}`;
-  });
+  return <CodeBlock code={code} language={language} />;
+}
 
-  // Now escape remaining HTML
-  processed = processed.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function CodeBlock({ code, language }: { code: string; language?: string }) {
+  const [copied, setCopied] = useState(false);
+  const resetTimerRef = useRef<number | null>(null);
 
-  // Headers (process from h6 to h1 to avoid conflicts)
-  processed = processed
-    .replace(/^######\s+(.*)$/gm, '<h6 class="text-sm font-semibold mt-4 mb-2">$1</h6>')
-    .replace(/^#####\s+(.*)$/gm, '<h5 class="text-sm font-semibold mt-4 mb-2">$1</h5>')
-    .replace(/^####\s+(.*)$/gm, '<h4 class="text-base font-semibold mt-4 mb-2">$1</h4>')
-    .replace(/^###\s+(.*)$/gm, '<h3 class="text-lg font-semibold mt-5 mb-2">$1</h3>')
-    .replace(/^##\s+(.*)$/gm, '<h2 class="text-xl font-semibold mt-6 mb-3 border-b pb-2">$1</h2>')
-    .replace(/^#\s+(.*)$/gm, '<h1 class="text-2xl font-bold mt-6 mb-4 border-b pb-2">$1</h1>');
-
-  // Bold and italic
-  processed = processed
-    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^\s*][^*]*[^\s*])\*/g, '<em>$1</em>')
-    .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>')
-    .replace(/__(.+?)__/g, '<strong>$1</strong>')
-    .replace(/_([^\s_][^_]*[^\s_])_/g, '<em>$1</em>');
-
-  // Strikethrough
-  processed = processed.replace(/~~(.+?)~~/g, '<del>$1</del>');
-
-  // Highlight (==text==)
-  processed = processed.replace(
-    /==(.+?)==/g,
-    '<mark class="bg-yellow-200 dark:bg-yellow-900 px-0.5 rounded">$1</mark>'
-  );
-
-  // Subscript (~text~) - single tilde, not double
-  processed = processed.replace(/~([^~\s](?:[^~]*[^~\s])?)~/g, '<sub>$1</sub>');
-
-  // Superscript (^text^)
-  processed = processed.replace(/\^([^\^\s][^\^]*)\^/g, '<sup>$1</sup>');
-
-  // Blockquotes (> becomes &gt; after escaping)
-  processed = processed.replace(
-    /^&gt;\s+(.*)$/gm,
-    '<blockquote class="border-l-4 border-primary/50 pl-4 italic text-muted-foreground my-2">$1</blockquote>'
-  );
-
-  // Horizontal rules
-  processed = processed
-    .replace(/^---$/gm, '<hr class="my-6 border-border" />')
-    .replace(/^\*\*\*$/gm, '<hr class="my-6 border-border" />');
-
-  // Tables - parse markdown tables into HTML
-  // First, ensure text ends with newline for easier parsing
-  processed = processed.endsWith('\n') ? processed : processed + '\n';
-
-  // Match table blocks: lines that start with | and end with |
-  processed = processed.replace(/(?:^|\n)((?:\|[^\n]+\|\n)+)/g, (_match, tableBlock) => {
-    const lines = tableBlock
-      .trim()
-      .split('\n')
-      .filter((line: string) => line.trim());
-    if (lines.length < 2) return _match;
-
-    // Check for separator row (e.g., |---|---|)
-    const separatorIndex = lines.findIndex((line: string) => /^\|[\s\-:|]+\|$/.test(line.trim()));
-
-    if (separatorIndex === -1) return _match;
-
-    const headerLines = lines.slice(0, separatorIndex);
-    // Filter out any separator-like rows from body (handles adjacent tables)
-    const isSeparatorRow = (line: string) => /^\|[\s\-:|]+\|$/.test(line.trim());
-    const bodyLines = lines
-      .slice(separatorIndex + 1)
-      .filter((line: string) => !isSeparatorRow(line));
-
-    const parseRow = (line: string, cellTag: string) => {
-      const cells = line
-        .split('|')
-        .slice(1, -1) // Remove empty first/last from split
-        .map((cell: string) => cell.trim());
-      return `<tr>${cells.map((cell: string) => `<${cellTag} class="border border-border px-3 py-2">${cell}</${cellTag}>`).join('')}</tr>`;
-    };
-
-    const headerHtml = headerLines.map((line: string) => parseRow(line, 'th')).join('');
-    const bodyHtml = bodyLines.map((line: string) => parseRow(line, 'td')).join('');
-
-    return `\n<table class="border-collapse border border-border my-4 w-full"><thead class="bg-muted">${headerHtml}</thead><tbody>${bodyHtml}</tbody></table>\n`;
-  });
-
-  // Task lists (checkboxes) - must come before regular lists
-  processed = processed
-    .replace(
-      /^[\*\-]\s+\[x\]\s+(.*)$/gim,
-      '<li class="ml-6 list-none flex items-start gap-2"><input type="checkbox" checked disabled class="mt-1 accent-primary" /><span class="line-through opacity-70">$1</span></li>'
-    )
-    .replace(
-      /^[\*\-]\s+\[\s?\]\s+(.*)$/gm,
-      '<li class="ml-6 list-none flex items-start gap-2"><input type="checkbox" disabled class="mt-1" /><span>$1</span></li>'
-    );
-
-  // Lists
-  processed = processed
-    .replace(/^[\*\-]\s+(.*)$/gm, '<li class="ml-6 list-disc">$1</li>')
-    .replace(/^\d+\.\s+(.*)$/gm, '<li class="ml-6 list-decimal">$1</li>');
-
-  // Links
-  processed = processed.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" class="text-primary underline hover:no-underline" target="_blank" rel="noopener">$1</a>'
-  );
-
-  // Images
-  processed = processed.replace(
-    /!\[([^\]]*)\]\(([^)]+)\)/g,
-    '<img src="$2" alt="$1" class="max-w-full rounded my-4" />'
-  );
-
-  // Auto-link bare URLs (not already in href or markdown link)
-  // Use callback to check previous character instead of lookbehind for browser compatibility
-  processed = processed.replace(/(https?:\/\/[^\s<>\)]+)/g, (match, url, offset) => {
-    const prevChar = offset > 0 ? processed.charAt(offset - 1) : '';
-    // Don't convert if already inside href="" or markdown link ()
-    if (prevChar === '"' || prevChar === '(') {
-      return match;
-    }
-    return `<a href="${url}" class="text-primary underline hover:no-underline" target="_blank" rel="noopener">${url}</a>`;
-  });
-
-  // Paragraphs - split by double newlines
-  const blocks = processed.split(/\n\n+/);
-  processed = blocks
-    .map((block) => {
-      const trimmed = block.trim();
-      if (!trimmed) return '';
-      // Don't wrap block elements or code block placeholders
-      if (
-        trimmed.startsWith('<h') ||
-        trimmed.startsWith('<ul') ||
-        trimmed.startsWith('<ol') ||
-        trimmed.startsWith('<li') ||
-        trimmed.startsWith('<blockquote') ||
-        trimmed.startsWith('<hr') ||
-        trimmed.startsWith('<pre') ||
-        trimmed.startsWith('<table') ||
-        trimmed.startsWith(codeBlockMarker)
-      ) {
-        return trimmed;
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current) {
+        window.clearTimeout(resetTimerRef.current);
       }
-      // Wrap in paragraph
-      return `<p class="my-3">${trimmed.replace(/\n/g, '<br />')}</p>`;
-    })
-    .join('\n');
+    };
+  }, []);
 
-  // Restore code blocks
-  for (let i = 0; i < codeBlocks.length; i++) {
-    processed = processed.split(`${codeBlockMarker}${i}${codeBlockMarker}`).join(codeBlocks[i]);
-  }
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
 
-  // Restore inline code
-  for (let i = 0; i < inlineCodes.length; i++) {
-    processed = processed.split(`${inlineCodeMarker}${i}${inlineCodeMarker}`).join(inlineCodes[i]);
-  }
+      if (resetTimerRef.current) {
+        window.clearTimeout(resetTimerRef.current);
+      }
 
-  // Restore LaTeX
-  for (let i = 0; i < latexBlocks.length; i++) {
-    processed = processed.split(`${latexBlockMarker}${i}${latexBlockMarker}`).join(latexBlocks[i]);
-    processed = processed
-      .split(`${latexInlineMarker}${i}${latexInlineMarker}`)
-      .join(latexBlocks[i]);
-  }
+      resetTimerRef.current = window.setTimeout(() => {
+        setCopied(false);
+        resetTimerRef.current = null;
+      }, 1500);
+    } catch {
+      setCopied(false);
+    }
+  }, [code]);
 
-  return processed;
+  return (
+    <div className="markdown-code-block">
+      {language && <span>{language}</span>}
+      <button type="button" aria-label="Copy code" onClick={handleCopy}>
+        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+      <pre>
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+function MarkdownImage(props: React.ImgHTMLAttributes<HTMLImageElement> & MarkdownExtraProps) {
+  const imageProps = omitMarkdownNode(props);
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- Markdown image dimensions are user-authored.
+    <img {...imageProps} alt={imageProps.alt || ''} />
+  );
 }
 
 export function NoteMarkdownPreview({
@@ -363,21 +245,20 @@ export function NoteMarkdownPreview({
   editorScrollPercentage = 0,
   onScroll,
 }: NoteMarkdownPreviewProps) {
-  // Debounce content updates to improve performance with large documents
   const [debouncedContent, setDebouncedContent] = useState(content);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const previewContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
       setDebouncedContent(content);
-    }, 150); // 150ms debounce for responsive feel while typing
+    }, 150);
 
     return () => window.clearTimeout(handle);
   }, [content]);
 
-  const html = useMemo(() => parseMarkdown(debouncedContent), [debouncedContent]);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const markdown = useMemo(() => parseMarkdown(debouncedContent), [debouncedContent]);
 
-  // Scroll Sync: Editor -> Preview
   useEffect(() => {
     if (containerRef.current && editorScrollPercentage >= 0) {
       const container = containerRef.current;
@@ -398,126 +279,15 @@ export function NoteMarkdownPreview({
     }
   };
 
-  // Extract internal links for embedding - find all internal link hrefs
-  const internalLinks = useMemo(() => {
-    const links: Array<{ type: 'note' | 'diagram'; id: string }> = [];
-    const seenIds = new Set<string>();
-
-    // Match both relative paths (/notes/id) and full URLs (http://host/notes/id)
-    const noteRegex = /href="(?:https?:\/\/[^"]*)?\/notes\/([a-zA-Z0-9_-]+)"/g;
-    const diagramRegex = /href="(?:https?:\/\/[^"]*)?\/diagram\/([a-zA-Z0-9_-]+)"/g;
-
-    let match;
-    while ((match = noteRegex.exec(html)) !== null) {
-      const id = match[1];
-      if (!seenIds.has(`note-${id}`)) {
-        seenIds.add(`note-${id}`);
-        links.push({ type: 'note', id });
-      }
-    }
-    while ((match = diagramRegex.exec(html)) !== null) {
-      const id = match[1];
-      if (!seenIds.has(`diagram-${id}`)) {
-        seenIds.add(`diagram-${id}`);
-        links.push({ type: 'diagram', id });
-      }
-    }
-    return links;
-  }, [html]);
-
-  // Replace ALL internal link anchors with placeholders
-  const processedHtml = useMemo(() => {
-    let result = html;
-
-    for (const link of internalLinks) {
-      const placeholder = `__EMBED_${link.type.toUpperCase()}_${link.id}__`;
-      // Pattern matches BOTH full URLs and relative paths for this ID
-      // Use a pattern that matches any anchor pointing to this note/diagram
-      const pathType = link.type === 'note' ? 'notes' : 'diagram';
-      const pattern = new RegExp(
-        `<a[^>]*href="(?:https?://[^"]*)?/${pathType}/${link.id}"[^>]*>([\\s\\S]*?)</a>`,
-        'g'
-      );
-      result = result.replace(pattern, placeholder);
-    }
-    return result;
-  }, [html, internalLinks]);
-
-  // Split HTML by placeholders and build segments
-  const segments = useMemo(() => {
-    if (internalLinks.length === 0) return [{ type: 'html' as const, content: html }];
-
-    const result: Array<
-      | { type: 'html'; content: string }
-      | { type: 'embed'; linkType: 'note' | 'diagram'; id: string }
-    > = [];
-
-    // Build a map of placeholders to link info
-    const placeholderMap = new Map<string, { type: 'note' | 'diagram'; id: string }>();
-    for (const link of internalLinks) {
-      const placeholder = `__EMBED_${link.type.toUpperCase()}_${link.id}__`;
-      placeholderMap.set(placeholder, { type: link.type, id: link.id });
-    }
-
-    // Split by all placeholders using a regex that matches any of them
-    const placeholderPattern = /__EMBED_(NOTE|DIAGRAM)_([a-zA-Z0-9_-]+)__/g;
-    let lastIndex = 0;
-    let match;
-
-    while ((match = placeholderPattern.exec(processedHtml)) !== null) {
-      // Add HTML before this placeholder
-      if (match.index > lastIndex) {
-        result.push({ type: 'html', content: processedHtml.slice(lastIndex, match.index) });
-      }
-      // Add the embed
-      const linkType = match[1].toLowerCase() as 'note' | 'diagram';
-      const id = match[2];
-      result.push({ type: 'embed', linkType, id });
-      lastIndex = match.index + match[0].length;
-    }
-
-    // Add remaining HTML
-    if (lastIndex < processedHtml.length) {
-      result.push({ type: 'html', content: processedHtml.slice(lastIndex) });
-    }
-
-    return result.length > 0 ? result : [{ type: 'html' as const, content: html }];
-  }, [processedHtml, html, internalLinks]);
-
   const popOut = () => {
-    const safeTitle = buildDownloadName(filename);
-
-    // Build HTML content for the pop-out window
-    const htmlContent = `<!doctype html><html><head><title>${safeTitle}</title>
+    const title = buildWindowTitle(filename);
+    const html = previewContentRef.current?.innerHTML ?? '';
+    const htmlContent = `<!doctype html><html><head><title>${escapeHtml(title)}</title>
 <meta charset="utf-8" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
-<style>
-body { margin: 24px; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: #111827; line-height: 1.6; }
-h1,h2,h3,h4,h5,h6 { color: #0f172a; margin-top: 1.2em; }
-h1, h2 { border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; }
-code { background: #f3f4f6; padding: 2px 4px; border-radius: 4px; font-family: ui-monospace, monospace; }
-pre { background: #f8fafc; padding: 12px; border-radius: 8px; overflow: auto; }
-pre code { background: none; padding: 0; }
-img { max-width: 100%; height: auto; border-radius: 8px; }
-a { color: #2563eb; text-decoration: underline; }
-a:hover { text-decoration: none; }
-table { border-collapse: collapse; border: 1px solid #e5e7eb; margin: 16px 0; width: 100%; }
-th, td { border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left; }
-thead { background: #f3f4f6; }
-th { font-weight: 600; }
-blockquote { border-left: 4px solid #3b82f6; padding-left: 16px; margin: 16px 0; font-style: italic; color: #6b7280; }
-mark { background: #fef08a; padding: 1px 4px; border-radius: 2px; }
-del { text-decoration: line-through; opacity: 0.7; }
-sub, sup { font-size: 0.75em; }
-ul, ol { margin: 8px 0; padding-left: 24px; }
-li { margin: 4px 0; }
-hr { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
-input[type="checkbox"] { margin-right: 8px; }
-.line-through { text-decoration: line-through; opacity: 0.7; }
-</style>
-</head><body>${html}</body></html>`;
+<style>${markdownCss.replaceAll('</style>', '<\\/style>')}</style>
+</head><body><main class="markdown-body">${html}</main></body></html>`;
 
-    // Use Blob URL for better security isolation instead of writing to about:blank
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const win = window.open(
@@ -526,13 +296,11 @@ input[type="checkbox"] { margin-right: 8px; }
       'resizable=yes,scrollbars=yes,width=1200,height=900,left=120,top=80'
     );
 
-    // Clean up the Blob URL when the window closes or after a delay
     if (win) {
       win.addEventListener('beforeunload', () => {
         URL.revokeObjectURL(url);
       });
     } else {
-      // If popup was blocked, clean up immediately
       URL.revokeObjectURL(url);
     }
   };
@@ -550,36 +318,592 @@ input[type="checkbox"] { margin-right: 8px; }
           className="bg-background/50 h-8 w-8 border shadow-sm backdrop-blur-sm"
           onClick={popOut}
           title="Open in new window"
+          aria-label="Open preview in new window"
         >
           <ExternalLink className="h-4 w-4" />
         </Button>
       </div>
-      <div className="prose prose-sm dark:prose-invert clear-both max-w-none p-6 pt-2">
-        {segments.map((segment, i) =>
-          segment.type === 'html' ? (
-            <div key={`html-${i}`} dangerouslySetInnerHTML={{ __html: segment.content }} />
-          ) : (
-            <InternalLinkEmbed
-              key={`${segment.linkType}-${segment.id}`}
-              type={segment.linkType}
-              id={segment.id}
-            />
-          )
-        )}
+      <div ref={previewContentRef} className="markdown-body clear-both max-w-none p-6 pt-2">
+        <Frontmatter entries={markdown.frontmatter} />
+        <ReactMarkdown
+          components={markdownComponents}
+          rehypePlugins={rehypePlugins}
+          remarkPlugins={remarkPlugins}
+        >
+          {markdown.body}
+        </ReactMarkdown>
       </div>
+      <style jsx global>
+        {markdownCss}
+      </style>
     </div>
   );
 }
 
-function buildDownloadName(name?: string): string {
-  const base = (name || 'document').trim();
-  const safeTitle =
-    base
-      .replace(/[^a-zA-Z0-9_\-\. ]+/g, '')
-      .replace(/\s+/g, '_')
-      .slice(0, 60) || 'document';
-  const now = new Date();
-  const timestamp = now.toISOString().replace(/[:]/g, '-').replace(/\..+/, '');
-  const filename = `${safeTitle}_${timestamp}`;
-  return filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
+function parseMarkdown(content: string): ParsedMarkdown {
+  try {
+    const parsed = matter(content);
+    const normalizedBody = normalizeLatexMathDelimiters(parsed.content);
+
+    return {
+      body: normalizedBody,
+      frontmatter: normalizeFrontmatter(parsed.data),
+    };
+  } catch {
+    return { body: content, frontmatter: [] };
+  }
 }
+
+function normalizeLatexMathDelimiters(markdown: string): string {
+  const segments = splitByFencedCodeBlocks(markdown);
+
+  return segments
+    .map((segment) =>
+      segment.type === 'fence' ? segment.value : normalizeLatexMathInText(segment.value)
+    )
+    .join('');
+}
+
+function splitByFencedCodeBlocks(
+  markdown: string
+): Array<{ type: 'text' | 'fence'; value: string }> {
+  const segments: Array<{ type: 'text' | 'fence'; value: string }> = [];
+  const lines = markdown.split('\n');
+  let textBuffer = '';
+  let fenceBuffer = '';
+  let inFence = false;
+  let fenceChar = '';
+  let fenceLength = 0;
+
+  const flushText = () => {
+    if (textBuffer) {
+      segments.push({ type: 'text', value: textBuffer });
+      textBuffer = '';
+    }
+  };
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const lineWithBreak = index < lines.length - 1 ? `${line}\n` : line;
+
+    if (!inFence) {
+      const openMatch = line.match(/^\s{0,3}(`{3,}|~{3,})[^\n]*$/);
+
+      if (!openMatch) {
+        textBuffer += lineWithBreak;
+        continue;
+      }
+
+      flushText();
+      inFence = true;
+      fenceChar = openMatch[1][0];
+      fenceLength = openMatch[1].length;
+      fenceBuffer = lineWithBreak;
+      continue;
+    }
+
+    fenceBuffer += lineWithBreak;
+
+    const closeMatch = line.match(/^\s{0,3}(`{3,}|~{3,})[ \t]*$/);
+    if (!closeMatch) {
+      continue;
+    }
+
+    if (closeMatch[1][0] !== fenceChar || closeMatch[1].length < fenceLength) {
+      continue;
+    }
+
+    segments.push({ type: 'fence', value: fenceBuffer });
+    inFence = false;
+    fenceChar = '';
+    fenceLength = 0;
+    fenceBuffer = '';
+  }
+
+  if (inFence && fenceBuffer) {
+    segments.push({ type: 'fence', value: fenceBuffer });
+  }
+
+  flushText();
+  return segments;
+}
+
+function normalizeLatexMathInText(text: string): string {
+  const blockNormalized = normalizeBracketWrappedBlockMath(text);
+  let output = '';
+  let cursor = 0;
+
+  while (cursor < blockNormalized.length) {
+    if (blockNormalized[cursor] === '`') {
+      const backtickCount = countConsecutive(blockNormalized, cursor, '`');
+      const delimiter = '`'.repeat(backtickCount);
+      const closeIndex = blockNormalized.indexOf(delimiter, cursor + backtickCount);
+
+      if (closeIndex === -1) {
+        output += blockNormalized.slice(cursor);
+        break;
+      }
+
+      output += blockNormalized.slice(cursor, closeIndex + backtickCount);
+      cursor = closeIndex + backtickCount;
+      continue;
+    }
+
+    if (blockNormalized.startsWith('\\[', cursor)) {
+      const closeIndex = findClosingMathDelimiter(blockNormalized, cursor + 2, '\\]');
+
+      if (closeIndex !== -1) {
+        output += `$$${blockNormalized.slice(cursor + 2, closeIndex)}$$`;
+        cursor = closeIndex + 2;
+        continue;
+      }
+    }
+
+    if (blockNormalized.startsWith('\\(', cursor)) {
+      const closeIndex = findClosingMathDelimiter(blockNormalized, cursor + 2, '\\)');
+
+      if (closeIndex !== -1) {
+        output += `$${blockNormalized.slice(cursor + 2, closeIndex)}$`;
+        cursor = closeIndex + 2;
+        continue;
+      }
+    }
+
+    if (blockNormalized[cursor] === '(') {
+      const closeIndex = blockNormalized.indexOf(')', cursor + 1);
+
+      if (closeIndex !== -1) {
+        const candidate = blockNormalized.slice(cursor + 1, closeIndex);
+
+        if (
+          /^\s+[\s\S]*\s+$/.test(candidate) &&
+          isLikelyMathContent(candidate.trim()) &&
+          !isEscaped(blockNormalized, cursor)
+        ) {
+          output += `$${candidate.trim()}$`;
+          cursor = closeIndex + 1;
+          continue;
+        }
+      }
+    }
+
+    output += blockNormalized[cursor];
+    cursor += 1;
+  }
+
+  return output;
+}
+
+function normalizeBracketWrappedBlockMath(text: string): string {
+  return text.replace(
+    /(^|\n)[ \t]*\[\s*\n([\s\S]*?)\n[ \t]*\](?=\n|$)/g,
+    (match, prefix: string, body: string) => {
+      const trimmedBody = body.trim();
+
+      if (!trimmedBody || !isLikelyMathContent(trimmedBody)) {
+        return match;
+      }
+
+      return `${prefix}$$${trimmedBody}$$`;
+    }
+  );
+}
+
+function findClosingMathDelimiter(text: string, fromIndex: number, delimiter: '\\)' | '\\]'): number {
+  let searchIndex = fromIndex;
+
+  while (searchIndex < text.length) {
+    const matchIndex = text.indexOf(delimiter, searchIndex);
+
+    if (matchIndex === -1) {
+      return -1;
+    }
+
+    if (!isEscaped(text, matchIndex)) {
+      return matchIndex;
+    }
+
+    searchIndex = matchIndex + delimiter.length;
+  }
+
+  return -1;
+}
+
+function isEscaped(text: string, index: number): boolean {
+  let slashCount = 0;
+  let cursor = index - 1;
+
+  while (cursor >= 0 && text[cursor] === '\\') {
+    slashCount += 1;
+    cursor -= 1;
+  }
+
+  return slashCount % 2 === 1;
+}
+
+function countConsecutive(text: string, startIndex: number, char: string): number {
+  let count = 0;
+  let cursor = startIndex;
+
+  while (cursor < text.length && text[cursor] === char) {
+    count += 1;
+    cursor += 1;
+  }
+
+  return count;
+}
+
+function isLikelyMathContent(content: string): boolean {
+  return /\\[a-zA-Z]+|[=_^]|[+\-*/]/.test(content);
+}
+
+function normalizeFrontmatter(data: Record<string, unknown>): FrontmatterEntry[] {
+  return Object.entries(data)
+    .map(([key, value]) => ({
+      key,
+      label: humanizeFrontmatterKey(key),
+      values: normalizeFrontmatterValue(value),
+    }))
+    .filter((entry) => entry.values.length > 0);
+}
+
+function normalizeFrontmatterValue(value: unknown): string[] {
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => normalizeFrontmatterValue(item));
+  }
+
+  if (value instanceof Date) {
+    return [value.toISOString().slice(0, 10)];
+  }
+
+  if (typeof value === 'object') {
+    return [JSON.stringify(value)];
+  }
+
+  return [String(value)];
+}
+
+function parseInternalHref(href?: string): InternalLink | null {
+  if (!href) return null;
+
+  let pathname = '';
+
+  try {
+    pathname = new URL(href, 'http://atlantis.local').pathname;
+  } catch {
+    return null;
+  }
+
+  const noteMatch = pathname.match(/^\/notes\/([a-zA-Z0-9_-]+)\/?$/);
+  if (noteMatch) {
+    return { type: 'note', id: noteMatch[1] };
+  }
+
+  const diagramMatch = pathname.match(/^\/diagram\/([a-zA-Z0-9_-]+)\/?$/);
+  if (diagramMatch) {
+    return { type: 'diagram', id: diagramMatch[1] };
+  }
+
+  return null;
+}
+
+function omitMarkdownNode<T extends MarkdownExtraProps>(props: T): Omit<T, 'node'> {
+  const { node, ...rest } = props;
+  void node;
+  return rest;
+}
+
+function humanizeFrontmatterKey(key: string): string {
+  return key
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function buildWindowTitle(name?: string): string {
+  return (
+    (name || 'document')
+      .trim()
+      .replace(/[^a-zA-Z0-9_\-. ]+/g, '')
+      .replace(/\s+/g, ' ')
+      .slice(0, 80) || 'document'
+  );
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+const markdownCss = `
+.markdown-body {
+  color: var(--foreground);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+.markdown-body > :first-child,
+.markdown-body .markdown-frontmatter + :first-child {
+  margin-top: 0;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  color: var(--foreground);
+  font-weight: 650;
+  line-height: 1.25;
+  margin: 1.5em 0 0.55em;
+}
+
+.markdown-body h1 {
+  border-bottom: 1px solid var(--border);
+  font-size: 1.75rem;
+  padding-bottom: 0.45rem;
+}
+
+.markdown-body h2 {
+  border-bottom: 1px solid var(--border);
+  font-size: 1.35rem;
+  padding-bottom: 0.35rem;
+}
+
+.markdown-body h3 {
+  font-size: 1.15rem;
+}
+
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  font-size: 1rem;
+}
+
+.markdown-body p,
+.markdown-body blockquote,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body table,
+.markdown-body pre,
+.markdown-body .markdown-code-block {
+  margin: 0.85rem 0;
+}
+
+.markdown-body details {
+  background: color-mix(in oklch, var(--muted) 85%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  margin: 0.85rem 0;
+  padding: 0.65rem 0.8rem;
+}
+
+.markdown-body summary {
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+
+.markdown-body details > :not(summary) {
+  margin-top: 0.6rem;
+}
+
+.markdown-body a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+.markdown-body a:hover {
+  text-decoration: none;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.5rem;
+}
+
+.markdown-body li + li {
+  margin-top: 0.25rem;
+}
+
+.markdown-body li.task-list-item {
+  list-style: none;
+  margin-left: -1.3rem;
+}
+
+.markdown-body input[type='checkbox'] {
+  accent-color: var(--primary);
+  margin-right: 0.45rem;
+  transform: translateY(0.1rem);
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
+  padding-left: 1rem;
+}
+
+.markdown-body table {
+  border-collapse: collapse;
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--border);
+  padding: 0.45rem 0.65rem;
+  vertical-align: top;
+}
+
+.markdown-body th {
+  background: var(--muted);
+  font-weight: 600;
+}
+
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.6rem 0;
+}
+
+.markdown-body img {
+  border-radius: 0.375rem;
+  height: auto;
+  max-width: 100%;
+}
+
+.markdown-body code {
+  background: var(--muted);
+  border-radius: 0.25rem;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  padding: 0.12rem 0.32rem;
+}
+
+.markdown-body pre {
+  background: var(--muted);
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  padding: 0.9rem;
+}
+
+.markdown-body pre code,
+.markdown-body .markdown-code-block code {
+  background: transparent;
+  border-radius: 0;
+  display: block;
+  padding: 0;
+  white-space: pre;
+}
+
+.markdown-body .markdown-code-block {
+  position: relative;
+}
+
+.markdown-body .markdown-code-block > span {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  left: 0.75rem;
+  position: absolute;
+  text-transform: uppercase;
+  top: 0.55rem;
+}
+
+.markdown-body .markdown-code-block > span + button + pre {
+  padding-top: 1.9rem;
+}
+
+.markdown-body .markdown-code-block button {
+  align-items: center;
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  border-radius: 0.35rem;
+  display: flex;
+  height: 1.75rem;
+  justify-content: center;
+  opacity: 0;
+  position: absolute;
+  right: 0.5rem;
+  top: 0.5rem;
+  transition: opacity 120ms ease, background-color 120ms ease;
+  width: 1.75rem;
+}
+
+.markdown-body .markdown-code-block:hover button,
+.markdown-body .markdown-code-block button:focus-visible {
+  opacity: 1;
+}
+
+.markdown-body .markdown-code-block button:hover {
+  background: color-mix(in oklch, var(--foreground) 14%, transparent);
+}
+
+.markdown-body mark {
+  background: #fef08a;
+  border-radius: 0.2rem;
+  padding: 0 0.15rem;
+}
+
+.dark .markdown-body mark {
+  background: #713f12;
+}
+
+.markdown-body .footnotes {
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+}
+
+.markdown-frontmatter {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  display: grid;
+  gap: 0.6rem;
+  margin: 0 0 1.25rem;
+  padding: 0.9rem 1rem;
+}
+
+.markdown-frontmatter div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.markdown-frontmatter dt {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.markdown-frontmatter dd {
+  margin: 0;
+}
+
+.markdown-frontmatter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.markdown-frontmatter-list span {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  font-size: 0.8rem;
+  padding: 0.05rem 0.45rem;
+}
+`;

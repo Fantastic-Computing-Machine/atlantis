@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 
 import { prisma } from '@/lib/prisma';
+import { publishSyncEvent } from '@/lib/pubsub';
 
 type TagRouteParams = {
   params: Promise<{ id: string }>;
@@ -31,6 +32,7 @@ export async function DELETE(request: Request, { params }: TagRouteParams) {
     await prisma.tag.delete({
       where: { id },
     });
+    await publishSyncEvent({ topic: 'list:tags' });
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: 'Failed to delete tag' }, { status: 500 });
@@ -83,6 +85,7 @@ export async function PATCH(request: Request, { params }: TagRouteParams) {
       where: { id },
       data: updateData,
     });
+    await publishSyncEvent({ topic: 'list:tags' });
 
     return NextResponse.json(tag);
   } catch (error) {
