@@ -1,18 +1,10 @@
+import { NextResponse } from 'next/server';
+
 import { ensureCsrfCookie, csrfFailureResponse, validateCsrfToken } from '@/lib/csrf';
 import { createDiagram, getDiagramPage } from '@/lib/data';
 import { logApiError } from '@/lib/logger';
 import { publishSyncEvent } from '@/lib/pubsub';
 import { diagramSchema } from '@/lib/schemas';
-import {
-  getCache,
-  CacheKeys,
-  CachePrefixes,
-  DEFAULT_TTL_MS,
-  withCacheHeader,
-  withNoCacheHeaders,
-  type CacheStatus,
-} from '@/lib/cache';
-import { NextResponse } from 'next/server';
 
 const DEFAULT_LIMIT = 24;
 
@@ -24,31 +16,12 @@ export async function GET(request: Request) {
     const offset = url.searchParams.get('offset');
     const query = url.searchParams.get('query') || undefined;
     const sort = (url.searchParams.get('sort') as import('@/lib/types').SortOption) || 'recent';
-    const fresh = url.searchParams.get('fresh') === 'true';
-
     const limitNumber = limit ? Number.parseInt(limit, 10) : DEFAULT_LIMIT;
     const offsetNumber = offset ? Number.parseInt(offset, 10) : 0;
+    const metadataOnly = url.searchParams.get('select') === 'id,updatedAt';
+    const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query, sort, metadataOnly });
 
-    if (fresh || query) {
-      const select = url.searchParams.get('select');
-      const metadataOnly = select === 'id,updatedAt';
-
-      const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query, sort, metadataOnly });
-      const status: CacheStatus = fresh ? 'BYPASS' : 'MISS';
-      const response = withCacheHeader(NextResponse.json(page), status);
-      return fresh ? withNoCacheHeaders(response) : response;
-    }
-
-    const cache = getCache();
-    const cacheKey = CacheKeys.diagramList(sort, offsetNumber, limitNumber);
-    const cached = await cache.get(cacheKey);
-    if (cached) {
-      return withCacheHeader(NextResponse.json(cached), 'HIT');
-    }
-
-    const page = await getDiagramPage({ limit: limitNumber, offset: offsetNumber, query, sort });
-    await cache.set(cacheKey, page, DEFAULT_TTL_MS);
-    return withCacheHeader(NextResponse.json(page), 'MISS');
+    return NextResponse.json(page);
   } catch (error) {
     logApiError('GET /api/diagrams', error);
     return NextResponse.json({ error: 'Failed to load diagrams' }, { status: 500 });
@@ -61,9 +34,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const json = await request.json();
-    const result = diagramSchema.safeParse(json);
-
+    const result = diagramSchema.safeParse(await request.json());
     if (!result.success) {
       return NextResponse.json(
         { error: 'Invalid input', details: result.error.flatten() },
@@ -72,10 +43,6 @@ export async function POST(request: Request) {
     }
 
     const newDiagram = await createDiagram(result.data);
-
-    const cache = getCache();
-    await cache.deletePrefix(CachePrefixes.diagramsList);
-
     await publishSyncEvent({
       topic: 'list:diagrams',
       payload: { id: newDiagram.id, created: true },
@@ -87,4 +54,4 @@ export async function POST(request: Request) {
     logApiError('POST /api/diagrams', error);
     return NextResponse.json({ error: 'Unable to create diagram' }, { status: 500 });
   }
-}
+}

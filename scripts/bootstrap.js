@@ -23,6 +23,7 @@ const isDevScript = lifecycle === 'dev';
 const autoApplyEnv = process.env.PRISMA_AUTO_APPLY;
 const skipAutoPush = process.env.PRISMA_SKIP_AUTOPUSH === 'true';
 const forceGenerate = process.env.PRISMA_FORCE_GENERATE === 'true';
+const prismaCli = require.resolve('prisma/build/index.js');
 const shouldAutoApply =
   autoApplyEnv === 'true' || (autoApplyEnv !== 'false' && isDevScript && !isCI && !isProd);
 const shouldGenerate = forceGenerate || !isProd;
@@ -146,14 +147,14 @@ async function main() {
 
   // Step 2: generate client (skip in prod unless forced)
   if (shouldGenerate) {
-    run('npx', ['prisma', 'generate']);
+    run(process.execPath, [prismaCli, 'generate']);
   }
 
   // Step 3: apply schema to DB
   // Always push for SQLite if database file is missing or empty (ensures tables exist)
   // Also push in dev mode or when explicitly enabled
   if (!skipAutoPush && (shouldAutoApply || sqliteNeedsPush)) {
-    run('npx', ['prisma', 'db', 'push']);
+    run(process.execPath, [prismaCli, 'db', 'push']);
   }
 
   // Step 3.5: backfill tag usage counts and note todos (idempotent)

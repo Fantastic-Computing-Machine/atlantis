@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { useResizeObserver } from 'usehooks-ts';
 import {
   Loader2,
   AlertCircle,
@@ -44,6 +43,7 @@ export function NoteLatexPreview({
   const [loading, setLoading] = useState(false);
   const [numPages, setNumPages] = useState<number>(0);
   const [fitScale, setFitScale] = useState(1.0);
+  const [width, setWidth] = useState(0);
   const [zoom, setZoom] = useState(1.0);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isFirstCompile, setIsFirstCompile] = useState(true);
@@ -52,7 +52,15 @@ export function NoteLatexPreview({
   const scale = fitScale * zoom;
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const { width = 0 } = useResizeObserver({ ref: containerRef as React.RefObject<HTMLElement> });
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   // Debounce compilation
   const compileLatex = useCallback(async () => {

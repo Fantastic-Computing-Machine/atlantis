@@ -1,5 +1,4 @@
 import { csrfFailureResponse, ensureCsrfCookie, validateCsrfToken } from '@/lib/csrf';
-import { clearContentCache } from '@/lib/cache';
 import { prisma } from '@/lib/prisma';
 import { publishSyncEvent } from '@/lib/pubsub';
 import { NextRequest, NextResponse } from 'next/server';
@@ -101,7 +100,6 @@ export async function DELETE(request: NextRequest) {
       prisma.note.deleteMany(),
       prisma.setting.deleteMany(),
     ]);
-    await clearContentCache();
     await publishSyncEvent({ topic: 'data:reset' });
 
     return NextResponse.json({ success: true, message: 'All data has been wiped' });

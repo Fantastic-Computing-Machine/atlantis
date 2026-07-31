@@ -34,36 +34,49 @@ export function useLiveSync<T extends { updatedAt: string }>({
   onExternalChange,
   onDeleted,
 }: UseLiveSyncOptions<T>): void {
-  const currentUpdatedAtRef = useRef(currentUpdatedAt);
-  const hasLocalChangesRef = useRef(hasLocalChanges);
+  const latestRef = useRef({
+    currentUpdatedAt,
+    hasLocalChanges,
+    allowWhileDirty,
+    isInstantPayload,
+    onUpdate,
+    onExternalChange,
+    onDeleted,
+  });
   const clientId = useMemo(() => getLiveSyncClientId(), []);
   const topicsQuery = useMemo(
     () => eventTopics.map((topic) => `topic=${encodeURIComponent(topic)}`).join('&'),
     [eventTopics]
   );
 
-  useEffect(() => {
-    currentUpdatedAtRef.current = currentUpdatedAt;
-    hasLocalChangesRef.current = hasLocalChanges;
-  }, [currentUpdatedAt, hasLocalChanges]);
+  latestRef.current = {
+    currentUpdatedAt,
+    hasLocalChanges,
+    allowWhileDirty,
+    isInstantPayload,
+    onUpdate,
+    onExternalChange,
+    onDeleted,
+  };
 
   useEffect(() => {
     if (!enabled || !topicsQuery) return;
 
     const stream = new EventSource(`/api/sync/stream?${topicsQuery}`);
     const onSync = (event: MessageEvent) => {
-      if (hasLocalChangesRef.current && !allowWhileDirty) return;
+      const latest = latestRef.current;
+      if (latest.hasLocalChanges && !latest.allowWhileDirty) return;
       try {
         const { payload, source } = JSON.parse(event.data) as SyncWireEvent;
         if (source === clientId || !payload || typeof payload !== 'object') return;
         if ('deleted' in payload && payload.deleted === true) {
-          onDeleted?.();
+          latest.onDeleted?.();
           return;
         }
-        if (!isInstantPayload(payload) || payload.updatedAt <= currentUpdatedAtRef.current) return;
-        currentUpdatedAtRef.current = payload.updatedAt;
-        onExternalChange?.();
-        onUpdate(payload);
+        latest.onExternalChange?.();
+        if (!latest.isInstantPayload(payload) || payload.updatedAt <= latest.currentUpdatedAt) return;
+        latest.currentUpdatedAt = payload.updatedAt;
+        latest.onUpdate(payload);
       } catch {
         // EventSource reconnects; never turn a transient socket error into polling.
       }
@@ -74,5 +87,5 @@ export function useLiveSync<T extends { updatedAt: string }>({
       stream.removeEventListener('sync', onSync);
       stream.close();
     };
-  }, [allowWhileDirty, clientId, enabled, isInstantPayload, onDeleted, onExternalChange, onUpdate, topicsQuery]);
+  }, [clientId, enabled, topicsQuery]);
 }

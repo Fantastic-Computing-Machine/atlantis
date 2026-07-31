@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getPubSubStatus, subscribeToSyncEvents, type SyncEvent } from '@/lib/pubsub';
+import { subscribeToSyncEvents, type SyncEvent } from '@/lib/pubsub';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,9 +22,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Invalid topic parameters' }, { status: 400 });
   }
 
-  if (!(await getPubSubStatus()).connected) {
-    return NextResponse.json({ error: 'Live sync is unavailable' }, { status: 503 });
-  }
 
   let unsubscribe: (() => void) | null = null;
   let keepalive: NodeJS.Timeout | null = null;

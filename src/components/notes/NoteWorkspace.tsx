@@ -95,67 +95,30 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [mounted, setMounted] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const draftPublishTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const draftSeqRef = useRef(0);
   const clientId = useMemo(() => getLiveSyncClientId(), []);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const publishDraftUpdate = useCallback(
-    async (next: Note) => {
-      if (!mounted || next.private) return;
-
-      try {
-        await ensureCsrfToken();
-        const seq = ++draftSeqRef.current;
-        await fetch(
-          '/api/sync/publish',
-          withCsrfHeader({
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-client-id': clientId,
-            },
-            body: JSON.stringify({
-              topic: `draft:note:${next.id}`,
-              source: clientId,
-              payload: {
-                ...next,
-                seq,
-              },
-            }),
-          })
-        );
-      } catch {
-        // ignore draft sync errors; autosave remains source of truth
-      }
-    },
-    [clientId, mounted]
-  );
-
-  const queueDraftUpdate = useCallback(
-    (next: Note) => {
-      if (!mounted || next.private) return;
-
-      if (draftPublishTimerRef.current) {
-        clearTimeout(draftPublishTimerRef.current);
-      }
-
-      draftPublishTimerRef.current = setTimeout(() => {
-        draftPublishTimerRef.current = null;
-        void publishDraftUpdate(next);
-      }, 180);
-    },
-    [mounted, publishDraftUpdate]
-  );
+  useEffect(() => {
+    if (hasChanges || initialNote.updatedAt <= liveUpdatedAt) return;
+    setNote(initialNote);
+    setLiveUpdatedAt(initialNote.updatedAt);
+    setTitle(initialNote.title);
+    setContent(initialNote.content);
+    setLanguage(initialNote.language);
+    setTags(initialNote.tags || []);
+    setIsPrivate(initialNote.private);
+    setStarred(initialNote.starred);
+    updateNote(initialNote.id, toNoteListItem(initialNote));
+  }, [hasChanges, initialNote, liveUpdatedAt, updateNote]);
 
   useLiveSync<Note>({
     currentUpdatedAt: liveUpdatedAt,
     hasLocalChanges: hasChanges,
     enabled: mounted && !isPrivate,
-    eventTopics: [`doc:note:${note.id}`, `draft:note:${note.id}`],
+    eventTopics: [`doc:note:${note.id}`],
     allowWhileDirty: true,
     isInstantPayload: (payload): payload is Note => {
       if (!payload || typeof payload !== 'object') return false;
@@ -181,7 +144,11 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
       updateNote(note.id, toNoteListItem(remoteNote));
     },
     onExternalChange: () => {
-      toast.info('Note updated by another user');
+      if (hasChanges) {
+        toast.info('Note updated by another user');
+      } else {
+        router.refresh();
+      }
     },
     onDeleted: () => router.replace('/notes'),
   });
@@ -197,82 +164,33 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     setHasChanges(changed);
   }, [title, content, language, isPrivate, tags, note]);
 
-  useEffect(() => {
-    return () => {
-      if (draftPublishTimerRef.current) {
-        clearTimeout(draftPublishTimerRef.current);
-      }
-    };
-  }, []);
-
-  const emitDraft = useCallback(
-    (patch: Partial<Note>) => {
-      if (!mounted) return;
-
-      const nextDraft: Note = {
-        ...note,
-        title,
-        content,
-        language,
-        starred,
-        private: isPrivate,
-        tags,
-        updatedAt: nextIsoAfter(liveUpdatedAt),
-        ...patch,
-      };
-
-      if (nextDraft.private) {
-        return;
-      }
-
-      setLiveUpdatedAt(nextDraft.updatedAt);
-      queueDraftUpdate(nextDraft);
-    },
-    [
-      mounted,
-      note,
-      title,
-      content,
-      language,
-      starred,
-      isPrivate,
-      tags,
-      liveUpdatedAt,
-      queueDraftUpdate,
-    ]
-  );
-
   const handleTitleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const nextTitle = e.target.value;
       setTitle(nextTitle);
-      emitDraft({ title: nextTitle });
     },
-    [emitDraft]
+    []
   );
 
   const handleContentChange = useCallback(
     (nextContent: string) => {
       setContent(nextContent);
-      emitDraft({ content: nextContent });
     },
-    [emitDraft]
+    []
   );
 
   const handleLanguageChange = useCallback(
     (nextLanguage: string) => {
       setLanguage(nextLanguage);
-      emitDraft({ language: nextLanguage });
     },
-    [emitDraft]
+    []
   );
 
   const handleTagsChange = useCallback(
     (nextTags: Tag[]) => {
       setTags(nextTags);
-      emitDraft({ tags: nextTags });
     },
-    [emitDraft]
+    []
   );
 
   const handleSave = useCallback(async () => {
@@ -382,7 +300,6 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
   const toggleStarred = useCallback(async () => {
     const newStarred = !starred;
     setStarred(newStarred);
-    emitDraft({ starred: newStarred });
 
     // Immediately persist starred state to server
     try {
@@ -419,15 +336,14 @@ export function NoteWorkspace({ initialNote }: NoteWorkspaceProps) {
     } catch {
       toast.error('Failed to update starred status');
     }
-  }, [starred, note.id, updateNote, clientId, emitDraft]);
+  }, [starred, note.id, updateNote, clientId]);
 
   const togglePrivate = useCallback(() => {
     setIsPrivate((prev) => {
       const nextPrivate = !prev;
-      emitDraft({ private: nextPrivate });
       return nextPrivate;
     });
-  }, [emitDraft]);
+  }, []);
 
   const handleDownload = useCallback(() => {
     const extensionMap: Record<string, string> = {

@@ -19,14 +19,15 @@ Goal: minimize search tokens and maximize first-pass routing accuracy.
 6. Tags (pages/settings/CRUD) -> `src/app/tags/page.tsx` + `src/app/tags/[tagSlug]/page.tsx` + `src/app/settings/tags/page.tsx` -> `src/app/api/tags/route.ts` + `src/app/api/tags/[id]/route.ts`.
 7. Settings + advanced prefs/stats chart -> `src/app/settings/page.tsx` -> `src/components/ui/chart.tsx` -> `src/app/api/settings/advanced/route.ts` + `src/app/api/settings/ai-key/route.ts` + `src/app/api/settings/stats/route.ts` -> `src/lib/settings.ts` + `src/lib/store.ts`.
 8. AI assistant -> `src/components/AiChatPanel.tsx` -> `src/app/api/ai/assist/route.ts` -> `src/app/api/settings/ai-key/route.ts` + `src/lib/settings.ts`.
-9. Live sync/SSE/collab -> `src/components/LiveRefresh.tsx` + `src/lib/useLiveSync.ts` + `src/lib/pubsub.ts` -> `src/app/api/sync/stream/route.ts` + `src/app/api/sync/publish/route.ts` (Redis-backed SSE refreshes active routes; editor drafts use document topics).
-10. Cache/freshness behavior -> `src/lib/cache.ts` -> `src/app/api/diagrams/route.ts` + `src/app/api/diagrams/[id]/route.ts` + `src/app/api/notes/route.ts` + `src/app/api/notes/[id]/route.ts`.
+9. Live sync/SSE -> `src/components/LiveRefresh.tsx` + `src/lib/useLiveSync.ts` + `src/lib/pubsub.ts` -> `src/app/api/sync/stream/route.ts` (in-process saved-entity events refresh connected clients within one container).
+10. Content reads -> `src/app/api/diagrams/route.ts` + `src/app/api/diagrams/[id]/route.ts` + `src/app/api/notes/route.ts` + `src/app/api/notes/[id]/route.ts` -> Prisma source of truth.
 11. API docs/public access API -> `src/app/docs/page.tsx` + `src/components/ApiDoc.tsx` + `docs/API_GUIDE.md` -> `src/app/api/access/diagrams/route.ts` + `src/app/api/access/diagrams/[id]/route.ts` + `src/app/api/access/notes/route.ts` + `src/app/api/access/notes/[id]/route.ts`.
 12. CSRF/auth guard -> `src/lib/csrf.ts` + `src/lib/csrf-client.ts` + `src/lib/csrf-constants.ts` -> `src/app/api/csrf/route.ts`.
 13. Backup/restore/wipe -> `src/app/api/backup/route.ts` + `src/app/api/settings/wipe/route.ts` -> `src/lib/data.ts` + `src/lib/schemas.ts`.
 14. DB/provider/bootstrap changes -> `prisma/schema.prisma` + `src/lib/prisma.ts` + `src/lib/database-url.ts` + `scripts/database-url.js` + `scripts/bootstrap.js` + `scripts/prepare-prisma-schema.js` + `scripts/backfill-tag-counts.js` (bootstrap now inspects SQLite schema drift for backfill-required columns before deciding `prisma db push`).
 15. Container image/runtime -> `Dockerfile` + `scripts/docker-entrypoint.sh` + `docs/CONTAINER_STARTUP.md` (Next standalone runtime, Prisma startup tools, reduced LaTeX package set).
 16. Root shell -> `src/app/layout.tsx` + `src/components/SnowEffectWrapper.tsx` + `src/components/KittyMode.tsx` -> theme, shortcuts, tooltip, toast, and optional snow/kitty effects.
+17. Public project website -> `docs/index.html` + `docs/styles.css` + `docs/script.js` -> static product overview, Docker quick start, and project documentation links.
 
 ## Ownership Map (Condensed)
 
