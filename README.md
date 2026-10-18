@@ -54,6 +54,10 @@ npm run dev
 
 Scripts: `npm run lint` (ESLint), `npm run build` (type/check + Next build).
 
+## ☁️ One-Click Deploy
+
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/Atlantis%20Diagrams/)
+
 ## Documentation
 
 - [Contributing Guide](CONTRIBUTING.md): Dev setup, lint/build steps, LaTeX notes, Docker workflows.
